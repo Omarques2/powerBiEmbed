@@ -251,10 +251,13 @@ import HamburgerIcon from "../components/icons/HamburgerIcon.vue";
 import SidebarContent from "../components/SidebarContent.vue";
 import ReportSkeletonCard from "../components/ReportSkeletonCard.vue";
 import IconRefresh from "../components/icons/IconRefresh.vue";
+import { useRouter } from "vue-router";
 
 type Workspace = { id?: string; workspaceId?: string; name?: string };
 type Report = { id: string; name?: string; workspaceId?: string };
-type MeResponse = { email: string | null; displayName: string | null };
+type MeResponse = { email: string | null; displayName: string | null; status: "pending" | "active" | "disabled"; rawStatus?: string; memberships?: any[]; };
+
+const router = useRouter();
 
 const me = ref<MeResponse | null>(null);
 const drawerOpen = ref(false);
@@ -526,7 +529,16 @@ onMounted(async () => {
   addResizeHandlers();
 
   powerbiService = createPowerBiService();
-  await Promise.all([loadMe(), loadWorkspaces()]);
+
+  await loadMe();
+
+  // Se o usuário não está ativo, manda pro /pending e não carrega workspaces
+  if (me.value?.status && me.value.status !== "active") {
+    await router.replace("/pending");
+    return;
+  }
+
+  await loadWorkspaces();
 });
 
 onBeforeUnmount(() => {

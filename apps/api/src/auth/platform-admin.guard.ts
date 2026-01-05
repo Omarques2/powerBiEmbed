@@ -13,9 +13,12 @@ export class PlatformAdminGuard implements CanActivate {
 
     const user = await this.prisma.users.findUnique({
       where: { entra_sub: sub },
-      select: { id: true },
+      select: { id: true, status: true },
     });
+
     if (!user) throw new ForbiddenException({ code: "USER_NOT_FOUND" });
+    if (user.status !== "active") throw new ForbiddenException({ code: "ADMIN_NOT_ACTIVE" });
+
 
     const adminRole = await this.prisma.user_app_roles.findFirst({
       where: {

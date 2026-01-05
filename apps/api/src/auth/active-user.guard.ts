@@ -22,7 +22,18 @@ export class ActiveUserGuard implements CanActivate {
 
     // Se por algum motivo ainda não existe no DB, trate como pending
     if (!user) {
-      throw new ForbiddenException({ code: "PENDING_APPROVAL", message: "User not provisioned yet" });
+      await this.prisma.users.create({
+        data: {
+          entra_sub: entraSub,
+          status: "pending",
+          last_login_at: new Date(),
+        },
+      });
+
+      throw new ForbiddenException({
+        code: "PENDING_APPROVAL",
+        message: "User created as pending; waiting approval",
+      });
     }
 
     if (user.status === "disabled") {

@@ -5,7 +5,7 @@ import { AuthGuard } from "../auth/auth.guard";
 import { UsersService } from "../users/users.service";
 import { BiAuthzService } from "../bi-authz/bi-authz.service";
 import type { AuthedRequest } from "../auth/authed-request.type";
-import { ActiveUserGuard } from "src/auth/active-user.guard";
+import { ActiveUserGuard } from "../auth/active-user.guard";
 
 @Controller("powerbi")
 export class PowerBiController {
@@ -22,14 +22,14 @@ export class PowerBiController {
     return this.biAuthz.listAllowedWorkspaces(user.id);
   }
 
-  @UseGuards(AuthGuard)
+  @UseGuards(AuthGuard, ActiveUserGuard)
   @Get("reports")
   async getReports(@Req() req: AuthedRequest, @Query("workspaceId") workspaceId: string) {
     const user = await this.usersService.upsertFromClaims(req.user ?? {});
     return this.biAuthz.listAllowedReports(user.id, workspaceId);
   }
 
-  @UseGuards(AuthGuard)
+  @UseGuards(AuthGuard, ActiveUserGuard)
   @Get("embed-config")
   async getEmbedConfig(
     @Req() req: AuthedRequest,
