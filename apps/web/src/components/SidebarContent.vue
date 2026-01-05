@@ -1,0 +1,389 @@
+<template>
+  <div class="flex h-full flex-col bg-white dark:bg-slate-900">
+    <!-- Header -->
+    <div
+      class="grid items-center border-b bg-white dark:bg-slate-900 dark:border-slate-800 h-[var(--topbar-h)]"
+      :class="padHeader"
+      style="grid-template-columns: 40px 1fr 40px;"
+    >
+      <!-- ESQUERDA -->
+      <div class="flex items-center justify-start">
+        <button
+          v-if="mode === 'desktop'"
+          class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white
+                 hover:bg-slate-50 active:scale-[0.98] transition
+                 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+          @click="$emit('toggleCollapsed')"
+          :aria-label="collapsed ? 'Expandir menu' : 'Colapsar menu'"
+          :title="collapsed ? 'Expandir' : 'Colapsar'"
+        >
+          <HamburgerIcon class="h-5 w-5" />
+        </button>
+
+        <img
+          v-else
+          :src="logoUrl"
+          alt="Logo"
+          class="h-10 w-10 object-contain rounded-lg"
+          aria-hidden="true"
+        />
+      </div>
+
+      <!-- CENTRO -->
+      <div class="min-w-0 text-center">
+        <div class="truncate text-xl font-semibold">Sigfarm</div>
+      </div>
+
+      <!-- DIREITA -->
+      <div class="flex items-center justify-end">
+        <button
+          v-if="mode === 'mobile'"
+          class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white
+                 hover:bg-slate-50 active:scale-[0.98] transition
+                 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+          @click="$emit('close')"
+          aria-label="Fechar"
+          title="Fechar"
+        >
+          <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18 6 6 18M6 6l12 12" />
+          </svg>
+        </button>
+
+        <img
+          v-else-if="!collapsed"
+          :src="logoUrl"
+          alt="Logo"
+          class="h-10 w-10 object-contain rounded-lg"
+          aria-hidden="true"
+        />
+        <span v-else class="h-10 w-10" aria-hidden="true"></span>
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="bg-white dark:bg-slate-900" :class="padSection">
+      <button
+        class="w-full rounded-xl px-3 py-2.5 text-sm font-medium transition
+               active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed disabled:active:scale-100
+               bg-slate-900 text-white hover:bg-slate-800
+               dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
+        @click="loadWorkspaces()"
+        :disabled="loadingWorkspaces"
+        :title="collapsed ? (loadingWorkspaces ? 'Carregando…' : 'Recarregar workspaces') : ''"
+        :aria-busy="loadingWorkspaces ? 'true' : 'false'"
+      >
+        <span v-if="!collapsed" class="inline-flex items-center justify-center gap-2">
+          <svg v-if="loadingWorkspaces" class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" />
+            <path class="opacity-75" d="M4 12a8 8 0 0 1 8-8" stroke="currentColor" stroke-width="3" stroke-linecap="round" />
+          </svg>
+          <span>{{ loadingWorkspaces ? "Carregando..." : "Recarregar workspaces" }}</span>
+        </span>
+
+        <span v-else class="mx-auto inline-flex items-center justify-center">
+          <svg class="h-5 w-5" :class="loadingWorkspaces ? 'animate-spin' : ''" viewBox="0 0 24 24"
+               fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 12a9 9 0 0 1-9 9 9 9 0 0 1-6.36-2.64" />
+            <path d="M3 12a9 9 0 0 1 15.36-6.36" />
+            <path d="M21 3v6h-6" />
+            <path d="M3 21v-6h6" />
+          </svg>
+        </span>
+      </button>
+    </div>
+
+    <!-- Scrollable list -->
+    <div class="flex-1 overflow-auto bg-white dark:bg-slate-900" :class="padList">
+      <!-- Error -->
+      <div
+        v-if="error"
+        class="mx-1 mb-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700
+               dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-200"
+        :class="collapsed ? 'p-2 text-[11px]' : ''"
+      >
+        <span v-if="!collapsed">{{ error }}</span>
+        <span v-else title="Erro">!</span>
+      </div>
+
+      <!-- Empty workspaces -->
+      <div v-if="workspaces.length === 0 && !loadingWorkspaces" class="mx-1 text-sm text-slate-500 dark:text-slate-400">
+        <span v-if="!collapsed">Nenhum workspace disponível para este usuário.</span>
+        <span v-else title="Nenhum workspace">—</span>
+      </div>
+
+      <!-- Workspaces -->
+      <div class="space-y-1">
+        <button
+          v-for="w in workspaces"
+          :key="w.workspaceId ?? w.id"
+          class="group w-full rounded-xl px-2 py-2 text-left hover:bg-slate-50 dark:hover:bg-slate-800"
+          :class="(selectedWorkspaceId === (w.workspaceId ?? w.id)) ? 'bg-slate-100 dark:bg-slate-800' : ''"
+          @click="handleSelectWorkspace(w)"
+          :title="collapsed ? (w.name ?? w.workspaceId ?? w.id) : ''"
+        >
+          <div class="flex items-center justify-between gap-2">
+            <div class="min-w-0">
+              <div v-if="!collapsed" class="truncate text-sm font-medium">
+                {{ w.name ?? w.workspaceId ?? w.id }}
+              </div>
+
+              <div
+                v-else
+                class="mx-auto grid h-10 w-10 place-items-center rounded-lg border border-slate-200 bg-white text-sm font-semibold
+                       dark:border-slate-800 dark:bg-slate-900"
+              >
+                {{ workspaceInitials(w.name ?? String(w.workspaceId ?? w.id)) }}
+              </div>
+
+              <div v-if="!collapsed" class="mt-0.5 truncate text-xs text-slate-500 dark:text-slate-400">
+                {{ w.workspaceId ?? w.id }}
+              </div>
+            </div>
+
+            <div v-if="!collapsed" class="text-xs text-slate-500 dark:text-slate-400">
+              {{ (selectedWorkspaceId === (w.workspaceId ?? w.id)) ? "▾" : "▸" }}
+            </div>
+          </div>
+        </button>
+
+        <!-- Reports under selected workspace (expanded) -->
+        <div v-if="!collapsed && selectedWorkspaceId" class="mt-2 space-y-1 px-1">
+          <div class="flex items-center justify-between px-2 py-2">
+            <div class="text-md font-semibold text-slate-800 dark:text-slate-200">Relatorios</div>
+
+            <button
+              class="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white p-1.5 text-xs font-medium
+                     hover:bg-slate-50 active:scale-[0.98] transition
+                     disabled:opacity-60 disabled:cursor-not-allowed disabled:active:scale-100
+                     dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+              @click="loadReports(selectedWorkspaceId)"
+              :disabled="loadingReports"
+              title="Recarregar reports"
+              :aria-busy="loadingReports ? 'true' : 'false'"
+            >
+              <svg class="h-5 w-5" :class="loadingReports ? 'animate-spin' : ''"
+                   viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                   stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 12a9 9 0 0 1-9 9 9 9 0 0 1-6.36-2.64" />
+                <path d="M3 12a9 9 0 0 1 15.36-6.36" />
+                <path d="M21 3v6h-6" />
+                <path d="M3 21v-6h6" />
+              </svg>
+            </button>
+          </div>
+
+          <div v-if="reports.length === 0 && !loadingReports" class="px-2 pb-2 text-xs text-slate-500 dark:text-slate-400">
+            Nenhum report liberado neste workspace.
+          </div>
+
+          <button
+            v-for="r in reports"
+            :key="r.id"
+            class="w-full rounded-xl border px-3 py-2 text-left text-sm hover:bg-slate-50 dark:hover:bg-slate-800
+                   bg-white dark:bg-slate-900"
+            :class="selectedReport?.id === r.id
+              ? 'border-slate-400 bg-slate-50 dark:border-slate-600 dark:bg-slate-800'
+              : 'border-slate-200 dark:border-slate-800'"
+            @click="handleOpenReport(r)"
+          >
+            <div class="truncate font-medium">{{ r.name ?? r.id }}</div>
+            <div class="mt-0.5 truncate text-xs text-slate-500 dark:text-slate-400">{{ r.id }}</div>
+          </button>
+        </div>
+
+        <!-- Reports as icons when collapsed -->
+        <div v-if="collapsed && selectedWorkspaceId" class="mt-2 space-y-2 px-1">
+          <div class="mx-auto h-px w-10 bg-slate-200 dark:bg-slate-800" />
+
+          <button
+            v-for="r in reports"
+            :key="r.id"
+            class="mx-auto grid h-10 w-10 place-items-center rounded-lg border border-slate-200 bg-white hover:bg-slate-50
+                   dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+            :class="selectedReport?.id === r.id ? 'border-slate-400 bg-slate-50 dark:border-slate-600 dark:bg-slate-800' : ''"
+            @click="handleOpenReport(r)"
+            :title="r.name ?? r.id"
+          >
+            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+              <path d="M14 2v6h6" />
+              <path d="M8 13h8M8 17h8M8 9h2" />
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer (logout at bottom) -->
+    <div class="mt-auto border-t bg-white dark:bg-slate-900 dark:border-slate-800" :class="padSection">
+      <div class="relative">
+        <button
+          class="transition"
+          :class="
+            isCollapsedDesktop
+              ? 'mx-auto grid h-12 w-12 place-items-center rounded-full border-0 bg-transparent hover:bg-transparent'
+              : 'w-full rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800'
+          "
+          @click.stop="userMenuOpen = !userMenuOpen"
+          :title="isCollapsedDesktop ? userEmailOrFallback : ''"
+          aria-label="Menu do usuário"
+        >
+          <template v-if="isCollapsedDesktop">
+            <div class="grid h-10 w-10 place-items-center rounded-full border border-slate-200 bg-white text-sm font-semibold
+                        dark:border-slate-800 dark:bg-slate-900">
+              {{ userInitials }}
+            </div>
+          </template>
+
+          <template v-else>
+            <div class="flex items-center gap-3">
+              <div class="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-slate-200 bg-white text-sm font-semibold
+                          dark:border-slate-800 dark:bg-slate-900">
+                {{ userInitials }}
+              </div>
+
+              <div class="min-w-0 flex-1 text-left">
+                <div class="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
+                  {{ userNameOrFallback }}
+                </div>
+                <div class="truncate text-xs text-slate-500 dark:text-slate-400">
+                  {{ userEmailOrFallback }}
+                </div>
+              </div>
+
+              <div class="shrink-0 text-slate-500 dark:text-slate-400">
+                <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                     stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M6 9l6 6 6-6" />
+                </svg>
+              </div>
+            </div>
+          </template>
+        </button>
+
+        <div
+          v-if="userMenuOpen"
+          class="absolute bottom-[calc(100%+8px)] z-30 rounded-2xl border border-slate-200 bg-white shadow-lg
+                 dark:border-slate-800 dark:bg-slate-900"
+          :class="isCollapsedDesktop ? 'left-full ml-2 w-[240px]' : 'left-0 w-full'"
+        >
+          <div class="p-2">
+            <div class="px-3 py-2">
+              <div class="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
+                {{ userNameOrFallback }}
+              </div>
+              <div class="truncate text-xs text-slate-500 dark:text-slate-400">
+                {{ userEmailOrFallback }}
+              </div>
+            </div>
+
+            <div class="my-2 h-px bg-slate-200 dark:bg-slate-800" />
+
+            <button
+              class="w-full rounded-xl px-3 py-2 text-left text-sm hover:bg-slate-50 dark:hover:bg-slate-800"
+              @click="onAccount(); userMenuOpen=false"
+            >
+              Minha conta
+            </button>
+
+            <button
+              class="w-full rounded-xl px-3 py-2 text-left text-sm text-red-700 hover:bg-red-50
+                     dark:text-red-300 dark:hover:bg-red-950/40"
+              @click="onLogout(); userMenuOpen=false"
+            >
+              Sair
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</template>
+
+<script setup lang="ts">
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import HamburgerIcon from "./icons/HamburgerIcon.vue";
+import logoUrl from "../assets/logo.png";
+
+type Workspace = { id?: string; workspaceId?: string; name?: string };
+type Report = { id: string; name?: string; workspaceId?: string };
+
+const props = defineProps<{
+  mode: "desktop" | "mobile";
+  collapsed: boolean;
+
+  workspaces: Workspace[];
+  reports: Report[];
+
+  selectedWorkspaceId: string | null;
+  selectedReport: Report | null;
+
+  loadingWorkspaces: boolean;
+  loadingReports: boolean;
+  error: string;
+
+  userName?: string | null;
+  userEmail?: string | null;
+
+  loadWorkspaces: () => void | Promise<void>;
+  loadReports: (workspaceId: string) => void | Promise<void>;
+  selectWorkspace: (w: Workspace) => void | Promise<void>;
+  openReport: (r: Report) => void | Promise<void>;
+  onLogout: () => void | Promise<void>;
+}>();
+
+const emit = defineEmits<{
+  (e: "toggleCollapsed"): void;
+  (e: "close"): void;
+}>();
+
+const padHeader = computed(() => (props.mode === "mobile" ? "px-4" : "px-3"));
+const padSection = computed(() => (props.mode === "mobile" ? "px-4 py-3" : "px-3 py-3"));
+const padList = computed(() => (props.mode === "mobile" ? "px-2 pb-4" : "px-2 pb-4"));
+const isCollapsedDesktop = computed(() => props.mode === "desktop" && props.collapsed);
+
+const userMenuOpen = ref(false);
+
+const userNameOrFallback = computed(() => (props.userName ?? "").trim() || "Usuário");
+const userEmailOrFallback = computed(() => (props.userEmail ?? "").trim() || "—");
+
+const userInitials = computed(() => {
+  const base = (props.userName ?? props.userEmail ?? "").trim();
+  if (!base) return "U";
+  const parts = base.split(/[\s.@_-]+/).filter(Boolean).slice(0, 2);
+  const initials = parts.map((p) => p[0]?.toUpperCase() ?? "").join("");
+  return initials || "U";
+});
+
+function workspaceInitials(label: string) {
+  const s = (label ?? "").trim();
+  if (!s) return "WS";
+  const parts = s.split(/\s+/).slice(0, 2);
+  return parts.map((p) => p[0]?.toUpperCase() ?? "").join("") || "WS";
+}
+
+function onAccount() {
+  // placeholder
+}
+
+function onGlobalClick() {
+  userMenuOpen.value = false;
+}
+
+onMounted(() => window.addEventListener("click", onGlobalClick));
+onBeforeUnmount(() => window.removeEventListener("click", onGlobalClick));
+
+async function handleSelectWorkspace(w: Workspace) {
+  await props.selectWorkspace(w);
+  if (props.mode === "mobile") emit("close");
+}
+
+async function handleOpenReport(r: Report) {
+  await props.openReport(r);
+  if (props.mode === "mobile") emit("close");
+}
+</script>

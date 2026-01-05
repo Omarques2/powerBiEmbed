@@ -1,0 +1,4 @@
+@import "tailwindcss";
+
+/* Faz o dark: responder à classe .dark no <html> */
+@variant dark (&:where(.dark, .dark *));

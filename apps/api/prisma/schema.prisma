@@ -1,0 +1,157 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model app_roles {
+  id             String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  application_id String           @db.Uuid
+  role_key       String
+  name           String
+  created_at     DateTime         @default(now()) @db.Timestamptz(6)
+  applications   applications     @relation(fields: [application_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  user_app_roles user_app_roles[]
+
+  @@unique([application_id, role_key])
+}
+
+model applications {
+  id             String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  app_key        String           @unique
+  name           String
+  created_at     DateTime         @default(now()) @db.Timestamptz(6)
+  app_roles      app_roles[]
+  user_app_roles user_app_roles[]
+}
+
+model bi_report_permissions {
+  id            String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id       String     @db.Uuid
+  report_ref_id String     @db.Uuid
+  can_view      Boolean    @default(true)
+  created_at    DateTime   @default(now()) @db.Timestamptz(6)
+  bi_reports    bi_reports @relation(fields: [report_ref_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users         users      @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([user_id, report_ref_id])
+  @@index([report_ref_id], map: "idx_bi_report_perm_report")
+  @@index([user_id], map: "idx_bi_report_perm_user")
+}
+
+model bi_reports {
+  id                    String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspace_ref_id      String                  @db.Uuid
+  report_id             String                  @db.Uuid
+  report_name           String?
+  dataset_id            String?                 @db.Uuid
+  is_active             Boolean                 @default(true)
+  created_at            DateTime                @default(now()) @db.Timestamptz(6)
+  bi_report_permissions bi_report_permissions[]
+  bi_workspaces         bi_workspaces           @relation(fields: [workspace_ref_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([workspace_ref_id, report_id])
+  @@index([workspace_ref_id], map: "idx_bi_reports_workspace")
+}
+
+model bi_workspace_permissions {
+  id               String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id          String        @db.Uuid
+  workspace_ref_id String        @db.Uuid
+  can_view         Boolean       @default(true)
+  created_at       DateTime      @default(now()) @db.Timestamptz(6)
+  users            users         @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  bi_workspaces    bi_workspaces @relation(fields: [workspace_ref_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([user_id, workspace_ref_id])
+  @@index([user_id], map: "idx_bi_ws_perm_user")
+  @@index([workspace_ref_id], map: "idx_bi_ws_perm_workspace")
+}
+
+model bi_workspaces {
+  id                       String                     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  customer_id              String                     @db.Uuid
+  workspace_id             String                     @db.Uuid
+  workspace_name           String?
+  is_active                Boolean                    @default(true)
+  created_at               DateTime                   @default(now()) @db.Timestamptz(6)
+  bi_reports               bi_reports[]
+  bi_workspace_permissions bi_workspace_permissions[]
+  customers                customers                  @relation(fields: [customer_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([customer_id, workspace_id])
+  @@index([customer_id], map: "idx_bi_workspaces_customer")
+}
+
+model customers {
+  id                        String                      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code                      String                      @unique
+  name                      String
+  status                    String                      @default("active")
+  created_at                DateTime                    @default(now()) @db.Timestamptz(6)
+  bi_workspaces             bi_workspaces[]
+  user_app_roles            user_app_roles[]
+  user_customer_memberships user_customer_memberships[]
+}
+
+model user_app_roles {
+  id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id        String       @db.Uuid
+  application_id String       @db.Uuid
+  customer_id    String?      @db.Uuid
+  app_role_id    String       @db.Uuid
+  created_at     DateTime     @default(now()) @db.Timestamptz(6)
+  app_roles      app_roles    @relation(fields: [app_role_id], references: [id], onUpdate: NoAction)
+  applications   applications @relation(fields: [application_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  customers      customers?   @relation(fields: [customer_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users          users        @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([user_id, application_id, customer_id, app_role_id])
+}
+
+model user_customer_memberships {
+  id          String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id     String          @db.Uuid
+  customer_id String          @db.Uuid
+  role        membership_role @default(viewer)
+  is_active   Boolean         @default(true)
+  created_at  DateTime        @default(now()) @db.Timestamptz(6)
+  customers   customers       @relation(fields: [customer_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users       users           @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([user_id, customer_id])
+  @@index([customer_id], map: "idx_memberships_customer")
+  @@index([user_id], map: "idx_memberships_user")
+}
+
+model users {
+  id                        String                      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  entra_sub                 String                      @unique
+  entra_oid                 String?                     @unique @db.Uuid
+  email                     String?                     @db.Citext
+  display_name              String?
+  created_at                DateTime                    @default(now()) @db.Timestamptz(6)
+  last_login_at             DateTime?                   @db.Timestamptz(6)
+  status                    user_status                 @default(pending)
+  bi_report_permissions     bi_report_permissions[]
+  bi_workspace_permissions  bi_workspace_permissions[]
+  user_app_roles            user_app_roles[]
+  user_customer_memberships user_customer_memberships[]
+
+  @@index([email], map: "idx_users_email")
+}
+
+enum user_status {
+  pending
+  active
+  disabled
+}
+
+enum membership_role {
+  owner
+  admin
+  member
+  viewer
+}
