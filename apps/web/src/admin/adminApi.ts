@@ -213,21 +213,6 @@ export async function getPowerBiCatalog(customerId: string) {
   return res.data as CustomerCatalog;
 }
 
-export async function createCustomer(payload: { code: string; name: string; status?: string }) {
-  const res = await http.post("/admin/customers", payload);
-  return res.data as { ok: boolean; customer: CustomerRow };
-}
-
-export async function updateCustomer(customerId: string, payload: { code?: string; name?: string }) {
-  const res = await http.patch(`/admin/customers/${customerId}`, payload);
-  return res.data as { ok: boolean; customer: CustomerRow };
-}
-
-export async function setCustomerStatus(customerId: string, status: string) {
-  const res = await http.post(`/admin/customers/${customerId}/status`, { status });
-  return res.data as { ok: boolean; customer: CustomerRow };
-}
-
 export async function unlinkCustomerWorkspace(customerId: string, workspaceRefId: string) {
   const res = await http.post(`/admin/customers/${customerId}/workspaces/${workspaceRefId}/unlink`);
   return res.data as {
@@ -236,4 +221,30 @@ export async function unlinkCustomerWorkspace(customerId: string, workspaceRefId
     reports: { totalFound: number; deactivated: number };
     permissions: { usersConsidered: number; workspacePermsRevoked: number; reportPermsRevoked: number };
   };
+}
+
+export type CreateCustomerPayload = {
+  code: string;
+  name: string;
+  status?: "active" | "inactive";
+};
+
+export type UpdateCustomerPayload = {
+  code?: string;
+  name?: string;
+};
+
+export async function createCustomer(payload: CreateCustomerPayload) {
+  const res = await http.post("/admin/customers", payload);
+  return res.data as CustomerRow;
+}
+
+export async function updateCustomer(customerId: string, payload: UpdateCustomerPayload) {
+  const res = await http.put(`/admin/customers/${customerId}`, payload);
+  return res.data as { ok: boolean; customer: CustomerRow };
+}
+
+export async function setCustomerStatus(customerId: string, status: "active" | "inactive") {
+  const res = await http.post(`/admin/customers/${customerId}/status`, { status });
+  return res.data as { ok: boolean; status: string; workspacesDeactivated?: number; reportsDeactivated?: number };
 }

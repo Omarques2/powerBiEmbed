@@ -1,4 +1,5 @@
-import { Body, Controller, Param, Patch, Post, Req, UseGuards } from "@nestjs/common";
+// apps/api/src/admin-users/admin-customers.controller.ts
+import { Body, Controller, Param, Post, Put, Req, UseGuards } from "@nestjs/common";
 import { AuthGuard } from "../auth/auth.guard";
 import { PlatformAdminGuard } from "../auth/platform-admin.guard";
 import { AdminUsersService } from "./admin-users.service";
@@ -10,35 +11,38 @@ export class AdminCustomersController {
   constructor(private readonly svc: AdminUsersService) {}
 
   @Post()
-  createCustomer(
+  create(
     @Req() req: AuthedRequest,
-    @Body() body: { code: string; name: string; status?: string },
+    @Body() body: { code: string; name: string; status?: "active" | "inactive" },
   ) {
     const actorSub = req.user?.sub ? String(req.user.sub) : null;
-    return this.svc.createCustomer(body, actorSub);
+    return this.svc.createCustomer(
+      { code: body.code, name: body.name, status: body.status },
+      actorSub,
+    );
   }
 
-  @Patch(":customerId")
-  updateCustomer(
+  @Put(":customerId")
+  update(
     @Req() req: AuthedRequest,
     @Param("customerId") customerId: string,
     @Body() body: { code?: string; name?: string },
   ) {
     const actorSub = req.user?.sub ? String(req.user.sub) : null;
-    return this.svc.updateCustomer(customerId, body, actorSub);
+    return this.svc.updateCustomer(customerId, { code: body.code, name: body.name }, actorSub);
   }
 
   @Post(":customerId/status")
   setStatus(
     @Req() req: AuthedRequest,
     @Param("customerId") customerId: string,
-    @Body() body: { status: string },
+    @Body() body: { status: "active" | "inactive" },
   ) {
     const actorSub = req.user?.sub ? String(req.user.sub) : null;
-    return this.svc.setCustomerStatus(customerId, body?.status, actorSub);
+    return this.svc.setCustomerStatus(customerId, body.status, actorSub);
   }
 
-  /**
+/**
    * Unlink (revogar) um workspace do customer de forma consistente:
    * - bi_workspaces.is_active = false
    * - bi_reports.is_active = false (do workspace)

@@ -1,3 +1,4 @@
+<!-- apps/web/src/views/AdminView.vue -->
 <template>
   <div class="min-h-screen bg-slate-50 p-6 dark:bg-slate-950">
     <div class="mx-auto max-w-6xl">
@@ -189,6 +190,21 @@
         </div>
       </div>
 
+      <!-- ========================= -->
+      <!-- TAB: CUSTOMERS -->
+      <!-- ========================= -->
+      <div v-if="tab === 'customers'" class="mt-6">
+        <CustomersPanel
+          :customers="customersActiveFirst"
+          :loading="loadingCustomers"
+          :error="error"
+          :refresh="loadCustomers"
+        />
+      </div>
+
+      <!-- ========================= -->
+      <!-- TAB: POWER BI OPS -->
+      <!-- ========================= -->
       <div v-if="tab === 'powerbi'" class="mt-6">
         <PowerBiOpsPanel :customers="customersActiveFirst" />
       </div>
@@ -348,7 +364,11 @@
                   Nenhum workspace ativo encontrado para o customer selecionado.
                 </div>
 
-                <div v-for="ws in perms.workspaces" :key="ws.workspaceRefId" class="rounded-2xl border border-slate-200 p-3 dark:border-slate-800">
+                <div
+                  v-for="ws in perms.workspaces"
+                  :key="ws.workspaceRefId"
+                  class="rounded-2xl border border-slate-200 p-3 dark:border-slate-800"
+                >
                   <div class="flex items-center justify-between gap-3">
                     <div class="min-w-0">
                       <div class="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
@@ -518,11 +538,13 @@ import {
   type ActiveUserRow,
 } from "../admin/adminApi";
 import PowerBiOpsPanel from "../admin/PowerBiOpsPanel.vue";
+import CustomersPanel from "../admin/CustomersPanel.vue";
 
 const router = useRouter();
 
 const tabs = [
   { key: "pending", label: "Pendentes" },
+  { key: "customers", label: "Customers" },
   { key: "active", label: "Usuários ativos" },
   { key: "audit", label: "Auditoria" },
   { key: "powerbi", label: "Power BI" },
@@ -542,20 +564,30 @@ function goBack() {
   router.replace("/app");
 }
 
-const loadingAny = computed(() => loadingPending.value || loadingActive.value || loadingPerms.value || loadingAudit.value);
-
-// ---------- PENDING ----------
-const loadingPending = ref(false);
-const savingPending = ref(false);
-
-const pending = ref<PendingUserRow[]>([]);
+// customers are shared across tabs (pending/customers/powerbi)
+const loadingCustomers = ref(false);
 const customers = ref<CustomerRow[]>([]);
-const selectedPending = ref<PendingUserRow | null>(null);
 
-const pendingCustomerId = ref<string>("");
-const pendingRole = ref<"owner" | "admin" | "member" | "viewer">("viewer");
-const pendingGrantCustomerWorkspaces = ref(true);
-const pendingActionMsg = ref("");
+const loadingAny = computed(() =>
+  loadingCustomers.value ||
+  loadingPending.value ||
+  loadingActive.value ||
+  loadingPerms.value ||
+  loadingAudit.value
+);
+
+// ---------- CUSTOMERS ----------
+async function loadCustomers() {
+  loadingCustomers.value = true;
+  error.value = "";
+  try {
+    customers.value = await listCustomers();
+  } catch (e: any) {
+    error.value = e?.response?.data?.message ?? e?.message ?? String(e);
+  } finally {
+    loadingCustomers.value = false;
+  }
+}
 
 const customersActiveFirst = computed(() => {
   const arr = [...customers.value];
@@ -568,6 +600,18 @@ const customersActiveFirst = computed(() => {
   return arr;
 });
 
+// ---------- PENDING ----------
+const loadingPending = ref(false);
+const savingPending = ref(false);
+
+const pending = ref<PendingUserRow[]>([]);
+const selectedPending = ref<PendingUserRow | null>(null);
+
+const pendingCustomerId = ref<string>("");
+const pendingRole = ref<"owner" | "admin" | "member" | "viewer">("viewer");
+const pendingGrantCustomerWorkspaces = ref(true);
+const pendingActionMsg = ref("");
+
 function selectPending(u: PendingUserRow) {
   selectedPending.value = u;
   pendingCustomerId.value = "";
@@ -578,6 +622,7 @@ function selectPending(u: PendingUserRow) {
 
 async function loadPending() {
   loadingPending.value = true;
+  error.value = "";
   try {
     const [p, c] = await Promise.all([listPendingUsers(), listCustomers()]);
     pending.value = p;
@@ -773,6 +818,8 @@ async function loadAudit(page = 1) {
 async function reloadCurrentTab() {
   error.value = "";
   if (tab.value === "pending") return loadPending();
+  if (tab.value === "customers") return loadCustomers();
+  if (tab.value === "powerbi") return loadCustomers();
   if (tab.value === "active") {
     await loadActiveUsers(activePaged.value.page || 1);
     if (selectedActive.value) await reloadPerms();
@@ -783,12 +830,18 @@ async function reloadCurrentTab() {
 
 watch(tab, async (t) => {
   error.value = "";
+
+  // customers shared for pending/customers/powerbi
+  if ((t === "customers" || t === "powerbi") && customers.value.length === 0 && !loadingCustomers.value) {
+    await loadCustomers();
+  }
+
   if (t === "pending" && pending.value.length === 0) await loadPending();
   if (t === "active" && activePaged.value.rows.length === 0) await loadActiveUsers(1);
   if (t === "audit" && auditPaged.value.rows.length === 0) await loadAudit(1);
 });
 
 onMounted(async () => {
-  await loadPending();
+  await loadPending(); // já traz customers também
 });
 </script>

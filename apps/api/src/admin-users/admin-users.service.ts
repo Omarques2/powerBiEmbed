@@ -2,11 +2,33 @@ import { BadRequestException, Injectable, NotFoundException } from "@nestjs/comm
 import { PrismaService } from "../prisma/prisma.service";
 
 const ALLOWED_ROLES = new Set(["owner", "admin", "member", "viewer"]);
-const ALLOWED_CUSTOMER_STATUS = new Set(["active", "inactive", "archived"]);
 
-function cleanText(x: unknown): string {
-  return String(x ?? "").trim();
+const ALLOWED_CUSTOMER_STATUS = new Set(["active", "inactive"]);
+
+function normalizeCustomerCode(code: string): string {
+  const v = (code ?? "").trim().toUpperCase();
+  return v;
 }
+
+function validateCustomerCode(code: string) {
+  // 3..32 chars, A-Z, 0-9, _ e -
+  const ok = /^[A-Z0-9][A-Z0-9_-]{2,31}$/.test(code);
+  if (!ok) {
+    throw new BadRequestException(
+      "Invalid customer code. Use 3-32 chars: A-Z, 0-9, '_' or '-', starting with alphanumeric.",
+    );
+  }
+}
+
+function normalizeCustomerName(name: string): string {
+  return (name ?? "").trim();
+}
+
+function validateCustomerName(name: string) {
+  if (name.length < 2) throw new BadRequestException("Customer name is too short (min 2).");
+  if (name.length > 120) throw new BadRequestException("Customer name is too long (max 120).");
+}
+
 
 @Injectable()
 export class AdminUsersService {
@@ -225,40 +247,56 @@ export class AdminUsersService {
   }
 
   async createCustomer(
-    input: { code: string; name: string; status?: string },
+    input: { code: string; name: string; status?: "active" | "inactive" },
     actorSub: string | null,
   ) {
-    const code = cleanText(input.code);
-    const name = cleanText(input.name);
-    const statusRaw = cleanText(input.status || "active") || "active";
-    const status = statusRaw.toLowerCase();
+    const code = normalizeCustomerCode(input.code);
+    const name = normalizeCustomerName(input.name);
+    const status = (input.status ?? "active").trim();
 
-    if (!code) throw new BadRequestException("code is required");
-    if (!name) throw new BadRequestException("name is required");
+    validateCustomerCode(code);
+    validateCustomerName(name);
+
     if (!ALLOWED_CUSTOMER_STATUS.has(status)) {
-      throw new BadRequestException(`Invalid customer status: ${status}`);
+      throw new BadRequestException(`Invalid status: ${status}`);
     }
 
     const actorUserId = await this.resolveActorUserId(actorSub);
 
-    return this.prisma.$transaction(async (tx) => {
-      const created = await tx.customers.create({
-        data: { code, name, status },
-        select: { id: true, code: true, name: true, status: true, created_at: true },
+    try {
+      const created = await this.prisma.$transaction(async (tx) => {
+        const row = await tx.customers.create({
+          data: { code, name, status },
+          select: { id: true, code: true, name: true, status: true, created_at: true },
+        });
+
+        await tx.audit_log.create({
+          data: {
+            actor_user_id: actorUserId,
+            action: "CUSTOMER_CREATED",
+            entity_type: "customers",
+            entity_id: row.id,
+            after_data: { id: row.id, code: row.code, name: row.name, status: row.status },
+          },
+        });
+
+        return row;
       });
 
-      await tx.audit_log.create({
-        data: {
-          actor_user_id: actorUserId,
-          action: "CUSTOMER_CREATED",
-          entity_type: "customers",
-          entity_id: created.id,
-          after_data: { customer: created },
-        },
-      });
-
-      return { ok: true, customer: created };
-    });
+      return {
+        id: created.id,
+        code: created.code,
+        name: created.name,
+        status: created.status,
+        createdAt: created.created_at,
+      };
+    } catch (e: any) {
+      // Prisma unique constraint
+      if (e?.code === "P2002") {
+        throw new BadRequestException("Customer code already exists.");
+      }
+      throw e;
+    }
   }
 
   async updateCustomer(
@@ -266,79 +304,131 @@ export class AdminUsersService {
     input: { code?: string; name?: string },
     actorSub: string | null,
   ) {
-    const code = input.code !== undefined ? cleanText(input.code) : undefined;
-    const name = input.name !== undefined ? cleanText(input.name) : undefined;
-
-    if (code !== undefined && !code) throw new BadRequestException("code cannot be empty");
-    if (name !== undefined && !name) throw new BadRequestException("name cannot be empty");
-
-    const actorUserId = await this.resolveActorUserId(actorSub);
-
-    return this.prisma.$transaction(async (tx) => {
-      const before = await tx.customers.findUnique({
-        where: { id: customerId },
-        select: { id: true, code: true, name: true, status: true },
-      });
-      if (!before) throw new NotFoundException("Customer not found");
-
-      const updated = await tx.customers.update({
-        where: { id: customerId },
-        data: {
-          ...(code !== undefined ? { code } : {}),
-          ...(name !== undefined ? { name } : {}),
-        },
-        select: { id: true, code: true, name: true, status: true },
-      });
-
-      await tx.audit_log.create({
-        data: {
-          actor_user_id: actorUserId,
-          action: "CUSTOMER_UPDATED",
-          entity_type: "customers",
-          entity_id: customerId,
-          before_data: { customer: before },
-          after_data: { customer: updated },
-        },
-      });
-
-      return { ok: true, customer: updated };
+    const customer = await this.prisma.customers.findUnique({
+      where: { id: customerId },
+      select: { id: true, code: true, name: true, status: true },
     });
-  }
+    if (!customer) throw new NotFoundException("Customer not found");
 
-  async setCustomerStatus(customerId: string, statusRaw: string, actorSub: string | null) {
-    const status = cleanText(statusRaw).toLowerCase();
-    if (!status) throw new BadRequestException("status is required");
-    if (!ALLOWED_CUSTOMER_STATUS.has(status)) {
-      throw new BadRequestException(`Invalid customer status: ${status}`);
+    const next: { code?: string; name?: string } = {};
+
+    if (typeof input.code === "string") {
+      const code = normalizeCustomerCode(input.code);
+      validateCustomerCode(code);
+      next.code = code;
+    }
+
+    if (typeof input.name === "string") {
+      const name = normalizeCustomerName(input.name);
+      validateCustomerName(name);
+      next.name = name;
+    }
+
+    if (!Object.keys(next).length) {
+      throw new BadRequestException("Nothing to update.");
     }
 
     const actorUserId = await this.resolveActorUserId(actorSub);
 
-    return this.prisma.$transaction(async (tx) => {
-      const before = await tx.customers.findUnique({
-        where: { id: customerId },
-        select: { id: true, code: true, name: true, status: true },
-      });
-      if (!before) throw new NotFoundException("Customer not found");
+    try {
+      const updated = await this.prisma.$transaction(async (tx) => {
+        const row = await tx.customers.update({
+          where: { id: customerId },
+          data: next,
+          select: { id: true, code: true, name: true, status: true, created_at: true },
+        });
 
+        await tx.audit_log.create({
+          data: {
+            actor_user_id: actorUserId,
+            action: "CUSTOMER_UPDATED",
+            entity_type: "customers",
+            entity_id: customerId,
+            before_data: { id: customer.id, code: customer.code, name: customer.name, status: customer.status },
+            after_data: { id: row.id, code: row.code, name: row.name, status: row.status },
+          },
+        });
+
+        return row;
+      });
+
+      return {
+        ok: true,
+        customer: {
+          id: updated.id,
+          code: updated.code,
+          name: updated.name,
+          status: updated.status,
+          createdAt: updated.created_at,
+        },
+      };
+    } catch (e: any) {
+      if (e?.code === "P2002") {
+        throw new BadRequestException("Customer code already exists.");
+      }
+      throw e;
+    }
+  }
+
+  async setCustomerStatus(customerId: string, statusRaw: "active" | "inactive", actorSub: string | null) {
+    const status = (statusRaw ?? "").trim();
+    if (!ALLOWED_CUSTOMER_STATUS.has(status)) {
+      throw new BadRequestException(`Invalid status: ${status}`);
+    }
+
+    const customer = await this.prisma.customers.findUnique({
+      where: { id: customerId },
+      select: { id: true, code: true, name: true, status: true },
+    });
+    if (!customer) throw new NotFoundException("Customer not found");
+
+    const actorUserId = await this.resolveActorUserId(actorSub);
+
+    return this.prisma.$transaction(async (tx) => {
       const updated = await tx.customers.update({
         where: { id: customerId },
         data: { status },
-        select: { id: true, code: true, name: true, status: true },
+        select: { id: true, status: true },
       });
+
+      // Cascata RECOMENDADA ao desativar: trava catálogo (reversível via novo sync/reativação)
+      let workspacesDeactivated = 0;
+      let reportsDeactivated = 0;
+
+      if (status === "inactive") {
+        const wsRes = await tx.bi_workspaces.updateMany({
+          where: { customer_id: customerId, is_active: true },
+          data: { is_active: false },
+        });
+        workspacesDeactivated = wsRes.count;
+
+        // desativa reports de workspaces desse customer
+        const wsRefs = await tx.bi_workspaces.findMany({
+          where: { customer_id: customerId },
+          select: { id: true },
+        });
+
+        if (wsRefs.length) {
+          const rpRes = await tx.bi_reports.updateMany({
+            where: { workspace_ref_id: { in: wsRefs.map((w) => w.id) }, is_active: true },
+            data: { is_active: false },
+          });
+          reportsDeactivated = rpRes.count;
+        }
+      }
 
       await tx.audit_log.create({
         data: {
           actor_user_id: actorUserId,
-          action: "CUSTOMER_STATUS_UPDATED",
+          action: "CUSTOMER_STATUS_CHANGED",
           entity_type: "customers",
           entity_id: customerId,
-          before_data: { status: before.status },
-          after_data: { status: updated.status },
+          before_data: { status: customer.status },
+          after_data: { status: updated.status, workspacesDeactivated, reportsDeactivated },
         },
       });
 
-      return { ok: true, customer: updated };
+      return { ok: true, status: updated.status, workspacesDeactivated, reportsDeactivated };
     });
   }
 
