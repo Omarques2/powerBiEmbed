@@ -1,9 +1,17 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
+import type { Prisma } from "@prisma/client";
 
 const ALLOWED_ROLES = new Set(["owner", "admin", "member", "viewer"]);
-
 const ALLOWED_CUSTOMER_STATUS = new Set(["active", "inactive"]);
+type MembershipRole = "owner" | "admin" | "member" | "viewer";
+
+function asBool(v: any, def = false) {
+  if (v === true || v === false) return v;
+  if (v === "true" || v === "1" || v === 1) return true;
+  if (v === "false" || v === "0" || v === 0) return false;
+  return def;
+}
 
 function normalizeCustomerCode(code: string): string {
   const v = (code ?? "").trim().toUpperCase();
@@ -228,6 +236,415 @@ export class AdminUsersService {
       });
 
       return { ok: true };
+    });
+  }
+
+  private async assertUserAndCustomer(userId: string, customerId: string) {
+    const user = await this.prisma.users.findUnique({
+      where: { id: userId },
+      select: { id: true, status: true, email: true, display_name: true },
+    });
+    if (!user) throw new NotFoundException("User not found");
+
+    const customer = await this.prisma.customers.findUnique({
+      where: { id: customerId },
+      select: { id: true, status: true, code: true, name: true },
+    });
+    if (!customer) throw new NotFoundException("Customer not found");
+    if (customer.status !== "active") throw new BadRequestException("Customer is not active");
+
+    return { user, customer };
+  }
+
+  private async grantCustomerCatalogAccessTx(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    customerId: string,
+  ) {
+    // 1) Workspaces ativos do customer
+    const workspaces = await tx.bi_workspaces.findMany({
+      where: { customer_id: customerId, is_active: true, customers: { status: "active" } },
+      select: { id: true },
+    });
+
+    let wsGranted = 0;
+    let rpGranted = 0;
+
+    if (workspaces.length) {
+      const wsRes = await tx.bi_workspace_permissions.createMany({
+        data: workspaces.map((ws) => ({
+          user_id: userId,
+          workspace_ref_id: ws.id,
+          can_view: true,
+        })),
+        skipDuplicates: true,
+      });
+      wsGranted = wsRes.count;
+
+      const reports = await tx.bi_reports.findMany({
+        where: {
+          workspace_ref_id: { in: workspaces.map((w) => w.id) },
+          is_active: true,
+          bi_workspaces: { is_active: true, customers: { status: "active" } },
+        },
+        select: { id: true },
+      });
+
+      if (reports.length) {
+        const rpRes = await tx.bi_report_permissions.createMany({
+          data: reports.map((r) => ({
+            user_id: userId,
+            report_ref_id: r.id,
+            can_view: true,
+          })),
+          skipDuplicates: true,
+        });
+        rpGranted = rpRes.count;
+      }
+    }
+
+    return { wsGranted, rpGranted };
+  }
+
+  private async revokeCustomerCatalogAccessTx(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    customerId: string,
+  ) {
+    // Descobre workspaces do customer e revoga apenas os que pertencem ao customer
+    const workspaces = await tx.bi_workspaces.findMany({
+      where: { customer_id: customerId },
+      select: { id: true },
+    });
+
+    const wsIds = workspaces.map((w) => w.id);
+    let wsRevoked = 0;
+    let rpRevoked = 0;
+
+    if (wsIds.length) {
+      const wsRes = await tx.bi_workspace_permissions.updateMany({
+        where: { user_id: userId, workspace_ref_id: { in: wsIds } },
+        data: { can_view: false },
+      });
+      wsRevoked = wsRes.count;
+
+      const reports = await tx.bi_reports.findMany({
+        where: { workspace_ref_id: { in: wsIds } },
+        select: { id: true },
+      });
+
+      const rpIds = reports.map((r) => r.id);
+      if (rpIds.length) {
+        const rpRes = await tx.bi_report_permissions.updateMany({
+          where: { user_id: userId, report_ref_id: { in: rpIds } },
+          data: { can_view: false },
+        });
+        rpRevoked = rpRes.count;
+      }
+    }
+
+    return { wsRevoked, rpRevoked };
+  }
+
+  // ------------------------------------------
+  // NOVO: upsert membership (add/reativar/trocar role)
+  // ------------------------------------------
+  async upsertUserMembership(
+    userId: string,
+    input: {
+      customerId: string;
+      role: MembershipRole;
+      isActive?: boolean;
+      grantCustomerWorkspaces?: boolean;
+      revokeCustomerPermissions?: boolean;
+      ensureUserActive?: boolean;
+    },
+    actorSub: string | null,
+  ) {
+    const customerId = (input.customerId ?? "").trim();
+    const role = (input.role ?? "").trim() as MembershipRole;
+
+    if (!customerId) throw new BadRequestException("customerId is required");
+    if (!ALLOWED_ROLES.has(role)) throw new BadRequestException(`Invalid role: ${role}`);
+
+    const isActive = asBool(input.isActive, true);
+    const grantCustomerWorkspaces = asBool(input.grantCustomerWorkspaces, false);
+    const revokeCustomerPermissions = asBool(input.revokeCustomerPermissions, false);
+    const ensureUserActive = asBool(input.ensureUserActive, false);
+
+    const { user, customer } = await this.assertUserAndCustomer(userId, customerId);
+    const actorUserId = await this.resolveActorUserId(actorSub);
+
+    return this.prisma.$transaction(async (tx) => {
+      const beforeMembership = await tx.user_customer_memberships.findUnique({
+        where: { user_id_customer_id: { user_id: userId, customer_id: customerId } },
+        select: { role: true, is_active: true, created_at: true },
+      });
+
+      if (ensureUserActive && user.status !== "active") {
+        await tx.users.update({ where: { id: userId }, data: { status: "active" } });
+      }
+
+      const membership = await tx.user_customer_memberships.upsert({
+        where: { user_id_customer_id: { user_id: userId, customer_id: customerId } },
+        create: { user_id: userId, customer_id: customerId, role: role as any, is_active: isActive },
+        update: { role: role as any, is_active: isActive },
+        select: { customer_id: true, role: true, is_active: true },
+      });
+
+      let granted = { wsGranted: 0, rpGranted: 0 };
+      let revoked = { wsRevoked: 0, rpRevoked: 0 };
+
+      // regra recomendada: se está desativando, revoga permissões do customer
+      if (!isActive && revokeCustomerPermissions) {
+        revoked = await this.revokeCustomerCatalogAccessTx(tx, userId, customerId);
+      }
+
+      // se está ativando e pediu grant, aplica grant
+      if (isActive && grantCustomerWorkspaces) {
+        granted = await this.grantCustomerCatalogAccessTx(tx, userId, customerId);
+      }
+
+      await tx.audit_log.create({
+        data: {
+          actor_user_id: actorUserId,
+          action: "USER_MEMBERSHIP_UPSERTED",
+          entity_type: "user_customer_memberships",
+          entity_id: `${userId}:${customerId}`,
+          before_data: {
+            user: { id: userId, email: user.email ?? null },
+            customer: { id: customerId, code: customer.code, name: customer.name },
+            membership: beforeMembership ?? null,
+          },
+          after_data: {
+            membership: { customerId, role: membership.role, isActive: membership.is_active },
+            granted,
+            revoked,
+          },
+        },
+      });
+
+      return {
+        ok: true,
+        membership: { customerId, role: membership.role, isActive: membership.is_active },
+        granted,
+        revoked,
+      };
+    });
+  }
+
+  // ------------------------------------------
+  // NOVO: patch membership (role/isActive)
+  // ------------------------------------------
+  async patchUserMembership(
+    userId: string,
+    customerIdRaw: string,
+    input: {
+      role?: MembershipRole;
+      isActive?: boolean;
+      grantCustomerWorkspaces?: boolean;
+      revokeCustomerPermissions?: boolean;
+    },
+    actorSub: string | null,
+  ) {
+    const customerId = (customerIdRaw ?? "").trim();
+    if (!customerId) throw new BadRequestException("customerId is required");
+
+    const role = input.role ? (String(input.role).trim() as MembershipRole) : null;
+    if (role && !ALLOWED_ROLES.has(role)) throw new BadRequestException(`Invalid role: ${role}`);
+
+    const isActive = (input.isActive === undefined) ? undefined : asBool(input.isActive);
+    const grantCustomerWorkspaces = asBool(input.grantCustomerWorkspaces, false);
+    const revokeCustomerPermissions = asBool(input.revokeCustomerPermissions, false);
+
+    const { user, customer } = await this.assertUserAndCustomer(userId, customerId);
+    const actorUserId = await this.resolveActorUserId(actorSub);
+
+    return this.prisma.$transaction(async (tx) => {
+      const before = await tx.user_customer_memberships.findUnique({
+        where: { user_id_customer_id: { user_id: userId, customer_id: customerId } },
+        select: { role: true, is_active: true, created_at: true },
+      });
+      if (!before) throw new NotFoundException("Membership not found");
+
+      const nextRole = role ?? (before.role as any);
+      const nextIsActive = (isActive === undefined) ? before.is_active : isActive;
+
+      const updated = await tx.user_customer_memberships.update({
+        where: { user_id_customer_id: { user_id: userId, customer_id: customerId } },
+        data: { role: nextRole as any, is_active: nextIsActive },
+        select: { customer_id: true, role: true, is_active: true },
+      });
+
+      let granted = { wsGranted: 0, rpGranted: 0 };
+      let revoked = { wsRevoked: 0, rpRevoked: 0 };
+
+      if (!nextIsActive && revokeCustomerPermissions) {
+        revoked = await this.revokeCustomerCatalogAccessTx(tx, userId, customerId);
+      }
+      if (nextIsActive && grantCustomerWorkspaces) {
+        granted = await this.grantCustomerCatalogAccessTx(tx, userId, customerId);
+      }
+
+      await tx.audit_log.create({
+        data: {
+          actor_user_id: actorUserId,
+          action: "USER_MEMBERSHIP_UPDATED",
+          entity_type: "user_customer_memberships",
+          entity_id: `${userId}:${customerId}`,
+          before_data: {
+            user: { id: userId, email: user.email ?? null },
+            customer: { id: customerId, code: customer.code, name: customer.name },
+            membership: before,
+          },
+          after_data: {
+            membership: { customerId, role: updated.role, isActive: updated.is_active },
+            granted,
+            revoked,
+          },
+        },
+      });
+
+      return { ok: true, membership: { customerId, role: updated.role, isActive: updated.is_active }, granted, revoked };
+    });
+  }
+
+  // ------------------------------------------
+  // NOVO: remover membership
+  // ------------------------------------------
+  async removeUserMembership(
+    userId: string,
+    customerIdRaw: string,
+    revokeCustomerPermissions: boolean,
+    actorSub: string | null,
+  ) {
+    const customerId = (customerIdRaw ?? "").trim();
+    if (!customerId) throw new BadRequestException("customerId is required");
+
+    const { user, customer } = await this.assertUserAndCustomer(userId, customerId);
+    const actorUserId = await this.resolveActorUserId(actorSub);
+
+    return this.prisma.$transaction(async (tx) => {
+      const before = await tx.user_customer_memberships.findUnique({
+        where: { user_id_customer_id: { user_id: userId, customer_id: customerId } },
+        select: { role: true, is_active: true, created_at: true },
+      });
+      if (!before) throw new NotFoundException("Membership not found");
+
+      await tx.user_customer_memberships.delete({
+        where: { user_id_customer_id: { user_id: userId, customer_id: customerId } },
+      });
+
+      const revoked = revokeCustomerPermissions
+        ? await this.revokeCustomerCatalogAccessTx(tx, userId, customerId)
+        : { wsRevoked: 0, rpRevoked: 0 };
+
+      await tx.audit_log.create({
+        data: {
+          actor_user_id: actorUserId,
+          action: "USER_MEMBERSHIP_REMOVED",
+          entity_type: "user_customer_memberships",
+          entity_id: `${userId}:${customerId}`,
+          before_data: {
+            user: { id: userId, email: user.email ?? null },
+            customer: { id: customerId, code: customer.code, name: customer.name },
+            membership: before,
+          },
+          after_data: { revoked },
+        },
+      });
+
+      return { ok: true, revoked };
+    });
+  }
+
+  // ------------------------------------------
+  // NOVO: transferir membership (trocar customer)
+  // ------------------------------------------
+  async transferUserMembership(
+    userId: string,
+    input: {
+      fromCustomerId: string;
+      toCustomerId: string;
+      toRole: MembershipRole;
+      deactivateFrom?: boolean;
+      revokeFromCustomerPermissions?: boolean;
+      grantToCustomerWorkspaces?: boolean;
+      toIsActive?: boolean;
+    },
+    actorSub: string | null,
+  ) {
+    const fromCustomerId = (input.fromCustomerId ?? "").trim();
+    const toCustomerId = (input.toCustomerId ?? "").trim();
+    const toRole = (input.toRole ?? "").trim() as MembershipRole;
+
+    if (!fromCustomerId) throw new BadRequestException("fromCustomerId is required");
+    if (!toCustomerId) throw new BadRequestException("toCustomerId is required");
+    if (fromCustomerId === toCustomerId) throw new BadRequestException("fromCustomerId and toCustomerId must be different");
+    if (!ALLOWED_ROLES.has(toRole)) throw new BadRequestException(`Invalid role: ${toRole}`);
+
+    const deactivateFrom = asBool(input.deactivateFrom, true);
+    const revokeFromCustomerPermissions = asBool(input.revokeFromCustomerPermissions, true);
+    const grantToCustomerWorkspaces = asBool(input.grantToCustomerWorkspaces, false);
+    const toIsActive = asBool(input.toIsActive, true);
+
+    // valida usuário + customers
+    const { user: usr } = await this.assertUserAndCustomer(userId, fromCustomerId);
+    await this.assertUserAndCustomer(userId, toCustomerId);
+
+    const actorUserId = await this.resolveActorUserId(actorSub);
+
+    return this.prisma.$transaction(async (tx) => {
+      const fromBefore = await tx.user_customer_memberships.findUnique({
+        where: { user_id_customer_id: { user_id: userId, customer_id: fromCustomerId } },
+        select: { role: true, is_active: true, created_at: true },
+      });
+      if (!fromBefore) throw new NotFoundException("Source membership not found");
+
+      // 1) desativa origem
+      if (deactivateFrom) {
+        await tx.user_customer_memberships.update({
+          where: { user_id_customer_id: { user_id: userId, customer_id: fromCustomerId } },
+          data: { is_active: false },
+        });
+      }
+
+      const revoked = revokeFromCustomerPermissions
+        ? await this.revokeCustomerCatalogAccessTx(tx, userId, fromCustomerId)
+        : { wsRevoked: 0, rpRevoked: 0 };
+
+      // 2) cria/ativa destino
+      const toMembership = await tx.user_customer_memberships.upsert({
+        where: { user_id_customer_id: { user_id: userId, customer_id: toCustomerId } },
+        create: { user_id: userId, customer_id: toCustomerId, role: toRole as any, is_active: toIsActive },
+        update: { role: toRole as any, is_active: toIsActive },
+        select: { customer_id: true, role: true, is_active: true },
+      });
+
+      const granted = (toIsActive && grantToCustomerWorkspaces)
+        ? await this.grantCustomerCatalogAccessTx(tx, userId, toCustomerId)
+        : { wsGranted: 0, rpGranted: 0 };
+
+      await tx.audit_log.create({
+        data: {
+          actor_user_id: actorUserId,
+          action: "USER_MEMBERSHIP_TRANSFERRED",
+          entity_type: "user_customer_memberships",
+          entity_id: `${userId}:${fromCustomerId}->${toCustomerId}`,
+          before_data: {
+            user: { id: userId, email: usr.email ?? null },
+            from: { customerId: fromCustomerId, membership: fromBefore },
+          },
+          after_data: {
+            to: { customerId: toCustomerId, role: toMembership.role, isActive: toMembership.is_active },
+            revokedFrom: revoked,
+            grantedTo: granted,
+            deactivateFrom,
+          },
+        },
+      });
+
+      return { ok: true, toMembership: { customerId: toCustomerId, role: toMembership.role, isActive: toMembership.is_active }, revokedFrom: revoked, grantedTo: granted };
     });
   }
 
@@ -654,14 +1071,16 @@ export class AdminUsersService {
     if (!user) throw new NotFoundException("User not found");
 
     const memberships = await this.prisma.user_customer_memberships.findMany({
-      where: { user_id: userId, is_active: true, customers: { status: "active" } },
+      where: { user_id: userId, customers: { status: "active" } },
       include: { customers: { select: { id: true, code: true, name: true, status: true } } },
       orderBy: { created_at: "asc" },
     });
 
-    // customer “context” (default: primeiro membership)
+    const activeMemberships = memberships.filter((m) => m.is_active);
+
     const effectiveCustomerId =
-      customerId ??
+      (customerId && memberships.some((m) => m.customer_id === customerId)) ? customerId :
+      activeMemberships[0]?.customer_id ??
       memberships[0]?.customer_id ??
       null;
 

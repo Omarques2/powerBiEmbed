@@ -69,7 +69,10 @@
               </div>
             </div>
 
-            <div v-if="pending.length === 0 && !loadingPending" class="mt-3 text-sm text-slate-600 dark:text-slate-300">
+            <div
+              v-if="pending.length === 0 && !loadingPending"
+              class="mt-3 text-sm text-slate-600 dark:text-slate-300"
+            >
               Nenhum usuário pendente no momento.
             </div>
 
@@ -297,7 +300,7 @@
                   Permissões
                 </div>
                 <div class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                  Gerenciar acesso por workspace e report (usuário ativo).
+                  Gerenciar memberships e acesso por workspace/report (usuário ativo).
                 </div>
               </div>
 
@@ -330,6 +333,13 @@
               </div>
 
               <div v-else-if="perms" class="mt-4 space-y-4">
+                <!-- Membership editor -->
+                <UserMembershipEditor
+                  :user-id="selectedActive.id"
+                  :memberships="perms.memberships"
+                  @refresh="refreshSelectedUser"
+                />
+
                 <!-- customer context -->
                 <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
                   <div>
@@ -342,12 +352,12 @@
                              dark:border-slate-800 dark:bg-slate-950"
                       @change="reloadPerms"
                     >
-                      <option v-for="m in perms.memberships" :key="m.customerId" :value="m.customerId">
-                        {{ m.customer.name }} ({{ m.customer.code }})
+                      <option v-for="m in permsMembershipOptions" :key="m.customerId" :value="m.customerId">
+                        {{ m.customer.name }} ({{ m.customer.code }}) <span v-if="!m.isActive">— inativo</span>
                       </option>
                     </select>
                     <div class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
-                      Dica: memberships ativas definem quais customers fazem sentido para o usuário.
+                      Dica: o contexto controla quais workspaces/reports são exibidos abaixo.
                     </div>
                   </div>
 
@@ -515,7 +525,6 @@
           Próximo upgrade fácil: ao clicar na linha, abrir um drawer/modal mostrando before/after JSON formatado.
         </div>
       </div>
-
     </div>
   </div>
 </template>
@@ -539,6 +548,7 @@ import {
 } from "../admin/adminApi";
 import PowerBiOpsPanel from "../admin/PowerBiOpsPanel.vue";
 import CustomersPanel from "../admin/CustomersPanel.vue";
+import UserMembershipEditor from "../admin/UserMembershipEditor.vue";
 
 const router = useRouter();
 
@@ -554,6 +564,41 @@ type TabKey = typeof tabs[number]["key"];
 const tab = ref<TabKey>("pending");
 
 const error = ref("");
+
+// ---------- typed perms payload (evita implicit any) ----------
+type MembershipRole = "owner" | "admin" | "member" | "viewer";
+
+type MembershipRow = {
+  customerId: string;
+  role: MembershipRole;
+  isActive: boolean;
+  customer: {
+    id: string;
+    code: string;
+    name: string;
+    status: string;
+  };
+};
+
+type ReportPermRow = {
+  reportRefId: string;
+  reportId: string;
+  name: string;
+  canView: boolean;
+};
+
+type WorkspacePermRow = {
+  workspaceRefId: string;
+  workspaceId: string;
+  name: string;
+  canView: boolean;
+  reports: ReportPermRow[];
+};
+
+type UserPermissionsResponse = {
+  memberships: MembershipRow[];
+  workspaces: WorkspacePermRow[];
+};
 
 // ---------- shared helpers ----------
 function fmtDate(iso: string) {
@@ -608,7 +653,7 @@ const pending = ref<PendingUserRow[]>([]);
 const selectedPending = ref<PendingUserRow | null>(null);
 
 const pendingCustomerId = ref<string>("");
-const pendingRole = ref<"owner" | "admin" | "member" | "viewer">("viewer");
+const pendingRole = ref<MembershipRole>("viewer");
 const pendingGrantCustomerWorkspaces = ref(true);
 const pendingActionMsg = ref("");
 
@@ -628,7 +673,7 @@ async function loadPending() {
     pending.value = p;
     customers.value = c;
 
-    if (selectedPending.value && !pending.value.find(x => x.id === selectedPending.value!.id)) {
+    if (selectedPending.value && !pending.value.find((x) => x.id === selectedPending.value!.id)) {
       selectedPending.value = null;
       pendingCustomerId.value = "";
     }
@@ -688,10 +733,16 @@ const selectedActive = ref<ActiveUserRow | null>(null);
 
 const loadingPerms = ref(false);
 const savingPerm = ref(false);
-const perms = ref<any | null>(null);
+const perms = ref<UserPermissionsResponse | null>(null);
 const permsCustomerId = ref<string>("");
 const permMsg = ref("");
 const grantReportsOnWorkspaceEnable = ref(true);
+
+const permsMembershipOptions = computed<MembershipRow[]>(() => {
+  const ms = perms.value?.memberships ?? [];
+  const active = ms.filter((m: MembershipRow) => m.isActive);
+  return active.length ? active : ms;
+});
 
 async function loadActiveUsers(page = 1) {
   loadingActive.value = true;
@@ -700,7 +751,7 @@ async function loadActiveUsers(page = 1) {
     const data = await listActiveUsers(activeQuery.value, page, activePaged.value.pageSize);
     activePaged.value = data;
 
-    if (selectedActive.value && !data.rows.find(x => x.id === selectedActive.value!.id)) {
+    if (selectedActive.value && !data.rows.find((x) => x.id === selectedActive.value!.id)) {
       selectedActive.value = null;
       perms.value = null;
       permsCustomerId.value = "";
@@ -718,23 +769,45 @@ async function selectActive(u: ActiveUserRow) {
   await reloadPerms();
 }
 
-async function reloadPerms() {
+function pickDefaultCustomerId(memberships: MembershipRow[], preferred?: string): string {
+  const active = memberships.filter((m) => m.isActive);
+  const allowed = new Set(active.map((m) => m.customerId));
+
+  // 1) mantém o preferred se for válido (quando existirem memberships ativas)
+  if (preferred && (allowed.size === 0 || allowed.has(preferred))) return preferred;
+
+  // 2) senão, pega primeiro ativo (sem indexar o array)
+  const firstActive = active.find(() => true);
+  if (firstActive) return firstActive.customerId;
+
+  // 3) fallback: primeiro membership (mesmo inativo)
+  const firstAny = memberships.find(() => true);
+  return firstAny?.customerId ?? "";
+}
+
+async function refreshSelectedUser() {
   if (!selectedActive.value) return;
+
   loadingPerms.value = true;
   error.value = "";
   permMsg.value = "";
-  try {
-    const data = await getUserPermissions(selectedActive.value.id, permsCustomerId.value || undefined);
-    perms.value = data;
 
-    // define customer default (primeiro membership)
-    if (!permsCustomerId.value) {
-      const first = data.memberships?.[0]?.customerId ?? "";
-      permsCustomerId.value = first;
-      if (first) {
-        const again = await getUserPermissions(selectedActive.value.id, first);
-        perms.value = again;
-      }
+  const userId = selectedActive.value.id;
+  const currentCustomerId = permsCustomerId.value || undefined;
+
+  try {
+    // 1) primeira carga mantendo contexto atual (se existir)
+    const base = (await getUserPermissions(userId, currentCustomerId)) as UserPermissionsResponse;
+
+    // 2) garante que o contexto continua válido
+    const desired = pickDefaultCustomerId(base.memberships ?? [], permsCustomerId.value);
+    permsCustomerId.value = desired;
+
+    // 3) se o desired for diferente, recarrega para refletir workspaces/reports do contexto correto
+    if (desired && desired !== currentCustomerId) {
+      perms.value = (await getUserPermissions(userId, desired)) as UserPermissionsResponse;
+    } else {
+      perms.value = base;
     }
   } catch (e: any) {
     error.value = e?.response?.data?.message ?? e?.message ?? String(e);
@@ -743,7 +816,36 @@ async function reloadPerms() {
   }
 }
 
-async function toggleWorkspace(ws: any) {
+async function reloadPerms() {
+  if (!selectedActive.value) return;
+
+  loadingPerms.value = true;
+  error.value = "";
+  permMsg.value = "";
+
+  const userId = selectedActive.value.id;
+  const preferredCustomerId = permsCustomerId.value || undefined;
+
+  try {
+    const base = (await getUserPermissions(userId, preferredCustomerId)) as UserPermissionsResponse;
+
+    // define customer default (com prioridade para memberships ativas)
+    const desired = pickDefaultCustomerId(base.memberships ?? [], permsCustomerId.value);
+    permsCustomerId.value = desired;
+
+    if (desired && desired !== preferredCustomerId) {
+      perms.value = (await getUserPermissions(userId, desired)) as UserPermissionsResponse;
+    } else {
+      perms.value = base;
+    }
+  } catch (e: any) {
+    error.value = e?.response?.data?.message ?? e?.message ?? String(e);
+  } finally {
+    loadingPerms.value = false;
+  }
+}
+
+async function toggleWorkspace(ws: WorkspacePermRow) {
   if (!selectedActive.value) return;
   savingPerm.value = true;
   error.value = "";
@@ -769,7 +871,7 @@ async function toggleWorkspace(ws: any) {
   }
 }
 
-async function toggleReport(r: any) {
+async function toggleReport(r: ReportPermRow) {
   if (!selectedActive.value) return;
   savingPerm.value = true;
   error.value = "";
