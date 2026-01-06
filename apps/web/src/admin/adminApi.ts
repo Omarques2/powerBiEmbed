@@ -47,3 +47,100 @@ export async function disableUser(userId: string) {
   const res = await http.post(`/admin/users/${userId}/disable`);
   return res.data as { ok: boolean };
 }
+
+export type ActiveUserRow = {
+  id: string;
+  email: string | null;
+  display_name: string | null;
+  created_at: string;
+  last_login_at: string | null;
+  status: "pending" | "active" | "disabled";
+};
+
+export type Paged<T> = {
+  page: number;
+  pageSize: number;
+  total: number;
+  rows: T[];
+};
+
+export type AuditRow = {
+  id: string;
+  createdAt: string;
+  action: string;
+  entityType: string;
+  entityId: string | null;
+  actorUserId: string | null;
+  actor: { id: string; email: string | null; displayName: string | null } | null;
+  ip: string | null;
+  userAgent: string | null;
+  before: any;
+  after: any;
+};
+
+export type UserPermissionsResponse = {
+  user: { id: string; email: string | null; displayName: string | null; status: string };
+  customerId: string | null;
+  customer?: { id: string; code: string; name: string; status: string };
+  memberships: Array<{
+    customerId: string;
+    role: string;
+    isActive: boolean;
+    customer: { id: string; code: string; name: string; status: string };
+  }>;
+  workspaces: Array<{
+    workspaceRefId: string;
+    workspaceId: string;
+    name: string;
+    canView: boolean;
+    reports: Array<{
+      reportRefId: string;
+      reportId: string;
+      name: string;
+      datasetId: string | null;
+      canView: boolean;
+    }>;
+  }>;
+};
+
+export async function listActiveUsers(q = "", page = 1, pageSize = 25) {
+  const res = await http.get("/admin/users/active", { params: { q, page, pageSize } });
+  return res.data as Paged<ActiveUserRow>;
+}
+
+export async function getUserPermissions(userId: string, customerId?: string) {
+  const res = await http.get(`/admin/users/${userId}/permissions`, { params: { customerId } });
+  return res.data as UserPermissionsResponse;
+}
+
+export async function setWorkspacePermission(
+  userId: string,
+  workspaceRefId: string,
+  canView: boolean,
+  grantReports = true,
+) {
+  const res = await http.put(`/admin/users/${userId}/workspaces/${workspaceRefId}`, {
+    canView,
+    grantReports,
+  });
+  return res.data as { ok: boolean; reportsAffected?: number };
+}
+
+export async function setReportPermission(userId: string, reportRefId: string, canView: boolean) {
+  const res = await http.put(`/admin/users/${userId}/reports/${reportRefId}`, { canView });
+  return res.data as { ok: boolean };
+}
+
+export async function listAuditLogs(params: {
+  page?: number;
+  pageSize?: number;
+  action?: string;
+  entityType?: string;
+  entityId?: string;
+  actorUserId?: string;
+  from?: string;
+  to?: string;
+}) {
+  const res = await http.get("/admin/audit", { params });
+  return res.data as Paged<AuditRow>;
+}
