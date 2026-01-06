@@ -8,13 +8,15 @@ export const http = axios.create({
 });
 
 http.interceptors.request.use(async (config) => {
-  const path = window.location.pathname;
-  if (path.startsWith("/login") || path.startsWith("/auth/callback")) {
-    return config;
-  }
+  // Permite chamadas "public" quando você quiser (raras)
+  const skipAuth =
+    (config.headers as any)?.["X-Skip-Auth"] === "1" ||
+    (config as any).skipAuth === true;
+
+  if (skipAuth) return config;
 
   const token = await acquireApiToken();
   config.headers = config.headers ?? {};
-  config.headers.Authorization = `Bearer ${token}`;
+  (config.headers as any).Authorization = `Bearer ${token}`;
   return config;
 });

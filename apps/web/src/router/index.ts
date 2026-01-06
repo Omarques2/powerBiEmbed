@@ -23,32 +23,31 @@ const router = createRouter({
 });
 
 router.beforeEach(async (to) => {
-  // 1) Rotas públicas
-  if (!to.meta.requiresAuth) return true;
-
-  // 2) GARANTE que MSAL já processou redirect/cached accounts
+  // Sempre garanta MSAL inicializado antes de qualquer decisão
   await initAuthOnce();
-
-  // 3) precisa estar logado no MSAL
   const acc = getActiveAccount();
 
-  // bônus: se já está logado e tenta ir para /login, manda para o lugar certo
+  // Se já estiver logado e tentar ir pra /login, redireciona
   if (to.path === "/login" && acc) {
     const me = await getMeCached(false);
-    if (!me) return "/app"; // fallback conservador
+    if (!me) return "/app"; // fallback
     return me.status === "active" ? "/app" : "/pending";
   }
 
+  // Rotas públicas seguem normalmente
+  if (!to.meta.requiresAuth) return true;
+
+  // Precisa estar logado no MSAL
   if (!acc) return "/login";
 
-  // 4) se rota exige active, valida /users/me antes de montar a tela
+  // Se rota exige active, valida /users/me
   if (to.meta.requiresActive) {
     const me = await getMeCached(false);
     if (!me) return "/login";
     if (me.status !== "active") return "/pending";
   }
 
-  // 5) se rota exige admin, valide /admin/me
+  // Admin check
   if (to.meta.requiresAdmin) {
     try {
       await (await import("../api/http")).http.get("/admin/me");
