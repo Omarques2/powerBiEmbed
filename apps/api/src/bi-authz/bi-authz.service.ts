@@ -7,11 +7,21 @@ export class BiAuthzService {
 
   async listAllowedWorkspaces(userId: string) {
     const rows = await this.prisma.bi_workspace_permissions.findMany({
-      where: { user_id: userId, can_view: true },
-      include: { bi_workspaces: true },
+      where: {
+        user_id: userId,
+        can_view: true,
+        bi_workspaces: {
+          is_active: true,
+          customers: { status: 'active' },
+        },
+      },
+      include: {
+        bi_workspaces: true,
+      },
+      orderBy: { created_at: 'asc' },
     });
 
-    return rows.map(r => ({
+    return rows.map((r) => ({
       workspaceId: r.bi_workspaces.workspace_id,
       name: r.bi_workspaces.workspace_name ?? String(r.bi_workspaces.workspace_id),
       customerId: r.bi_workspaces.customer_id,
@@ -19,47 +29,74 @@ export class BiAuthzService {
   }
 
   async listAllowedReports(userId: string, workspaceId: string) {
-    // 1) verifica permissão no workspace
-    const ws = await this.prisma.bi_workspace_permissions.findFirst({
+    // 1) valida acesso ao workspace + workspace ativo + customer ativo
+    const wsPerm = await this.prisma.bi_workspace_permissions.findFirst({
       where: {
         user_id: userId,
         can_view: true,
-        bi_workspaces: { workspace_id: workspaceId },
+        bi_workspaces: {
+          workspace_id: workspaceId,
+          is_active: true,
+          customers: { status: 'active' },
+        },
       },
       include: { bi_workspaces: true },
     });
-    if (!ws) throw new ForbiddenException('No access to workspace');
 
-    // 2) por simplicidade: liberar todos os reports do workspace
-    const reports = await this.prisma.bi_reports.findMany({
+    if (!wsPerm) throw new ForbiddenException('No access to workspace');
+
+    // 2) permissões por report (can_view=true) + report ativo
+    const perms = await this.prisma.bi_report_permissions.findMany({
       where: {
-        workspace_ref_id: ws.bi_workspaces.id,
-        is_active: true,
+        user_id: userId,
+        can_view: true,
+        bi_reports: {
+          workspace_ref_id: wsPerm.bi_workspaces.id,
+          is_active: true,
+          bi_workspaces: {
+            is_active: true,
+            customers: { status: 'active' },
+          },
+        },
       },
       select: {
-        report_id: true,
-        report_name: true,
-        dataset_id: true,
+        bi_reports: {
+          select: {
+            report_id: true,
+            report_name: true,
+            dataset_id: true,
+          },
+        },
       },
+      orderBy: { created_at: 'asc' },
     });
 
-    return reports.map(r => ({
-      id: r.report_id,
-      name: r.report_name ?? String(r.report_id),
-      datasetId: r.dataset_id,
+    return perms.map((p) => ({
+      id: p.bi_reports.report_id,
+      name: p.bi_reports.report_name ?? String(p.bi_reports.report_id),
+      datasetId: p.bi_reports.dataset_id,
       workspaceId,
     }));
   }
 
   async assertCanViewReport(userId: string, workspaceId: string, reportId: string) {
-    // versão simples: se pode ver o workspace, pode ver o report
-    const ok = await this.prisma.bi_workspace_permissions.findFirst({
+    const ok = await this.prisma.bi_report_permissions.findFirst({
       where: {
         user_id: userId,
         can_view: true,
-        bi_workspaces: { workspace_id: workspaceId },
+        bi_reports: {
+          report_id: reportId,
+          is_active: true,
+          bi_workspaces: {
+            workspace_id: workspaceId,
+            is_active: true,
+            customers: { status: 'active' },
+          },
+        },
       },
+      select: { id: true },
     });
+
     if (!ok) throw new ForbiddenException('No access to workspace/report');
   }
 }

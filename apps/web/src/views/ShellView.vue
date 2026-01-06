@@ -23,6 +23,8 @@
           :loadReports="loadReports"
           :selectWorkspace="selectWorkspace"
           :openReport="openReport"
+          :isAdmin="isAdmin"
+          :goAdmin="goAdmin"
           :onLogout="onLogout"
           :userName="me?.displayName ?? null"
           :userEmail="me?.email ?? null"
@@ -56,6 +58,8 @@
           :loadReports="loadReports"
           :selectWorkspace="selectWorkspace"
           :openReport="openReport"
+          :isAdmin="isAdmin"
+          :goAdmin="goAdmin"
           :onLogout="onLogout"
           :userName="me?.displayName ?? null"
           :userEmail="me?.email ?? null"
@@ -252,6 +256,7 @@ import SidebarContent from "../components/SidebarContent.vue";
 import ReportSkeletonCard from "../components/ReportSkeletonCard.vue";
 import IconRefresh from "../components/icons/IconRefresh.vue";
 import { useRouter } from "vue-router";
+import { useTheme } from "../composables/useTheme";
 
 type Workspace = { id?: string; workspaceId?: string; name?: string };
 type Report = { id: string; name?: string; workspaceId?: string };
@@ -260,6 +265,8 @@ type MeResponse = { email: string | null; displayName: string | null; status: "p
 const router = useRouter();
 
 const me = ref<MeResponse | null>(null);
+const isAdmin = ref(false);
+
 const drawerOpen = ref(false);
 const sidebarOpen = ref(true);
 
@@ -280,33 +287,12 @@ const containerEl = ref<HTMLDivElement | null>(null);
 
 let powerbiService: pbi.service.Service | null = null;
 let resizeObs: ResizeObserver | null = null;
-
 let embeddedReport: pbi.Report | null = null;
 
 /**
- * THEME (simples e persistente)
+ * THEME (centralizado via useTheme)
  */
-const THEME_KEY = "theme"; // "dark" | "light"
-const isDark = ref(false);
-
-function applyTheme(dark: boolean) {
-  isDark.value = dark;
-  document.documentElement.classList.toggle("dark", dark);
-  localStorage.setItem(THEME_KEY, dark ? "dark" : "light");
-}
-
-function initTheme() {
-  const saved = localStorage.getItem(THEME_KEY);
-  if (saved === "dark") return applyTheme(true);
-  if (saved === "light") return applyTheme(false);
-
-  const prefersDark = window.matchMedia?.("(prefers-color-scheme: dark)")?.matches ?? false;
-  applyTheme(prefersDark);
-}
-
-function toggleTheme() {
-  applyTheme(!isDark.value);
-}
+const { isDark, toggle: toggleTheme } = useTheme();
 
 /**
  * Power BI helpers
@@ -337,13 +323,10 @@ async function applyReportLayout() {
       customLayout: { displayOption },
     } as any);
   } catch {
-    // ignora se a versão não suportar
+    // ignora
   }
 }
 
-/**
- * Resize (runtime existe; tipos podem não expor)
- */
 function resizeEmbedded() {
   try {
     if (!powerbiService || !containerEl.value || !selectedReport.value) return;
@@ -352,8 +335,6 @@ function resizeEmbedded() {
     if (typeof svc.resize === "function") {
       svc.resize(containerEl.value);
     }
-
-    // depois de resize, aplica layout (evita scroll quando muda breakpoint)
     void applyReportLayout();
   } catch {}
 }
@@ -482,11 +463,7 @@ async function openReport(r: Report) {
 
     report.on("loaded", async () => {
       loadingEmbed.value = false;
-
-      // aplica layout correto (mobile: FitToPage / desktop: FitToWidth)
       await applyReportLayout();
-
-      // força resize após settings/iframe
       window.setTimeout(() => resizeEmbedded(), 0);
     });
 
@@ -524,30 +501,40 @@ async function loadMe() {
   }
 }
 
+async function checkAdmin() {
+  try {
+    await http.get("/admin/me");
+    isAdmin.value = true;
+  } catch {
+    isAdmin.value = false;
+  }
+}
+
+async function goAdmin() {
+  await router.push("/admin");
+}
+
 onMounted(async () => {
-  initTheme();
   addResizeHandlers();
 
   powerbiService = createPowerBiService();
 
   await loadMe();
 
-  // sem sessão/token válido -> login
   if (!me.value) {
     await router.replace("/login");
     return;
   }
 
-  // pendente/disabled -> pending
   if (me.value.status !== "active") {
     await router.replace("/pending");
     return;
   }
 
-  // ativo -> carrega workspaces
+  // detecta admin (silencioso)
+  await checkAdmin();
+
   await loadWorkspaces();
-
-
 });
 
 onBeforeUnmount(() => {

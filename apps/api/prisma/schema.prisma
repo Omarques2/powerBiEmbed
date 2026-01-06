@@ -139,8 +139,32 @@ model users {
   bi_workspace_permissions  bi_workspace_permissions[]
   user_app_roles            user_app_roles[]
   user_customer_memberships user_customer_memberships[]
+  audit_logs_as_actor       audit_log[]                 @relation("audit_actor")
 
   @@index([email], map: "idx_users_email")
+}
+
+model audit_log {
+  id            String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  actor_user_id String? @db.Uuid
+
+  action      String
+  entity_type String
+  entity_id   String? @db.Uuid
+
+  before_data Json?
+  after_data  Json?
+
+  ip         String?
+  user_agent String?
+
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+
+  actor users? @relation("audit_actor", fields: [actor_user_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+
+  @@index([created_at], map: "idx_audit_created")
+  @@index([entity_type, entity_id], map: "idx_audit_entity")
+  @@index([actor_user_id], map: "idx_audit_actor")
 }
 
 enum user_status {

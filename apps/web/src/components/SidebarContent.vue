@@ -1,3 +1,4 @@
+<!-- src/components/SidebarContent.vue -->
 <template>
   <div class="flex h-full flex-col bg-white dark:bg-slate-900">
     <!-- Header -->
@@ -62,7 +63,7 @@
       </div>
     </div>
 
-    <!-- Actions -->
+    <!-- Actions (top) -->
     <div class="bg-white dark:bg-slate-900" :class="padSection">
       <button
         class="w-full rounded-xl px-3 py-2.5 text-sm font-medium transition
@@ -217,35 +218,94 @@
       </div>
     </div>
 
-    <!-- Footer (logout at bottom) -->
-    <div class="mt-auto border-t bg-white dark:bg-slate-900 dark:border-slate-800" :class="padSection">
-      <div class="relative">
+    <!-- Bottom area (Admin + User) -->
+    <div class="mt-auto">
+      <!-- Admin shortcut (fica embaixo, acima do footer do usuário) -->
+      <div v-if="showAdminButton" class="border-t bg-white dark:bg-slate-900 dark:border-slate-800" :class="padSection">
         <button
-          class="transition"
-          :class="
-            isCollapsedDesktop
-              ? 'mx-auto grid h-12 w-12 place-items-center rounded-full border-0 bg-transparent hover:bg-transparent'
-              : 'w-full rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800'
-          "
-          @click.stop="userMenuOpen = !userMenuOpen"
-          :title="isCollapsedDesktop ? userEmailOrFallback : ''"
-          aria-label="Menu do usuário"
+          class="w-full rounded-xl px-3 py-2.5 text-sm font-medium transition
+                 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed disabled:active:scale-100
+                 border border-slate-200 bg-white hover:bg-slate-50
+                 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+          @click="handleGoAdmin"
+          :disabled="!goAdmin"
+          :title="collapsed ? 'Painel admin' : ''"
+          aria-label="Painel admin"
         >
-          <template v-if="isCollapsedDesktop">
-            <div class="grid h-10 w-10 place-items-center rounded-full border border-slate-200 bg-white text-sm font-semibold
-                        dark:border-slate-800 dark:bg-slate-900">
-              {{ userInitials }}
-            </div>
-          </template>
+          <span v-if="!collapsed" class="inline-flex items-center justify-center gap-2">
+            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 2l8 4v6c0 5-3.5 9.5-8 10-4.5-.5-8-5-8-10V6l8-4z" />
+              <path d="M9 12l2 2 4-4" />
+            </svg>
+            <span>Painel admin</span>
+          </span>
 
-          <template v-else>
-            <div class="flex items-center gap-3">
-              <div class="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-slate-200 bg-white text-sm font-semibold
+          <span v-else class="mx-auto inline-flex items-center justify-center">
+            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 2l8 4v6c0 5-3.5 9.5-8 10-4.5-.5-8-5-8-10V6l8-4z" />
+              <path d="M9 12l2 2 4-4" />
+            </svg>
+          </span>
+        </button>
+      </div>
+
+      <!-- Footer (User) -->
+      <div class="border-t bg-white dark:bg-slate-900 dark:border-slate-800" :class="padSection">
+        <div class="relative">
+          <button
+            class="transition"
+            :class="
+              isCollapsedDesktop
+                ? 'mx-auto grid h-12 w-12 place-items-center rounded-full border-0 bg-transparent hover:bg-transparent'
+                : 'w-full rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800'
+            "
+            @click.stop="userMenuOpen = !userMenuOpen"
+            :title="isCollapsedDesktop ? userEmailOrFallback : ''"
+            aria-label="Menu do usuário"
+          >
+            <template v-if="isCollapsedDesktop">
+              <div class="grid h-10 w-10 place-items-center rounded-full border border-slate-200 bg-white text-sm font-semibold
                           dark:border-slate-800 dark:bg-slate-900">
                 {{ userInitials }}
               </div>
+            </template>
 
-              <div class="min-w-0 flex-1 text-left">
+            <template v-else>
+              <div class="flex items-center gap-3">
+                <div class="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-slate-200 bg-white text-sm font-semibold
+                            dark:border-slate-800 dark:bg-slate-900">
+                  {{ userInitials }}
+                </div>
+
+                <div class="min-w-0 flex-1 text-left">
+                  <div class="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
+                    {{ userNameOrFallback }}
+                  </div>
+                  <div class="truncate text-xs text-slate-500 dark:text-slate-400">
+                    {{ userEmailOrFallback }}
+                  </div>
+                </div>
+
+                <div class="shrink-0 text-slate-500 dark:text-slate-400">
+                  <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                       stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M6 9l6 6 6-6" />
+                  </svg>
+                </div>
+              </div>
+            </template>
+          </button>
+
+          <div
+            v-if="userMenuOpen"
+            class="absolute bottom-[calc(100%+8px)] z-30 rounded-2xl border border-slate-200 bg-white shadow-lg
+                   dark:border-slate-800 dark:bg-slate-900"
+            :class="isCollapsedDesktop ? 'left-full ml-2 w-[240px]' : 'left-0 w-full'"
+          >
+            <div class="p-2">
+              <div class="px-3 py-2">
                 <div class="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
                   {{ userNameOrFallback }}
                 </div>
@@ -254,48 +314,23 @@
                 </div>
               </div>
 
-              <div class="shrink-0 text-slate-500 dark:text-slate-400">
-                <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                     stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M6 9l6 6 6-6" />
-                </svg>
-              </div>
+              <div class="my-2 h-px bg-slate-200 dark:bg-slate-800" />
+
+              <button
+                class="w-full rounded-xl px-3 py-2 text-left text-sm hover:bg-slate-50 dark:hover:bg-slate-800"
+                @click="onAccount(); userMenuOpen=false"
+              >
+                Minha conta
+              </button>
+
+              <button
+                class="w-full rounded-xl px-3 py-2 text-left text-sm text-red-700 hover:bg-red-50
+                       dark:text-red-300 dark:hover:bg-red-950/40"
+                @click="onLogout(); userMenuOpen=false"
+              >
+                Sair
+              </button>
             </div>
-          </template>
-        </button>
-
-        <div
-          v-if="userMenuOpen"
-          class="absolute bottom-[calc(100%+8px)] z-30 rounded-2xl border border-slate-200 bg-white shadow-lg
-                 dark:border-slate-800 dark:bg-slate-900"
-          :class="isCollapsedDesktop ? 'left-full ml-2 w-[240px]' : 'left-0 w-full'"
-        >
-          <div class="p-2">
-            <div class="px-3 py-2">
-              <div class="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
-                {{ userNameOrFallback }}
-              </div>
-              <div class="truncate text-xs text-slate-500 dark:text-slate-400">
-                {{ userEmailOrFallback }}
-              </div>
-            </div>
-
-            <div class="my-2 h-px bg-slate-200 dark:bg-slate-800" />
-
-            <button
-              class="w-full rounded-xl px-3 py-2 text-left text-sm hover:bg-slate-50 dark:hover:bg-slate-800"
-              @click="onAccount(); userMenuOpen=false"
-            >
-              Minha conta
-            </button>
-
-            <button
-              class="w-full rounded-xl px-3 py-2 text-left text-sm text-red-700 hover:bg-red-50
-                     dark:text-red-300 dark:hover:bg-red-950/40"
-              @click="onLogout(); userMenuOpen=false"
-            >
-              Sair
-            </button>
           </div>
         </div>
       </div>
@@ -329,6 +364,9 @@ const props = defineProps<{
   userName?: string | null;
   userEmail?: string | null;
 
+  isAdmin?: boolean;
+  goAdmin?: () => void | Promise<void>;
+
   loadWorkspaces: () => void | Promise<void>;
   loadReports: (workspaceId: string) => void | Promise<void>;
   selectWorkspace: (w: Workspace) => void | Promise<void>;
@@ -359,6 +397,8 @@ const userInitials = computed(() => {
   return initials || "U";
 });
 
+const showAdminButton = computed(() => Boolean(props.isAdmin && props.goAdmin));
+
 function workspaceInitials(label: string) {
   const s = (label ?? "").trim();
   if (!s) return "WS";
@@ -384,6 +424,14 @@ async function handleSelectWorkspace(w: Workspace) {
 
 async function handleOpenReport(r: Report) {
   await props.openReport(r);
+  if (props.mode === "mobile") emit("close");
+}
+
+async function handleGoAdmin() {
+  if (!props.isAdmin || !props.goAdmin) return;
+
+  await props.goAdmin();
+
   if (props.mode === "mobile") emit("close");
 }
 </script>
