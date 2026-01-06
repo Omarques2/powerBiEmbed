@@ -1,7 +1,9 @@
 <template>
   <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
     <!-- PASSO A -->
-    <section class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+    <section
+      class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+    >
       <div class="flex items-center justify-between gap-3">
         <div>
           <div class="text-sm font-semibold text-slate-900 dark:text-slate-100">Workspaces</div>
@@ -11,8 +13,9 @@
         </div>
 
         <button
+          type="button"
           class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs hover:bg-slate-50
-                 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+                 disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
           :disabled="loadingRemote"
           @click="loadRemoteWorkspaces()"
         >
@@ -20,8 +23,11 @@
         </button>
       </div>
 
-      <div v-if="remoteError" class="mt-3 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700
-                                   dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-200">
+      <div
+        v-if="remoteError"
+        class="mt-3 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700
+               dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-200"
+      >
         {{ remoteError }}
       </div>
 
@@ -49,8 +55,9 @@
             </span>
 
             <button
+              type="button"
               class="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] hover:bg-slate-50
-                     dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+                     disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
               @click.prevent="peekRemoteReports(w.id)"
               :disabled="loadingReportsByWs[w.id]"
               title="Ver reports remotos"
@@ -60,9 +67,14 @@
           </label>
         </div>
 
-        <div v-if="peekReports.workspaceId" class="mt-3 rounded-xl border border-slate-200 p-3 text-xs dark:border-slate-800">
+        <div
+          v-if="peekReports.workspaceId"
+          class="mt-3 rounded-xl border border-slate-200 p-3 text-xs dark:border-slate-800"
+        >
           <div class="font-semibold text-slate-900 dark:text-slate-100">Reports (remoto)</div>
-          <div class="mt-1 text-[11px] text-slate-500 dark:text-slate-400 truncate">{{ peekReports.workspaceId }}</div>
+          <div class="mt-1 truncate text-[11px] text-slate-500 dark:text-slate-400">
+            {{ peekReports.workspaceId }}
+          </div>
 
           <div v-if="peekReports.items.length === 0" class="mt-2 text-xs text-slate-500 dark:text-slate-400">
             Nenhum report (ou sem permissão de listar).
@@ -79,7 +91,9 @@
     </section>
 
     <!-- PASSO B -->
-    <section class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+    <section
+      class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+    >
       <div>
         <div class="text-sm font-semibold text-slate-900 dark:text-slate-100">Sync por customer</div>
         <div class="mt-1 text-xs text-slate-600 dark:text-slate-300">
@@ -114,6 +128,7 @@
 
         <div class="flex gap-2">
           <button
+            type="button"
             class="flex-1 rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800
                    disabled:opacity-60 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
             :disabled="!customerId || syncing"
@@ -123,6 +138,7 @@
           </button>
 
           <button
+            type="button"
             class="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm hover:bg-slate-50
                    disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
             :disabled="!customerId || loadingCatalog"
@@ -143,8 +159,11 @@
           </div>
         </div>
 
-        <div v-if="catalogError" class="rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700
-                                       dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-200">
+        <div
+          v-if="catalogError"
+          class="rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700
+                 dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-200"
+        >
           {{ catalogError }}
         </div>
 
@@ -162,17 +181,33 @@
               :key="w.workspaceRefId"
               class="rounded-xl border border-slate-200 p-2 dark:border-slate-800"
             >
-              <div class="flex items-center justify-between gap-2">
+              <!-- HEADER DO CARD (aqui vai o botão) -->
+              <div class="flex items-start justify-between gap-3">
                 <div class="min-w-0">
-                  <div class="truncate font-medium">
+                  <div class="truncate font-medium text-slate-900 dark:text-slate-100">
                     {{ w.name }}
                     <span class="ml-2 text-[11px]" :class="w.isActive ? 'text-emerald-600' : 'text-slate-500'">
                       {{ w.isActive ? "active" : "inactive" }}
                     </span>
                   </div>
-                  <div class="truncate text-[11px] text-slate-500 dark:text-slate-400">{{ w.workspaceId }}</div>
+                  <div class="truncate text-[11px] text-slate-500 dark:text-slate-400">
+                    {{ w.workspaceId }}
+                  </div>
+                  <div class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                    {{ w.reports.length }} reports
+                  </div>
                 </div>
-                <div class="text-[11px] text-slate-500 dark:text-slate-400">{{ w.reports.length }} reports</div>
+
+                <button
+                  type="button"
+                  class="shrink-0 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] hover:bg-slate-50
+                         disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+                  :disabled="!customerId || !w.isActive || unlinking[w.workspaceRefId]"
+                  @click.stop="unlinkWorkspace(w.workspaceRefId)"
+                  title="Desvincular (desativa workspace, reports e revoga permissões)"
+                >
+                  {{ unlinking[w.workspaceRefId] ? "..." : "Desvincular" }}
+                </button>
               </div>
 
               <ul class="mt-2 space-y-1">
@@ -181,9 +216,73 @@
                   <span class="text-slate-500 dark:text-slate-400">— {{ r.reportId }}</span>
                 </li>
               </ul>
+
               <div v-if="w.reports.length > 8" class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
                 +{{ w.reports.length - 8 }}…
               </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- PASSO C -->
+    <section
+      class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+    >
+      <div>
+        <div class="text-sm font-semibold text-slate-900 dark:text-slate-100">Usuários ativos</div>
+        <div class="mt-1 text-xs text-slate-600 dark:text-slate-300">
+          Base para permissões (listActiveUsers).
+        </div>
+      </div>
+
+      <div class="mt-3 space-y-3">
+        <div class="flex gap-2">
+          <input
+            v-model="userSearch"
+            type="text"
+            class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
+                   dark:border-slate-800 dark:bg-slate-900"
+            placeholder="Buscar por nome/email…"
+          />
+          <button
+            type="button"
+            class="rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800
+                   disabled:opacity-60 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
+            :disabled="loadingUsers"
+            @click="loadUsers()"
+          >
+            {{ loadingUsers ? "..." : "Buscar" }}
+          </button>
+        </div>
+
+        <div
+          v-if="permError"
+          class="rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700
+                 dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-200"
+        >
+          {{ permError }}
+        </div>
+
+        <div class="max-h-[520px] overflow-auto rounded-xl border border-slate-200 dark:border-slate-800">
+          <div v-if="users.length === 0" class="p-3 text-xs text-slate-500 dark:text-slate-400">
+            Nenhum usuário encontrado.
+          </div>
+
+          <div
+            v-for="u in users"
+            :key="u.id"
+            class="border-b border-slate-200 p-3 text-xs last:border-b-0 dark:border-slate-800"
+          >
+            <div class="truncate font-medium text-slate-900 dark:text-slate-100">
+              {{ (u as any).name ?? (u as any).displayName ?? (u as any).email ?? u.id }}
+            </div>
+            <div class="truncate text-[11px] text-slate-500 dark:text-slate-400">
+              {{ (u as any).email ?? (u as any).upn ?? "" }}
+            </div>
+            <div class="truncate text-[11px] text-slate-500 dark:text-slate-400">
+              {{ u.id }}
             </div>
           </div>
         </div>
@@ -201,6 +300,7 @@ import {
   syncPowerBiCatalog,
   getPowerBiCatalog,
   listActiveUsers,
+  unlinkCustomerWorkspace,
 } from "./adminApi";
 
 const props = defineProps<{
@@ -230,6 +330,17 @@ watch(selectedWorkspaceIds, () => {
   selectAllRemote.value =
     remoteWorkspaces.value.length > 0 &&
     selectedWorkspaceIds.value.length === remoteWorkspaces.value.length;
+});
+
+watch(remoteWorkspaces, () => {
+  // Remove seleções que não existem mais após reload
+  const valid = new Set(remoteWorkspaces.value.map((w) => w.id));
+  selectedWorkspaceIds.value = selectedWorkspaceIds.value.filter((id) => valid.has(id));
+
+  // Se “Selecionar todos” estiver marcado, re-seleciona tudo do novo snapshot
+  if (selectAllRemote.value) {
+    selectedWorkspaceIds.value = remoteWorkspaces.value.map((w) => w.id);
+  }
 });
 
 async function loadRemoteWorkspaces() {
@@ -266,6 +377,21 @@ const syncResult = ref<any>(null);
 const loadingCatalog = ref(false);
 const catalogError = ref("");
 const catalog = ref<any>(null);
+
+const unlinking = reactive<Record<string, boolean>>({});
+
+async function unlinkWorkspace(workspaceRefId: string) {
+  if (!customerId.value) return;
+  unlinking[workspaceRefId] = true;
+  try {
+    await unlinkCustomerWorkspace(customerId.value, workspaceRefId);
+    await loadCatalog();
+  } catch (e: any) {
+    catalogError.value = e?.response?.data?.message ?? e?.message ?? "Falha ao desvincular workspace";
+  } finally {
+    unlinking[workspaceRefId] = false;
+  }
+}
 
 async function runSync() {
   if (!customerId.value) return;

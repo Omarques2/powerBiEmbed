@@ -2,6 +2,11 @@ import { BadRequestException, Injectable, NotFoundException } from "@nestjs/comm
 import { PrismaService } from "../prisma/prisma.service";
 
 const ALLOWED_ROLES = new Set(["owner", "admin", "member", "viewer"]);
+const ALLOWED_CUSTOMER_STATUS = new Set(["active", "inactive", "archived"]);
+
+function cleanText(x: unknown): string {
+  return String(x ?? "").trim();
+}
 
 @Injectable()
 export class AdminUsersService {
@@ -217,6 +222,235 @@ export class AdminUsersService {
       status: c.status,
       createdAt: c.created_at,
     }));
+  }
+
+  async createCustomer(
+    input: { code: string; name: string; status?: string },
+    actorSub: string | null,
+  ) {
+    const code = cleanText(input.code);
+    const name = cleanText(input.name);
+    const statusRaw = cleanText(input.status || "active") || "active";
+    const status = statusRaw.toLowerCase();
+
+    if (!code) throw new BadRequestException("code is required");
+    if (!name) throw new BadRequestException("name is required");
+    if (!ALLOWED_CUSTOMER_STATUS.has(status)) {
+      throw new BadRequestException(`Invalid customer status: ${status}`);
+    }
+
+    const actorUserId = await this.resolveActorUserId(actorSub);
+
+    return this.prisma.$transaction(async (tx) => {
+      const created = await tx.customers.create({
+        data: { code, name, status },
+        select: { id: true, code: true, name: true, status: true, created_at: true },
+      });
+
+      await tx.audit_log.create({
+        data: {
+          actor_user_id: actorUserId,
+          action: "CUSTOMER_CREATED",
+          entity_type: "customers",
+          entity_id: created.id,
+          after_data: { customer: created },
+        },
+      });
+
+      return { ok: true, customer: created };
+    });
+  }
+
+  async updateCustomer(
+    customerId: string,
+    input: { code?: string; name?: string },
+    actorSub: string | null,
+  ) {
+    const code = input.code !== undefined ? cleanText(input.code) : undefined;
+    const name = input.name !== undefined ? cleanText(input.name) : undefined;
+
+    if (code !== undefined && !code) throw new BadRequestException("code cannot be empty");
+    if (name !== undefined && !name) throw new BadRequestException("name cannot be empty");
+
+    const actorUserId = await this.resolveActorUserId(actorSub);
+
+    return this.prisma.$transaction(async (tx) => {
+      const before = await tx.customers.findUnique({
+        where: { id: customerId },
+        select: { id: true, code: true, name: true, status: true },
+      });
+      if (!before) throw new NotFoundException("Customer not found");
+
+      const updated = await tx.customers.update({
+        where: { id: customerId },
+        data: {
+          ...(code !== undefined ? { code } : {}),
+          ...(name !== undefined ? { name } : {}),
+        },
+        select: { id: true, code: true, name: true, status: true },
+      });
+
+      await tx.audit_log.create({
+        data: {
+          actor_user_id: actorUserId,
+          action: "CUSTOMER_UPDATED",
+          entity_type: "customers",
+          entity_id: customerId,
+          before_data: { customer: before },
+          after_data: { customer: updated },
+        },
+      });
+
+      return { ok: true, customer: updated };
+    });
+  }
+
+  async setCustomerStatus(customerId: string, statusRaw: string, actorSub: string | null) {
+    const status = cleanText(statusRaw).toLowerCase();
+    if (!status) throw new BadRequestException("status is required");
+    if (!ALLOWED_CUSTOMER_STATUS.has(status)) {
+      throw new BadRequestException(`Invalid customer status: ${status}`);
+    }
+
+    const actorUserId = await this.resolveActorUserId(actorSub);
+
+    return this.prisma.$transaction(async (tx) => {
+      const before = await tx.customers.findUnique({
+        where: { id: customerId },
+        select: { id: true, code: true, name: true, status: true },
+      });
+      if (!before) throw new NotFoundException("Customer not found");
+
+      const updated = await tx.customers.update({
+        where: { id: customerId },
+        data: { status },
+        select: { id: true, code: true, name: true, status: true },
+      });
+
+      await tx.audit_log.create({
+        data: {
+          actor_user_id: actorUserId,
+          action: "CUSTOMER_STATUS_UPDATED",
+          entity_type: "customers",
+          entity_id: customerId,
+          before_data: { status: before.status },
+          after_data: { status: updated.status },
+        },
+      });
+
+      return { ok: true, customer: updated };
+    });
+  }
+
+  async unlinkWorkspaceFromCustomer(customerId: string, workspaceRefId: string, actorSub: string | null) {
+    const actorUserId = await this.resolveActorUserId(actorSub);
+
+    return this.prisma.$transaction(async (tx) => {
+      const ws = await tx.bi_workspaces.findUnique({
+        where: { id: workspaceRefId },
+        select: {
+          id: true,
+          customer_id: true,
+          workspace_id: true,
+          workspace_name: true,
+          is_active: true,
+          customers: { select: { id: true, status: true } },
+        },
+      });
+      if (!ws) throw new NotFoundException("Workspace not found");
+      if (ws.customer_id !== customerId) throw new BadRequestException("Workspace does not belong to this customer");
+
+      // se customer não estiver active, você pode decidir permitir unlink mesmo assim.
+      // Aqui eu permito unlink sempre; o importante é revogar e auditar.
+
+      const before = {
+        workspace: {
+          workspaceRefId: ws.id,
+          workspaceId: ws.workspace_id,
+          name: ws.workspace_name ?? null,
+          isActive: ws.is_active,
+        },
+      };
+
+      // 1) Desativa workspace
+      await tx.bi_workspaces.update({
+        where: { id: workspaceRefId },
+        data: { is_active: false },
+      });
+
+      // 2) Desativa reports do workspace
+      const reports = await tx.bi_reports.findMany({
+        where: { workspace_ref_id: workspaceRefId },
+        select: { id: true, report_id: true, is_active: true },
+      });
+
+      const repIds = reports.map((r) => r.id);
+
+      const repDeact = await tx.bi_reports.updateMany({
+        where: { workspace_ref_id: workspaceRefId },
+        data: { is_active: false },
+      });
+
+      // 3) Descobre usuários do customer (membership ativo)
+      const memberRows = await tx.user_customer_memberships.findMany({
+        where: {
+          customer_id: customerId,
+          is_active: true,
+          customers: { status: "active" }, // opcional; remove se quiser revogar mesmo com customer inactive
+        },
+        select: { user_id: true },
+      });
+
+      const userIds = memberRows.map((m) => m.user_id);
+
+      let wsPermRevoked = 0;
+      let rpPermRevoked = 0;
+
+      if (userIds.length) {
+        const wsPermRes = await tx.bi_workspace_permissions.updateMany({
+          where: {
+            workspace_ref_id: workspaceRefId,
+            user_id: { in: userIds },
+          },
+          data: { can_view: false },
+        });
+        wsPermRevoked = wsPermRes.count;
+
+        if (repIds.length) {
+          const rpPermRes = await tx.bi_report_permissions.updateMany({
+            where: {
+              report_ref_id: { in: repIds },
+              user_id: { in: userIds },
+            },
+            data: { can_view: false },
+          });
+          rpPermRevoked = rpPermRes.count;
+        }
+      }
+
+      const after = {
+        workspace: { workspaceRefId, isActive: false },
+        reports: { totalFound: reports.length, deactivated: repDeact.count },
+        permissions: {
+          usersConsidered: userIds.length,
+          workspacePermsRevoked: wsPermRevoked,
+          reportPermsRevoked: rpPermRevoked,
+        },
+      };
+
+      await tx.audit_log.create({
+        data: {
+          actor_user_id: actorUserId,
+          action: "CUSTOMER_WORKSPACE_UNLINKED",
+          entity_type: "bi_workspaces",
+          entity_id: workspaceRefId,
+          before_data: before,
+          after_data: after,
+        },
+      });
+
+      return { ok: true, ...after };
+    });
   }
 
   // =========================
