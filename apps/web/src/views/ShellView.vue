@@ -532,13 +532,22 @@ onMounted(async () => {
 
   await loadMe();
 
-  // Se o usuário não está ativo, manda pro /pending e não carrega workspaces
-  if (me.value?.status && me.value.status !== "active") {
+  // sem sessão/token válido -> login
+  if (!me.value) {
+    await router.replace("/login");
+    return;
+  }
+
+  // pendente/disabled -> pending
+  if (me.value.status !== "active") {
     await router.replace("/pending");
     return;
   }
 
+  // ativo -> carrega workspaces
   await loadWorkspaces();
+
+
 });
 
 onBeforeUnmount(() => {

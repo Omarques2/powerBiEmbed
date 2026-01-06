@@ -32,8 +32,6 @@ export const msal = new PublicClientApplication({
     redirectUri,
     postLogoutRedirectUri,
     navigateToLoginRequestUrl: false,
-
-    // Apenas se for CIAM/B2C/custom authority
     ...(isCiamLike && knownAuthority ? { knownAuthorities: [knownAuthority] } : {}),
   },
   cache: {
@@ -41,6 +39,16 @@ export const msal = new PublicClientApplication({
     storeAuthStateInCookie: false,
   },
 });
+
+let initPromise: Promise<void> | null = null;
+
+/**
+ * Inicializa MSAL + processa redirect exatamente 1x (robusto para produção).
+ */
+export function initAuthOnce(): Promise<void> {
+  if (!initPromise) initPromise = initAuth();
+  return initPromise;
+}
 
 export async function initAuth(): Promise<void> {
   await msal.initialize();
@@ -51,6 +59,7 @@ export async function initAuth(): Promise<void> {
     return;
   }
 
+  // Restaura conta se já existir no cache
   const accounts = msal.getAllAccounts();
   msal.setActiveAccount(accounts[0] ?? null);
 }
@@ -62,7 +71,7 @@ export function getActiveAccount(): AccountInfo | null {
 export async function login(): Promise<void> {
   await msal.loginRedirect({
     scopes: ["openid", "profile", "email", apiScope],
-    prompt: "select_account", // evita “colar” em uma conta errada
+    prompt: "select_account",
   });
 }
 
@@ -71,6 +80,8 @@ export async function logout(): Promise<void> {
 }
 
 export async function acquireApiToken(): Promise<string> {
+  await initAuthOnce();
+
   const account = getActiveAccount();
   if (!account) {
     await login();

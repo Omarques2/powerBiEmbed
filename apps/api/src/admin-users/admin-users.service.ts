@@ -89,4 +89,19 @@ export class AdminUsersService {
       return { ok: true };
     });
   }
+
+  async listCustomers() {
+    const rows = await this.prisma.customers.findMany({
+      orderBy: [{ status: "asc" }, { name: "asc" }], // "active" normalmente vem antes
+      select: { id: true, code: true, name: true, status: true, created_at: true },
+    });
+
+    return rows.map(c => ({
+      id: c.id,
+      code: c.code,
+      name: c.name,
+      status: c.status,
+      createdAt: c.created_at,
+    }));
+  }
 }

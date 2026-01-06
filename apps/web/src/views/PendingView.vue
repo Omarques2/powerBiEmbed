@@ -18,9 +18,9 @@
 
       <div class="mt-6 flex items-center justify-between gap-3">
         <button
-          class="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm
+          class="inline-flex items-center justify-center rounded-xl border border-slate-900 bg-white px-4 py-2 text-sm
                  hover:bg-slate-50 active:scale-[0.98] transition
-                 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+                 dark:border-slate-800 dark:bg-slate-300 dark:hover:bg-slate-200"
           @click="checkNow"
           :disabled="checking"
         >
@@ -30,7 +30,7 @@
         <button
           class="inline-flex items-center justify-center rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white
                  hover:bg-slate-800 active:scale-[0.98] transition
-                 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
+                 dark:bg-slate-300 dark:text-slate-900 dark:hover:bg-slate-200"
           @click="onLogout"
         >
           Sair
@@ -63,7 +63,15 @@ async function fetchMe(): Promise<MeResponse | null> {
   try {
     const res = await http.get("/users/me");
     return res.data as MeResponse;
-  } catch {
+  } catch (e: any) {
+    const status = e?.response?.status;
+
+    // Se perdeu sessão / token inválido, volta para login
+    if (status === 401) {
+      await logout();
+      return null;
+    }
+
     return null;
   }
 }
@@ -72,6 +80,10 @@ async function checkNow() {
   checking.value = true;
   try {
     const me = await fetchMe();
+    if (!me) {
+      statusMessage.value = "Sessão expirada. Redirecionando para login...";
+      return;
+    }
     const st = me?.status;
 
     if (st === "active") {
