@@ -189,6 +189,10 @@
         </div>
       </div>
 
+      <div v-if="tab === 'powerbi'" class="mt-6">
+        <PowerBiOpsPanel :customers="customersActiveFirst" />
+      </div>
+
       <!-- ========================= -->
       <!-- TAB: ACTIVE USERS + PERMS -->
       <!-- ========================= -->
@@ -513,6 +517,7 @@ import {
   listAuditLogs,
   type ActiveUserRow,
 } from "../admin/adminApi";
+import PowerBiOpsPanel from "../admin/PowerBiOpsPanel.vue";
 
 const router = useRouter();
 
@@ -520,6 +525,7 @@ const tabs = [
   { key: "pending", label: "Pendentes" },
   { key: "active", label: "Usuários ativos" },
   { key: "audit", label: "Auditoria" },
+  { key: "powerbi", label: "Power BI" },
 ] as const;
 
 type TabKey = typeof tabs[number]["key"];

@@ -132,4 +132,57 @@ export class PowerBiCatalogSyncService {
       reportsDeactivated,
     };
   }
+
+  async getCustomerCatalog(customerIdRaw: string) {
+    const customerId = (customerIdRaw ?? "").trim();
+    if (!customerId) throw new BadRequestException("customerId is required");
+
+    const customer = await this.prisma.customers.findUnique({
+      where: { id: customerId },
+      select: { id: true, status: true, code: true, name: true },
+    });
+    if (!customer) throw new NotFoundException("Customer not found");
+
+    const workspaces = await this.prisma.bi_workspaces.findMany({
+      where: { customer_id: customerId },
+      orderBy: [{ is_active: "desc" }, { created_at: "asc" }],
+      select: {
+        id: true,
+        workspace_id: true,
+        workspace_name: true,
+        is_active: true,
+        created_at: true,
+        bi_reports: {
+          orderBy: [{ is_active: "desc" }, { created_at: "asc" }],
+          select: {
+            id: true,
+            report_id: true,
+            report_name: true,
+            dataset_id: true,
+            is_active: true,
+            created_at: true,
+          },
+        },
+      },
+    });
+
+    return {
+      customer,
+      workspaces: workspaces.map((w) => ({
+        workspaceRefId: w.id,
+        workspaceId: w.workspace_id,
+        name: w.workspace_name ?? String(w.workspace_id),
+        isActive: w.is_active,
+        createdAt: w.created_at,
+        reports: w.bi_reports.map((r) => ({
+          reportRefId: r.id,
+          reportId: r.report_id,
+          name: r.report_name ?? String(r.report_id),
+          datasetId: r.dataset_id,
+          isActive: r.is_active,
+          createdAt: r.created_at,
+        })),
+      })),
+    };
+  }
 }

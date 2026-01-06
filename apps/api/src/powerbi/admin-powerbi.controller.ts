@@ -36,4 +36,9 @@ export class AdminPowerBiController {
       deactivateMissing: body.deactivateMissing ?? false,
     });
   }
+
+  @Get("catalog")
+  async catalog(@Query("customerId") customerId: string) {
+    return this.sync.getCustomerCatalog(customerId);
+  }
 }
