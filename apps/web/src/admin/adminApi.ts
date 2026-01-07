@@ -19,7 +19,7 @@ export type CustomerRow = {
 
 export type ActivatePayload = {
   customerId: string;
-  role: "owner" | "admin" | "member" | "viewer";
+  role: MembershipRole;
   grantCustomerWorkspaces?: boolean;
 };
 
@@ -78,13 +78,15 @@ export type AuditRow = {
   after: any;
 };
 
+export type MembershipRole = "owner" | "admin" | "member" | "viewer";
+
 export type UserPermissionsResponse = {
   user: { id: string; email: string | null; displayName: string | null; status: string };
   customerId: string | null;
   customer?: { id: string; code: string; name: string; status: string };
   memberships: Array<{
     customerId: string;
-    role: string;
+    role: MembershipRole; // ✅ aqui
     isActive: boolean;
     customer: { id: string; code: string; name: string; status: string };
   }>;
@@ -106,6 +108,11 @@ export type UserPermissionsResponse = {
 export async function listActiveUsers(q = "", page = 1, pageSize = 25) {
   const res = await http.get("/admin/users/active", { params: { q, page, pageSize } });
   return res.data as Paged<ActiveUserRow>;
+}
+
+export async function getUserById(userId: string) {
+  const res = await http.get(`/admin/users/${encodeURIComponent(userId)}`);
+  return res.data as ActiveUserRow;
 }
 
 export async function getUserPermissions(userId: string, customerId?: string) {
@@ -249,8 +256,6 @@ export async function setCustomerStatus(customerId: string, status: "active" | "
   return res.data as { ok: boolean; status: string; workspacesDeactivated?: number; reportsDeactivated?: number };
 }
 
-export type MembershipRole = "owner" | "admin" | "member" | "viewer";
-
 export async function upsertUserMembership(userId: string, payload: {
   customerId: string;
   role: MembershipRole;
@@ -338,4 +343,62 @@ export async function revokePlatformAdmin(userId: string, appKey = "PBI_EMBED") 
     params: { appKey, roleKey: "platform_admin" },
   });
   return res.data;
+}
+
+export type AdminOverviewDTO = {
+  counts: {
+    pendingUsers: number;
+    inactiveCustomers: number;
+    platformAdmins: number;
+    workspaces: number;
+    reports: number;
+  };
+  audit: {
+    critical: Array<{
+      id: string;
+      createdAt: string;
+      action: string;
+      entityType: string;
+      entityId: string | null;
+      actorUserId: string | null;
+      actor: { email: string | null; displayName: string | null } | null;
+    }>;
+  };
+  powerbi: {
+    lastSyncAt: string | null;
+    lastSyncStatus: "ok" | "fail" | "unknown";
+  };
+};
+
+export async function getAdminOverview() {
+  const res = await http.get("/admin/overview");
+  return res.data as AdminOverviewDTO;
+}
+
+export type AdminSearchDTO = {
+  q: string;
+  users: Array<{ id: string; email: string | null; displayName: string | null; status: string }>;
+  customers: Array<{ id: string; code: string; name: string; status: string }>;
+  powerbi: {
+    workspaces: Array<{
+      id: string;
+      workspaceId: string;
+      name: string;
+      customerId: string;
+      isActive?: boolean;
+    }>;
+    reports: Array<{
+      id: string;
+      reportId: string;
+      name: string;
+      datasetId: string | null;
+      workspaceRefId: string;
+      isActive?: boolean;
+    }>;
+  };
+};
+
+export async function globalSearch(q: string, limit = 8) {
+  const res = await http.get("/admin/search", { params: { q, limit } });
+  return res.data as AdminSearchDTO;
 }

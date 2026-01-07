@@ -1,536 +1,138 @@
 <!-- apps/web/src/views/AdminView.vue -->
 <template>
-  <div class="min-h-screen bg-slate-50 p-6 dark:bg-slate-950">
-    <div class="mx-auto max-w-6xl">
-      <div class="flex items-center justify-between gap-4">
-        <div>
-          <h1 class="text-xl font-semibold text-slate-900 dark:text-slate-100">Admin</h1>
-          <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">
-            Usuários, permissões e auditoria.
-          </p>
-        </div>
-
-        <div class="flex items-center gap-2">
-          <button
-            class="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm hover:bg-slate-50
-                   dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
-            :disabled="loadingAny"
-            @click="reloadCurrentTab"
-          >
-            {{ loadingAny ? "Carregando..." : "Recarregar" }}
-          </button>
-
-          <button
-            class="rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800
-                   dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
-            @click="goBack"
-          >
-            Voltar
-          </button>
-        </div>
-      </div>
-
-      <div
-        v-if="error"
-        class="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700
-               dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-200"
-      >
-        {{ error }}
-      </div>
-
-      <!-- Tabs -->
-      <div class="mt-6 flex flex-wrap gap-2">
-        <button
-          v-for="t in tabs"
-          :key="t.key"
-          class="rounded-full border px-4 py-2 text-sm font-medium transition
-                 dark:border-slate-800"
-          :class="tab === t.key
-            ? 'border-slate-900 bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 dark:border-slate-100'
-            : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800'"
-          @click="tab = t.key"
-        >
-          {{ t.label }}
-        </button>
-      </div>
-
-      <!-- ========================= -->
-      <!-- TAB: PENDING USERS -->
-      <!-- ========================= -->
-      <div v-if="tab === 'pending'" class="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div class="lg:col-span-2">
-          <div
-            class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm
-                   dark:border-slate-800 dark:bg-slate-900"
-          >
-            <div class="flex items-center justify-between">
-              <div class="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                Usuários pendentes ({{ pending.length }})
-              </div>
-            </div>
-
-            <div
-              v-if="pending.length === 0 && !loadingPending"
-              class="mt-3 text-sm text-slate-600 dark:text-slate-300"
-            >
-              Nenhum usuário pendente no momento.
-            </div>
-
-            <div class="mt-3 divide-y divide-slate-200 dark:divide-slate-800">
-              <button
-                v-for="u in pending"
-                :key="u.id"
-                class="w-full px-2 py-3 text-left hover:bg-slate-50 dark:hover:bg-slate-800"
-                :class="selectedPending?.id === u.id ? 'bg-slate-50 dark:bg-slate-800' : ''"
-                @click="selectPending(u)"
-              >
-                <div class="flex items-center justify-between gap-3">
-                  <div class="min-w-0">
-                    <div class="truncate text-sm font-medium text-slate-900 dark:text-slate-100">
-                      {{ u.display_name ?? "—" }}
-                    </div>
-                    <div class="truncate text-xs text-slate-600 dark:text-slate-300">
-                      {{ u.email ?? "sem email" }}
-                    </div>
-                  </div>
-
-                  <div class="shrink-0 text-xs text-slate-500 dark:text-slate-400">
-                    {{ fmtDate(u.created_at) }}
-                  </div>
-                </div>
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div>
-          <div
-            class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm
-                   dark:border-slate-800 dark:bg-slate-900"
-          >
-            <div class="text-sm font-semibold text-slate-900 dark:text-slate-100">
-              Aprovação
-            </div>
-
-            <div v-if="!selectedPending" class="mt-3 text-sm text-slate-600 dark:text-slate-300">
-              Selecione um usuário pendente à esquerda.
-            </div>
-
-            <div v-else class="mt-3 space-y-3">
-              <div class="rounded-xl border border-slate-200 p-3 text-sm dark:border-slate-800">
-                <div class="font-medium text-slate-900 dark:text-slate-100">
-                  {{ selectedPending.display_name ?? "—" }}
-                </div>
-                <div class="text-xs text-slate-600 dark:text-slate-300">
-                  {{ selectedPending.email ?? "sem email" }}
-                </div>
-              </div>
-
-              <div>
-                <label class="block text-xs font-medium text-slate-700 dark:text-slate-300">Customer</label>
-                <select
-                  v-model="pendingCustomerId"
-                  class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
-                         dark:border-slate-800 dark:bg-slate-900"
-                >
-                  <option value="" disabled>Selecione…</option>
-                  <option v-for="c in customersActiveFirst" :key="c.id" :value="c.id">
-                    {{ c.name }} ({{ c.code }}) — {{ c.status }}
-                  </option>
-                </select>
-              </div>
-
-              <div>
-                <label class="block text-xs font-medium text-slate-700 dark:text-slate-300">Role</label>
-                <select
-                  v-model="pendingRole"
-                  class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
-                         dark:border-slate-800 dark:bg-slate-900"
-                >
-                  <option value="viewer">viewer</option>
-                  <option value="member">member</option>
-                  <option value="admin">admin</option>
-                  <option value="owner">owner</option>
-                </select>
-              </div>
-
-              <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
-                <input type="checkbox" v-model="pendingGrantCustomerWorkspaces" />
-                Conceder workspaces do customer automaticamente
-              </label>
-
-              <div class="flex gap-2">
-                <button
-                  class="flex-1 rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800
-                         disabled:opacity-60 disabled:cursor-not-allowed
-                         dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
-                  :disabled="savingPending || !pendingCustomerId"
-                  @click="approvePending"
-                >
-                  {{ savingPending ? "Ativando..." : "Ativar" }}
-                </button>
-
-                <button
-                  class="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700 hover:bg-red-100
-                         disabled:opacity-60 disabled:cursor-not-allowed
-                         dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-200 dark:hover:bg-red-950/55"
-                  :disabled="savingPending"
-                  @click="disablePending"
-                >
-                  {{ savingPending ? "..." : "Desativar" }}
-                </button>
-              </div>
-
-              <div v-if="pendingActionMsg" class="text-xs text-slate-600 dark:text-slate-300">
-                {{ pendingActionMsg }}
-              </div>
-            </div>
-          </div>
-
-          <div class="mt-4 text-xs text-slate-500 dark:text-slate-400">
-            Observação: esta aba aprova “pendentes”. Para permissões finas, use “Usuários ativos”.
-          </div>
-        </div>
-      </div>
-
-      <!-- ========================= -->
-      <!-- TAB: CUSTOMERS -->
-      <!-- ========================= -->
-      <div v-if="tab === 'customers'" class="mt-6">
-        <CustomersPanel
-          :customers="customersActiveFirst"
-          :loading="loadingCustomers"
-          :error="error"
-          :refresh="loadCustomers"
+  <div class="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
+    <div class="mx-auto max-w-[1400px] px-3 py-4">
+      <div class="grid grid-cols-1 gap-4 lg:grid-cols-[260px_1fr]">
+        <!-- SIDEBAR (layout-only) -->
+        <AdminSidebar
+          :activeKey="tab"
+          :items="sidebarItems"
+          @select="onSelectTab"
         />
-      </div>
 
-      <!-- ========================= -->
-      <!-- TAB: SECURITY -->
-      <!-- ========================= -->
-      <div v-if="tab === 'security'" class="mt-6">
-        <SecurityPlatformAdminsPanel />
-      </div>
+        <!-- MAIN -->
+        <main class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <!-- TOP BAR (layout-only) -->
+          <AdminTopBar
+            :title="title"
+            :subtitle="subtitle"
+            :loadingAny="loadingAny"
+            :showSearch="false"
+            @reload="reloadCurrentTab"
+            @back="goBack"
+            @search="noopSearch"
+          />
 
-      <!-- ========================= -->
-      <!-- TAB: POWER BI OPS -->
-      <!-- ========================= -->
-      <div v-if="tab === 'powerbi'" class="mt-6">
-        <PowerBiOpsPanel :customers="customersActiveFirst" />
-      </div>
-
-      <!-- ========================= -->
-      <!-- TAB: ACTIVE USERS + PERMS -->
-      <!-- ========================= -->
-      <div v-if="tab === 'active'" class="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <!-- Active list -->
-        <div class="lg:col-span-1">
-          <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <div class="flex items-center justify-between gap-2">
-              <div class="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                Usuários ativos
-              </div>
-              <div class="text-xs text-slate-500 dark:text-slate-400">
-                {{ activePaged.total }}
-              </div>
-            </div>
-
-            <div class="mt-3 flex gap-2">
-              <input
-                v-model="activeQuery"
-                class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
-                       dark:border-slate-800 dark:bg-slate-950"
-                placeholder="Buscar (email ou nome)..."
-                @keydown.enter="loadActiveUsers(1)"
-              />
-              <button
-                class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm hover:bg-slate-50
-                       dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
-                :disabled="loadingActive"
-                @click="loadActiveUsers(1)"
-              >
-                OK
-              </button>
-            </div>
-
-            <div v-if="loadingActive" class="mt-3 text-xs text-slate-500 dark:text-slate-400">Carregando...</div>
-
-            <div class="mt-3 divide-y divide-slate-200 dark:divide-slate-800">
-              <button
-                v-for="u in activePaged.rows"
-                :key="u.id"
-                class="w-full px-2 py-3 text-left hover:bg-slate-50 dark:hover:bg-slate-800"
-                :class="selectedActive?.id === u.id ? 'bg-slate-50 dark:bg-slate-800' : ''"
-                @click="selectActive(u)"
-              >
-                <div class="min-w-0">
-                  <div class="truncate text-sm font-medium text-slate-900 dark:text-slate-100">
-                    {{ u.display_name ?? "—" }}
-                  </div>
-                  <div class="truncate text-xs text-slate-600 dark:text-slate-300">
-                    {{ u.email ?? "sem email" }}
-                  </div>
-                  <div class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
-                    last login: {{ u.last_login_at ? fmtDate(u.last_login_at) : "—" }}
-                  </div>
-                </div>
-              </button>
-            </div>
-
-            <!-- pagination -->
-            <div class="mt-3 flex items-center justify-between text-xs text-slate-600 dark:text-slate-300">
-              <button
-                class="rounded-lg border px-2 py-1 dark:border-slate-800"
-                :disabled="activePaged.page <= 1 || loadingActive"
-                @click="loadActiveUsers(activePaged.page - 1)"
-              >
-                ←
-              </button>
-              <div>Página {{ activePaged.page }}</div>
-              <button
-                class="rounded-lg border px-2 py-1 dark:border-slate-800"
-                :disabled="loadingActive || activePaged.page * activePaged.pageSize >= activePaged.total"
-                @click="loadActiveUsers(activePaged.page + 1)"
-              >
-                →
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <!-- Permissions panel -->
-        <div class="lg:col-span-2">
-          <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <div class="flex items-center justify-between gap-3">
-              <div>
-                <div class="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                  Permissões
-                </div>
-                <div class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                  Gerenciar memberships e acesso por workspace/report (usuário ativo).
-                </div>
-              </div>
-
-              <button
-                class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm hover:bg-slate-50
-                       dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
-                :disabled="!selectedActive || loadingPerms"
-                @click="reloadPerms"
-              >
-                Recarregar permissões
-              </button>
-            </div>
-
-            <div v-if="!selectedActive" class="mt-4 text-sm text-slate-600 dark:text-slate-300">
-              Selecione um usuário ativo na lista à esquerda.
-            </div>
-
-            <div v-else class="mt-4">
-              <div class="rounded-xl border border-slate-200 p-3 text-sm dark:border-slate-800">
-                <div class="font-medium text-slate-900 dark:text-slate-100">
-                  {{ selectedActive.display_name ?? "—" }}
-                </div>
-                <div class="text-xs text-slate-600 dark:text-slate-300">
-                  {{ selectedActive.email ?? "sem email" }}
-                </div>
-              </div>
-
-              <div v-if="loadingPerms" class="mt-4 text-xs text-slate-500 dark:text-slate-400">
-                Carregando permissões...
-              </div>
-
-              <div v-else-if="perms" class="mt-4 space-y-4">
-                <!-- Membership editor -->
-                <UserMembershipEditor
-                  :user-id="selectedActive.id"
-                  :memberships="perms.memberships"
-                  @refresh="refreshSelectedUser"
-                />
-
-                <!-- customer context -->
-                <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
-                  <div>
-                    <label class="block text-xs font-medium text-slate-700 dark:text-slate-300">
-                      Customer (contexto)
-                    </label>
-                    <select
-                      v-model="permsCustomerId"
-                      class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
-                             dark:border-slate-800 dark:bg-slate-950"
-                      @change="reloadPerms"
-                    >
-                      <option v-for="m in permsMembershipOptions" :key="m.customerId" :value="m.customerId">
-                        {{ m.customer.name }} ({{ m.customer.code }}) <span v-if="!m.isActive">— inativo</span>
-                      </option>
-                    </select>
-                    <div class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
-                      Dica: o contexto controla quais workspaces/reports são exibidos abaixo.
-                    </div>
-                  </div>
-
-                  <div class="flex items-end">
-                    <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
-                      <input type="checkbox" v-model="grantReportsOnWorkspaceEnable" />
-                      Ao habilitar um workspace, conceder reports automaticamente
-                    </label>
-                  </div>
-                </div>
-
-                <!-- workspaces -->
-                <div v-if="perms.workspaces.length === 0" class="text-sm text-slate-600 dark:text-slate-300">
-                  Nenhum workspace ativo encontrado para o customer selecionado.
-                </div>
-
-                <div
-                  v-for="ws in perms.workspaces"
-                  :key="ws.workspaceRefId"
-                  class="rounded-2xl border border-slate-200 p-3 dark:border-slate-800"
-                >
-                  <div class="flex items-center justify-between gap-3">
-                    <div class="min-w-0">
-                      <div class="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
-                        {{ ws.name }}
-                      </div>
-                      <div class="truncate text-xs text-slate-500 dark:text-slate-400">
-                        workspaceId: {{ ws.workspaceId }}
-                      </div>
-                    </div>
-
-                    <button
-                      class="rounded-full px-4 py-2 text-sm font-medium transition"
-                      :class="ws.canView
-                        ? 'bg-emerald-100 text-emerald-900 hover:bg-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-100'
-                        : 'bg-slate-100 text-slate-800 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-100'"
-                      :disabled="savingPerm"
-                      @click="toggleWorkspace(ws)"
-                    >
-                      {{ ws.canView ? "Workspace: ON" : "Workspace: OFF" }}
-                    </button>
-                  </div>
-
-                  <div class="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2">
-                    <button
-                      v-for="r in ws.reports"
-                      :key="r.reportRefId"
-                      class="rounded-xl border px-3 py-2 text-left text-sm transition
-                             dark:border-slate-800"
-                      :class="r.canView
-                        ? 'border-emerald-300 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-900/15 dark:border-emerald-900/40'
-                        : 'border-slate-200 bg-white hover:bg-slate-50 dark:bg-slate-950'"
-                      :disabled="savingPerm || !ws.canView"
-                      @click="toggleReport(r)"
-                      :title="!ws.canView ? 'Habilite o workspace primeiro' : ''"
-                    >
-                      <div class="truncate font-medium text-slate-900 dark:text-slate-100">
-                        {{ r.name }}
-                      </div>
-                      <div class="mt-1 truncate text-xs text-slate-500 dark:text-slate-400">
-                        {{ r.canView ? "Report: ON" : "Report: OFF" }} — {{ r.reportId }}
-                      </div>
-                    </button>
-                  </div>
-                </div>
-
-                <div v-if="permMsg" class="text-xs text-slate-600 dark:text-slate-300">
-                  {{ permMsg }}
-                </div>
-              </div>
-            </div>
+          <!-- ERROR -->
+          <div
+            v-if="error"
+            class="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700
+                   dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-200"
+          >
+            {{ error }}
           </div>
 
-          <div class="mt-4 text-xs text-slate-500 dark:text-slate-400">
-            Nota: seu runtime enforcement já está correto (BiAuthz exige workspace + report). Aqui só damos tooling para o admin.
-          </div>
-        </div>
-      </div>
-
-      <!-- ========================= -->
-      <!-- TAB: AUDIT -->
-      <!-- ========================= -->
-      <div v-if="tab === 'audit'" class="mt-6">
-        <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          <div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-            <div>
-              <div class="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                Auditoria
-              </div>
-              <div class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                Paginação por data desc. Use filtros para reduzir volume.
-              </div>
-            </div>
-
-            <div class="flex flex-wrap gap-2">
-              <input v-model="auditFilter.action" class="rounded-xl border px-3 py-2 text-sm dark:border-slate-800 dark:bg-slate-950" placeholder="action" />
-              <input v-model="auditFilter.entityType" class="rounded-xl border px-3 py-2 text-sm dark:border-slate-800 dark:bg-slate-950" placeholder="entityType" />
-              <input v-model="auditFilter.entityId" class="rounded-xl border px-3 py-2 text-sm dark:border-slate-800 dark:bg-slate-950" placeholder="entityId" />
-              <button
-                class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm hover:bg-slate-50
-                       dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
-                :disabled="loadingAudit"
-                @click="loadAudit(1)"
-              >
-                Filtrar
-              </button>
-            </div>
+          <!-- ========================= -->
+          <!-- TAB: OVERVIEW (placeholder) -->
+          <!-- ========================= -->
+          <div v-if="tab === 'overview'" class="mt-6">
+            <OverviewPanel />
           </div>
 
-          <div v-if="loadingAudit" class="mt-3 text-xs text-slate-500 dark:text-slate-400">Carregando...</div>
+          <!-- ========================= -->
+          <!-- TAB: PENDING USERS (extracted) -->
+          <!-- ========================= -->
+          <PendingUsersTab
+            v-else-if="tab === 'pending'"
+            :pending="pending"
+            :loadingPending="loadingPending"
+            :savingPending="savingPending"
+            :selectedPending="selectedPending"
+            :customers="customersActiveFirst"
+            :pendingCustomerId="pendingCustomerId"
+            :pendingRole="pendingRole"
+            :pendingGrantCustomerWorkspaces="pendingGrantCustomerWorkspaces"
+            :pendingActionMsg="pendingActionMsg"
+            :fmtDate="fmtDate"
+            @selectPending="selectPending"
+            @update:pendingCustomerId="pendingCustomerId = $event"
+            @update:pendingRole="pendingRole = $event"
+            @update:pendingGrantCustomerWorkspaces="pendingGrantCustomerWorkspaces = $event"
+            @approve="approvePending"
+            @disable="disablePending"
+          />
 
-          <div v-else class="mt-4 overflow-auto">
-            <table class="min-w-full text-left text-sm">
-              <thead class="text-xs text-slate-500 dark:text-slate-400">
-                <tr>
-                  <th class="py-2 pr-4">Quando</th>
-                  <th class="py-2 pr-4">Actor</th>
-                  <th class="py-2 pr-4">Action</th>
-                  <th class="py-2 pr-4">Entity</th>
-                  <th class="py-2 pr-4">IP</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
-                <tr v-for="r in auditPaged.rows" :key="r.id">
-                  <td class="py-2 pr-4 whitespace-nowrap">{{ fmtDate(r.createdAt) }}</td>
-                  <td class="py-2 pr-4">
-                    <div class="text-sm text-slate-900 dark:text-slate-100">
-                      {{ r.actor?.displayName ?? "—" }}
-                    </div>
-                    <div class="text-xs text-slate-500 dark:text-slate-400">
-                      {{ r.actor?.email ?? r.actorUserId ?? "—" }}
-                    </div>
-                  </td>
-                  <td class="py-2 pr-4 font-medium text-slate-900 dark:text-slate-100">{{ r.action }}</td>
-                  <td class="py-2 pr-4">
-                    <div class="text-sm text-slate-900 dark:text-slate-100">{{ r.entityType }}</div>
-                    <div class="text-xs text-slate-500 dark:text-slate-400">{{ r.entityId ?? "—" }}</div>
-                  </td>
-                  <td class="py-2 pr-4 text-xs text-slate-500 dark:text-slate-400">{{ r.ip ?? "—" }}</td>
-                </tr>
-              </tbody>
-            </table>
-
-            <div class="mt-3 flex items-center justify-between text-xs text-slate-600 dark:text-slate-300">
-              <button
-                class="rounded-lg border px-2 py-1 dark:border-slate-800"
-                :disabled="auditPaged.page <= 1 || loadingAudit"
-                @click="loadAudit(auditPaged.page - 1)"
-              >
-                ←
-              </button>
-              <div>Página {{ auditPaged.page }} ({{ auditPaged.total }})</div>
-              <button
-                class="rounded-lg border px-2 py-1 dark:border-slate-800"
-                :disabled="loadingAudit || auditPaged.page * auditPaged.pageSize >= auditPaged.total"
-                @click="loadAudit(auditPaged.page + 1)"
-              >
-                →
-              </button>
-            </div>
+          <!-- ========================= -->
+          <!-- TAB: CUSTOMERS -->
+          <!-- ========================= -->
+          <div v-else-if="tab === 'customers'" class="mt-6">
+            <CustomersPanel
+              :customers="customersActiveFirst"
+              :loading="loadingCustomers"
+              :error="error"
+              :refresh="loadCustomers"
+            />
           </div>
-        </div>
 
-        <div class="mt-3 text-xs text-slate-500 dark:text-slate-400">
-          Próximo upgrade fácil: ao clicar na linha, abrir um drawer/modal mostrando before/after JSON formatado.
-        </div>
+          <!-- ========================= -->
+          <!-- TAB: SECURITY -->
+          <!-- ========================= -->
+          <div v-else-if="tab === 'security'" class="mt-6">
+            <SecurityPlatformAdminsPanel />
+          </div>
+
+          <!-- ========================= -->
+          <!-- TAB: POWER BI OPS -->
+          <!-- ========================= -->
+          <div v-else-if="tab === 'powerbi'" class="mt-6">
+            <PowerBiOpsPanel :customers="customersActiveFirst" />
+          </div>
+
+          <!-- ========================= -->
+          <!-- TAB: ACTIVE USERS + PERMS (extracted) -->
+          <!-- ========================= -->
+          <ActiveUsersPermsTab
+            v-else-if="tab === 'active'"
+            :loadingActive="loadingActive"
+            :activeQuery="activeQuery"
+            :activePaged="activePaged"
+            :selectedActive="selectedActive"
+            :loadingPerms="loadingPerms"
+            :savingPerm="savingPerm"
+            :perms="perms"
+            :permsCustomerId="permsCustomerId"
+            :permsMembershipOptions="permsMembershipOptions"
+            :grantReportsOnWorkspaceEnable="grantReportsOnWorkspaceEnable"
+            :permMsg="permMsg"
+            :fmtDate="fmtDate"
+            @update:activeQuery="activeQuery = $event"
+            @loadActiveUsers="loadActiveUsers"
+            @selectActive="selectActive"
+            @reloadPerms="reloadPerms"
+            @refreshSelectedUser="refreshSelectedUser"
+            @update:permsCustomerId="permsCustomerId = $event"
+            @update:grantReportsOnWorkspaceEnable="grantReportsOnWorkspaceEnable = $event"
+            @toggleWorkspace="toggleWorkspace"
+            @toggleReport="toggleReport"
+          />
+
+          <!-- ========================= -->
+          <!-- TAB: AUDIT (extracted) -->
+          <!-- ========================= -->
+          <AuditTab
+            v-else-if="tab === 'audit'"
+            :loadingAudit="loadingAudit"
+            :auditPaged="auditPaged"
+            :auditFilter="auditFilter"
+            :fmtDate="fmtDate"
+            @update:auditFilter="auditFilter = $event"
+            @loadAudit="loadAudit"
+          />
+
+          <div v-else class="mt-6 text-sm text-slate-600 dark:text-slate-300">
+            Aba desconhecida.
+          </div>
+        </main>
       </div>
     </div>
   </div>
@@ -539,6 +141,15 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
+
+import AdminSidebar, { type AdminTabKey } from "../admin/components/AdminSidebar.vue";
+import AdminTopBar from "../admin/components/AdminTopBar.vue";
+
+import PendingUsersTab from "../admin/tabs/PendingUsersTab.vue";
+import ActiveUsersPermsTab from "../admin/tabs/ActiveUsersPermsTab.vue";
+import AuditTab from "../admin/tabs/AuditTab.vue";
+import OverviewPanel from "../admin/OverviewPanel.vue";
+
 import {
   type CustomerRow,
   type PendingUserRow,
@@ -553,40 +164,80 @@ import {
   listAuditLogs,
   type ActiveUserRow,
 } from "../admin/adminApi";
+
 import PowerBiOpsPanel from "../admin/PowerBiOpsPanel.vue";
 import CustomersPanel from "../admin/CustomersPanel.vue";
-import UserMembershipEditor from "../admin/UserMembershipEditor.vue";
 import SecurityPlatformAdminsPanel from "../admin/SecurityPlatformAdminsPanel.vue";
 
 const router = useRouter();
 
-const tabs = [
-  { key: "pending", label: "Pendentes" },
+// ------------------------------------
+// Tabs (sidebar-driven)
+// ------------------------------------
+const sidebarItems: Array<{ key: AdminTabKey; label: string }> = [
+  { key: "overview", label: "Overview" },
+  { key: "pending", label: "Identity · Pendentes" },
+  { key: "active", label: "Identity · Usuários ativos" },
   { key: "customers", label: "Customers" },
-  { key: "active", label: "Usuários ativos" },
   { key: "security", label: "Security" },
-  { key: "audit", label: "Auditoria" },
-  { key: "powerbi", label: "Power BI" },
-] as const;
+  { key: "audit", label: "Audit" },
+  { key: "powerbi", label: "Power BI Ops" },
+];
 
-type TabKey = typeof tabs[number]["key"];
-const tab = ref<TabKey>("pending");
+const tab = ref<AdminTabKey>("pending");
 
+function onSelectTab(k: AdminTabKey) {
+  tab.value = k;
+}
+
+const title = computed(() => {
+  switch (tab.value) {
+    case "overview": return "Overview";
+    case "pending": return "Usuários pendentes";
+    case "active": return "Usuários ativos";
+    case "customers": return "Customers";
+    case "security": return "Security";
+    case "audit": return "Auditoria";
+    case "powerbi": return "Power BI Ops";
+    default: return "Admin";
+  }
+});
+
+const subtitle = computed(() => {
+  switch (tab.value) {
+    case "overview": return "Centro operacional (em evolução).";
+    case "pending": return "Aprovar/ativar e atribuir memberships.";
+    case "active": return "Gerenciar memberships e permissões de Power BI.";
+    case "customers": return "Cadastro e status de customers.";
+    case "security": return "Platform admins e operações de risco.";
+    case "audit": return "Rastreabilidade de ações administrativas.";
+    case "powerbi": return "Sincronização e catálogo Power BI.";
+    default: return "";
+  }
+});
+
+function noopSearch() {
+  // Nesta fase mantive desligado (showSearch=false).
+  // Você pluga aqui GlobalSearchPalette quando estiver pronto.
+}
+
+function goBack() {
+  router.replace("/app");
+}
+
+// ------------------------------------
+// Shared state
+// ------------------------------------
 const error = ref("");
 
-// ---------- typed perms payload (evita implicit any) ----------
+// ---------- typed perms payload ----------
 type MembershipRole = "owner" | "admin" | "member" | "viewer";
 
 type MembershipRow = {
   customerId: string;
   role: MembershipRole;
   isActive: boolean;
-  customer: {
-    id: string;
-    code: string;
-    name: string;
-    status: string;
-  };
+  customer: { id: string; code: string; name: string; status: string };
 };
 
 type ReportPermRow = {
@@ -612,10 +263,6 @@ type UserPermissionsResponse = {
 // ---------- shared helpers ----------
 function fmtDate(iso: string) {
   try { return new Date(iso).toLocaleString(); } catch { return iso; }
-}
-
-function goBack() {
-  router.replace("/app");
 }
 
 // customers are shared across tabs (pending/customers/powerbi)
@@ -758,9 +405,9 @@ async function loadActiveUsers(page = 1) {
   error.value = "";
   try {
     const data = await listActiveUsers(activeQuery.value, page, activePaged.value.pageSize);
-    activePaged.value = data;
+    activePaged.value = data as any;
 
-    if (selectedActive.value && !data.rows.find((x) => x.id === selectedActive.value!.id)) {
+    if (selectedActive.value && !data.rows.find((x: any) => x.id === selectedActive.value!.id)) {
       selectedActive.value = null;
       perms.value = null;
       permsCustomerId.value = "";
@@ -782,15 +429,12 @@ function pickDefaultCustomerId(memberships: MembershipRow[], preferred?: string)
   const active = memberships.filter((m) => m.isActive);
   const allowed = new Set(active.map((m) => m.customerId));
 
-  // 1) mantém o preferred se for válido (quando existirem memberships ativas)
   if (preferred && (allowed.size === 0 || allowed.has(preferred))) return preferred;
 
-  // 2) senão, pega primeiro ativo (sem indexar o array)
-  const firstActive = active.find(() => true);
+  const firstActive = active[0];
   if (firstActive) return firstActive.customerId;
 
-  // 3) fallback: primeiro membership (mesmo inativo)
-  const firstAny = memberships.find(() => true);
+  const firstAny = memberships[0];
   return firstAny?.customerId ?? "";
 }
 
@@ -805,16 +449,13 @@ async function refreshSelectedUser() {
   const currentCustomerId = permsCustomerId.value || undefined;
 
   try {
-    // 1) primeira carga mantendo contexto atual (se existir)
-    const base = (await getUserPermissions(userId, currentCustomerId)) as UserPermissionsResponse;
+    const base = (await getUserPermissions(userId, currentCustomerId)) as unknown as UserPermissionsResponse;
 
-    // 2) garante que o contexto continua válido
     const desired = pickDefaultCustomerId(base.memberships ?? [], permsCustomerId.value);
     permsCustomerId.value = desired;
 
-    // 3) se o desired for diferente, recarrega para refletir workspaces/reports do contexto correto
     if (desired && desired !== currentCustomerId) {
-      perms.value = (await getUserPermissions(userId, desired)) as UserPermissionsResponse;
+      perms.value = (await getUserPermissions(userId, desired)) as unknown as UserPermissionsResponse;
     } else {
       perms.value = base;
     }
@@ -836,14 +477,13 @@ async function reloadPerms() {
   const preferredCustomerId = permsCustomerId.value || undefined;
 
   try {
-    const base = (await getUserPermissions(userId, preferredCustomerId)) as UserPermissionsResponse;
+    const base = (await getUserPermissions(userId, preferredCustomerId)) as unknown as UserPermissionsResponse;
 
-    // define customer default (com prioridade para memberships ativas)
     const desired = pickDefaultCustomerId(base.memberships ?? [], permsCustomerId.value);
     permsCustomerId.value = desired;
 
     if (desired && desired !== preferredCustomerId) {
-      perms.value = (await getUserPermissions(userId, desired)) as UserPermissionsResponse;
+      perms.value = (await getUserPermissions(userId, desired)) as unknown as UserPermissionsResponse;
     } else {
       perms.value = base;
     }
@@ -917,7 +557,7 @@ async function loadAudit(page = 1) {
       entityType: auditFilter.value.entityType || undefined,
       entityId: auditFilter.value.entityId || undefined,
     });
-    auditPaged.value = data;
+    auditPaged.value = data as any;
   } catch (e: any) {
     error.value = e?.response?.data?.message ?? e?.message ?? String(e);
   } finally {
@@ -931,19 +571,19 @@ async function reloadCurrentTab() {
   if (tab.value === "pending") return loadPending();
   if (tab.value === "customers") return loadCustomers();
   if (tab.value === "powerbi") return loadCustomers();
-  if (tab.value === "security") return; // o painel já tem refresh próprio (load onMounted + botões internos)
+  if (tab.value === "security") return;
   if (tab.value === "active") {
     await loadActiveUsers(activePaged.value.page || 1);
     if (selectedActive.value) await reloadPerms();
     return;
   }
   if (tab.value === "audit") return loadAudit(auditPaged.value.page || 1);
+  if (tab.value === "overview") return;
 }
 
 watch(tab, async (t) => {
   error.value = "";
 
-  // customers shared for pending/customers/powerbi
   if ((t === "customers" || t === "powerbi") && customers.value.length === 0 && !loadingCustomers.value) {
     await loadCustomers();
   }
@@ -951,8 +591,6 @@ watch(tab, async (t) => {
   if (t === "pending" && pending.value.length === 0) await loadPending();
   if (t === "active" && activePaged.value.rows.length === 0) await loadActiveUsers(1);
   if (t === "audit" && auditPaged.value.rows.length === 0) await loadAudit(1);
-
-  // security: não pre-carrega nada aqui para evitar dupla chamada (o componente carrega sozinho)
 });
 
 onMounted(async () => {

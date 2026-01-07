@@ -1,8 +1,21 @@
-import { Body, Controller, Get, Param, Post, Req, UseGuards, Patch, Delete, Query, } from "@nestjs/common";
+// apps/api/src/admin-users/admin-users.controller.ts
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Req,
+  UseGuards,
+  Patch,
+  Delete,
+  Query,
+} from "@nestjs/common";
 import { AuthGuard } from "../auth/auth.guard";
 import { PlatformAdminGuard } from "../auth/platform-admin.guard";
 import { AdminUsersService } from "./admin-users.service";
 import type { AuthedRequest } from "../auth/authed-request.type";
+import { ParseUUIDPipe } from "@nestjs/common";
 
 type MembershipRole = "owner" | "admin" | "member" | "viewer";
 
@@ -115,5 +128,23 @@ export class AdminUsersController {
   ) {
     const actorSub = req.user?.sub ? String(req.user.sub) : null;
     return this.svc.transferUserMembership(userId, body, actorSub);
+  }
+
+  @Get("active")
+  listActive(
+    @Query("q") q?: string,
+    @Query("page") page?: string,
+    @Query("pageSize") pageSize?: string,
+  ) {
+    return this.svc.listActiveUsers({
+      q,
+      page: Number(page ?? 1),
+      pageSize: Number(pageSize ?? 25),
+    });
+  }
+
+  @Get(":userId")
+  getById(@Param("userId") userId: string) {
+    return this.svc.getUserById(userId);
   }
 }

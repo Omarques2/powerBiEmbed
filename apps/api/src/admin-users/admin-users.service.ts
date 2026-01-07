@@ -208,6 +208,32 @@ export class AdminUsersService {
     });
   }
 
+  async getUserById(userId: string) {
+    const u = await this.prisma.users.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        display_name: true,
+        created_at: true,
+        last_login_at: true,
+        status: true,
+      },
+    });
+
+    if (!u) throw new NotFoundException("User not found");
+
+    // Retorno alinhado ao padrão do seu frontend (snake_case)
+    return {
+      id: u.id,
+      email: u.email,
+      display_name: u.display_name,
+      created_at: u.created_at.toISOString(),
+      last_login_at: u.last_login_at ? u.last_login_at.toISOString() : null,
+      status: u.status,
+    };
+  }
+
   async disableUser(userId: string, actorSub: string | null = null) {
     const user = await this.prisma.users.findUnique({
       where: { id: userId },
@@ -1561,4 +1587,229 @@ export class AdminUsersService {
       return { ok: true, idempotent: false };
     });
   }
+
+  // ============================================================
+  // Entrega 2 — Overview (stats) + Busca global
+  // ============================================================
+
+  async getAdminOverview() {
+    // “Critical actions” deve refletir o que você considera operacional/risco.
+    // Ajuste essa lista conforme seus actions atuais.
+    const criticalActions = [
+      "PLATFORM_ADMIN_GRANTED",
+      "PLATFORM_ADMIN_REVOKED",
+      "PLATFORM_ADMIN_BOOTSTRAPPED",
+      "USER_DISABLED",
+      "CUSTOMER_STATUS_CHANGED",
+      "PBI_CATALOG_SYNC_OK",
+      "PBI_CATALOG_SYNC_FAILED",
+    ];
+
+    const [
+      pendingUsers,
+      inactiveCustomers,
+      platformAdmins,
+      workspaces,
+      reports,
+      criticalAudit,
+      lastSyncOk,
+      lastSyncFail,
+    ] = await this.prisma.$transaction([
+      this.prisma.users.count({ where: { status: "pending" } }),
+      this.prisma.customers.count({ where: { status: "inactive" } }),
+
+      // conta platform admins para o app PBI_EMBED (role global customer_id = null)
+      this.prisma.user_app_roles.count({
+        where: {
+          customer_id: null,
+          applications: { app_key: "PBI_EMBED" },
+          app_roles: { role_key: "platform_admin" },
+          users: { status: "active" },
+        },
+      }),
+
+      this.prisma.bi_workspaces.count({}),
+      this.prisma.bi_reports.count({}),
+
+      this.prisma.audit_log.findMany({
+        where: { action: { in: criticalActions } },
+        orderBy: { created_at: "desc" },
+        take: 10,
+        select: {
+          id: true,
+          created_at: true,
+          action: true,
+          entity_type: true,
+          entity_id: true,
+          actor_user_id: true,
+          actor: {
+            select: { id: true, email: true, display_name: true },
+          },
+        },
+      }),
+
+      this.prisma.audit_log.findFirst({
+        where: { action: "PBI_CATALOG_SYNC_OK" },
+        orderBy: { created_at: "desc" },
+        select: { created_at: true },
+      }),
+
+      this.prisma.audit_log.findFirst({
+        where: { action: "PBI_CATALOG_SYNC_FAILED" },
+        orderBy: { created_at: "desc" },
+        select: { created_at: true },
+      }),
+    ]);
+
+    const okAt = lastSyncOk?.created_at ? new Date(lastSyncOk.created_at).getTime() : null;
+    const failAt = lastSyncFail?.created_at ? new Date(lastSyncFail.created_at).getTime() : null;
+
+    const lastSyncAt =
+      okAt || failAt ? new Date(Math.max(okAt ?? 0, failAt ?? 0)).toISOString() : null;
+
+    const lastSyncStatus =
+      okAt || failAt
+        ? okAt !== null && okAt >= (failAt ?? 0)
+          ? "ok"
+          : "fail"
+        : "unknown";
+
+    return {
+      counts: {
+        pendingUsers,
+        inactiveCustomers,
+        platformAdmins,
+        workspaces,
+        reports,
+      },
+      audit: {
+        critical: criticalAudit.map((r) => ({
+          id: r.id,
+          createdAt: r.created_at.toISOString(),
+          action: r.action,
+          entityType: r.entity_type,
+          entityId: r.entity_id,
+          actorUserId: r.actor_user_id,
+          actor: r.actor
+            ? {
+                email: r.actor.email ?? null,
+                displayName: r.actor.display_name ?? null,
+              }
+            : null,
+        })),
+      },
+      powerbi: {
+        lastSyncAt,
+        lastSyncStatus,
+      },
+    };
+  }
+
+  async globalSearch(input: { q: string; limit: number }) {
+    const q = input.q.trim();
+    const limit = input.limit;
+
+    // Heurísticas para id: Power BI GUIDs são comuns
+    const looksLikeGuid =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(q);
+
+    const [users, customers, workspaces, reports] = await this.prisma.$transaction([
+      this.prisma.users.findMany({
+        where: {
+          OR: [
+            { email: { contains: q, mode: "insensitive" } },
+            { display_name: { contains: q, mode: "insensitive" } },
+            ...(looksLikeGuid ? [{ id: q }] : []),
+          ],
+        },
+        orderBy: { created_at: "desc" },
+        take: limit,
+        select: { id: true, email: true, display_name: true, status: true },
+      }),
+
+      this.prisma.customers.findMany({
+        where: {
+          OR: [
+            { code: { contains: q, mode: "insensitive" } },
+            { name: { contains: q, mode: "insensitive" } },
+            ...(looksLikeGuid ? [{ id: q }] : []),
+          ],
+        },
+        orderBy: [{ status: "asc" }, { code: "asc" }],
+        take: limit,
+        select: { id: true, code: true, name: true, status: true },
+      }),
+
+      this.prisma.bi_workspaces.findMany({
+        where: {
+          OR: [
+            { workspace_name: { contains: q, mode: "insensitive" } },
+            ...(looksLikeGuid ? [{ workspace_id: q }] : []),
+          ],
+        },
+        take: limit,
+        orderBy: { created_at: "desc" },
+        select: {
+          id: true,
+          workspace_id: true,
+          workspace_name: true,
+          customer_id: true,
+          is_active: true,
+        },
+      }),
+
+      this.prisma.bi_reports.findMany({
+        where: {
+          OR: [
+            { report_name: { contains: q, mode: "insensitive" } },
+            ...(looksLikeGuid ? [{ report_id: q }, { dataset_id: q }] : []),
+          ],
+        },
+        take: limit,
+        orderBy: { created_at: "desc" },
+        select: {
+          id: true,
+          report_id: true,
+          report_name: true,
+          dataset_id: true,
+          workspace_ref_id: true,
+          is_active: true,
+        },
+      }),
+    ]);
+
+    return {
+      q,
+      users: users.map((u) => ({
+        id: u.id,
+        email: u.email ?? null,
+        displayName: u.display_name ?? null,
+        status: u.status,
+      })),
+      customers: customers.map((c) => ({
+        id: c.id,
+        code: c.code,
+        name: c.name,
+        status: c.status,
+      })),
+      powerbi: {
+        workspaces: workspaces.map((w) => ({
+          id: w.id,
+          workspaceId: w.workspace_id,
+          name: w.workspace_name ?? w.workspace_id,
+          customerId: w.customer_id,
+          isActive: w.is_active,
+        })),
+        reports: reports.map((r) => ({
+          id: r.id,
+          reportId: r.report_id,
+          name: r.report_name ?? r.report_id,
+          datasetId: r.dataset_id,
+          workspaceRefId: r.workspace_ref_id,
+          isActive: r.is_active,
+        })),
+      },
+    };
+  }
+
 }
