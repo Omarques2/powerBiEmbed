@@ -6,6 +6,7 @@ import { AdminController } from "./admin.controller";
 import { AdminAuditController } from "./admin-audit.controller";
 import { AdminPermissionsController } from "./admin-permissions.controller";
 import { AdminCustomersController } from "./admin-customers.controller"; // <-- ADD
+import { AdminSecurityController } from "./admin-security.controller";
 
 @Module({
   controllers: [
@@ -13,7 +14,8 @@ import { AdminCustomersController } from "./admin-customers.controller"; // <-- 
     AdminController,
     AdminAuditController,
     AdminPermissionsController,
-    AdminCustomersController, // <-- ADD
+    AdminCustomersController,      
+    AdminSecurityController,
   ],
   providers: [AdminUsersService],
 })

@@ -29,8 +29,11 @@
       </div>
     </div>
 
-    <div v-if="error" class="mt-3 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700
-                           dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-200">
+    <div
+      v-if="error"
+      class="mt-3 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700
+             dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-200"
+    >
       {{ error }}
     </div>
 
@@ -151,8 +154,11 @@
           </button>
         </div>
 
-        <div v-if="modalError" class="mt-3 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700
-                                     dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-200">
+        <div
+          v-if="modalError"
+          class="mt-3 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700
+                 dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-200"
+        >
           {{ modalError }}
         </div>
 
@@ -167,8 +173,12 @@
                      dark:border-slate-800 dark:bg-slate-900"
               :disabled="modal.mode === 'edit' && lockCodeOnEdit"
             />
-            <div v-if="modal.mode === 'edit' && lockCodeOnEdit" class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
-              Code está travado no modo edit (recomendado). Se quiser permitir edição do code, desative <span class="font-mono">lockCodeOnEdit</span> no componente.
+            <div
+              v-if="modal.mode === 'edit' && lockCodeOnEdit"
+              class="mt-1 text-[11px] text-slate-500 dark:text-slate-400"
+            >
+              Code está travado no modo edit (recomendado). Se quiser permitir edição do code, desative
+              <span class="font-mono">lockCodeOnEdit</span> no componente.
             </div>
           </div>
 
@@ -225,6 +235,9 @@
 import { computed, ref } from "vue";
 import type { CustomerRow } from "./adminApi";
 import { createCustomer, updateCustomer, setCustomerStatus } from "./adminApi";
+import { useToast } from "../ui/toast/useToast";
+
+const { push } = useToast();
 
 const props = defineProps<{
   customers: CustomerRow[];
@@ -268,7 +281,7 @@ const modal = ref<{ open: boolean; mode: "create" | "edit"; customerId?: string 
   mode: "create",
 });
 
-const form = ref<{ code: string; name: string; status: "active" | "inactive" }>({
+const form = ref<{ code: string; name: string; status: "active" | "inactive" }>(/* */{
   code: "",
   name: "",
   status: "active",
@@ -307,6 +320,10 @@ function validateLocal() {
   }
 }
 
+function extractErrMessage(e: any): string {
+  return e?.response?.data?.message ?? e?.message ?? "Erro desconhecido";
+}
+
 async function save() {
   modalError.value = "";
   saving.value = true;
@@ -319,6 +336,12 @@ async function save() {
 
     if (modal.value.mode === "create") {
       await createCustomer({ code, name, status: form.value.status });
+      push({
+        kind: "success",
+        title: "Customer criado",
+        message: `${code} — ${name}`,
+        timeoutMs: 3500,
+      });
     } else {
       const customerId = modal.value.customerId!;
       const payload: any = { name };
@@ -327,12 +350,28 @@ async function save() {
       if (!lockCodeOnEdit) payload.code = code;
 
       await updateCustomer(customerId, payload);
+      push({
+        kind: "success",
+        title: "Customer atualizado",
+        message: `${code} — ${name}`,
+        timeoutMs: 3500,
+      });
     }
 
     await props.refresh();
     closeModal();
   } catch (e: any) {
-    modalError.value = e?.response?.data?.message ?? e?.message ?? "Falha ao salvar";
+    const msg = extractErrMessage(e);
+    modalError.value = msg;
+
+    // P0: toast global padronizado (sem perder o erro inline do modal)
+    push({
+      kind: "error",
+      title: "Falha ao salvar customer",
+      message: msg,
+      details: e?.response?.data ?? e,
+      timeoutMs: 8000,
+    });
   } finally {
     saving.value = false;
   }
@@ -340,13 +379,27 @@ async function save() {
 
 async function toggleStatus(c: CustomerRow) {
   busyId.value = c.id;
+
   try {
     const next = c.status === "active" ? "inactive" : "active";
     await setCustomerStatus(c.id, next as any);
+
+    push({
+      kind: "success",
+      title: "Customer atualizado",
+      message: `Status: ${next}`,
+      timeoutMs: 3500,
+    });
+
     await props.refresh();
   } catch (e: any) {
-    // se preferir, pode emitir toast global; aqui fica simples
-    alert(e?.response?.data?.message ?? e?.message ?? "Falha ao alterar status");
+    push({
+      kind: "error",
+      title: "Falha ao atualizar customer",
+      message: extractErrMessage(e),
+      details: e?.response?.data ?? e,
+      timeoutMs: 8000,
+    });
   } finally {
     busyId.value = "";
   }

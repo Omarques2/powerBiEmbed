@@ -1332,4 +1332,233 @@ export class AdminUsersService {
       return { ok: true };
     });
   }
+
+  // =============================
+  // SECURITY / PLATFORM ADMINS
+  // =============================
+
+  async listPlatformAdmins(input: { appKey: string; roleKey?: string }) {
+    const appKey = (input.appKey ?? "PBI_EMBED").trim();
+    const roleKey = (input.roleKey ?? "platform_admin").trim();
+
+    const rows = await this.prisma.user_app_roles.findMany({
+      where: {
+        customer_id: null,
+        applications: { app_key: appKey },
+        app_roles: { role_key: roleKey },
+      },
+      select: {
+        created_at: true,
+        users: { select: { id: true, email: true, display_name: true, status: true } },
+        applications: { select: { app_key: true } },
+        app_roles: { select: { role_key: true } },
+      },
+      orderBy: { created_at: "asc" },
+    });
+
+    return rows.map((r) => ({
+      userId: r.users.id,
+      email: r.users.email ?? null,
+      displayName: r.users.display_name ?? null,
+      status: r.users.status,
+      grantedAt: r.created_at,
+      appKey: r.applications.app_key,
+      roleKey: r.app_roles.role_key,
+    }));
+  }
+
+  private async ensureAppAndRoleTx(
+    tx: Prisma.TransactionClient,
+    input: { appKey: string; roleKey: string },
+  ) {
+    const app = await tx.applications.upsert({
+      where: { app_key: input.appKey },
+      create: { app_key: input.appKey, name: input.appKey },
+      update: { name: input.appKey },
+      select: { id: true, app_key: true },
+    });
+
+    const role = await tx.app_roles.upsert({
+      where: { application_id_role_key: { application_id: app.id, role_key: input.roleKey } },
+      create: {
+        application_id: app.id,
+        role_key: input.roleKey,
+        name: input.roleKey === "platform_admin" ? "Platform Admin" : input.roleKey,
+      },
+      update: {
+        name: input.roleKey === "platform_admin" ? "Platform Admin" : input.roleKey,
+      },
+      select: { id: true, role_key: true },
+    });
+
+    return { app, role };
+  }
+
+  private async countPlatformAdminsTx(
+    tx: Prisma.TransactionClient,
+    input: { appKey: string; roleKey: string },
+  ) {
+    return tx.user_app_roles.count({
+      where: {
+        customer_id: null,
+        applications: { app_key: input.appKey },
+        app_roles: { role_key: input.roleKey },
+      },
+    });
+  }
+
+  async grantPlatformAdmin(
+    input: { appKey: string; roleKey: string; userId: string | null; userEmail: string | null },
+    actorSub: string | null,
+  ) {
+    const appKey = (input.appKey ?? "PBI_EMBED").trim();
+    const roleKey = (input.roleKey ?? "platform_admin").trim();
+
+    const actorUserId = await this.resolveActorUserId(actorSub);
+
+    // Resolve user alvo
+    const targetUser =
+      input.userId
+        ? await this.prisma.users.findUnique({
+            where: { id: input.userId },
+            select: { id: true, email: true, status: true },
+          })
+        : await this.prisma.users.findFirst({
+            where: { email: { equals: String(input.userEmail), mode: "insensitive" } as any },
+            select: { id: true, email: true, status: true },
+          });
+
+    if (!targetUser) {
+      throw new NotFoundException("User not found");
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const { app, role } = await this.ensureAppAndRoleTx(tx, { appKey, roleKey });
+
+      // Idempotência: se já existe, no-op
+      const existing = await tx.user_app_roles.findFirst({
+        where: {
+          user_id: targetUser.id,
+          application_id: app.id,
+          app_role_id: role.id,
+          customer_id: null,
+        },
+        select: { id: true, created_at: true },
+      });
+
+      if (!existing) {
+        await tx.user_app_roles.create({
+          data: {
+            user_id: targetUser.id,
+            application_id: app.id,
+            customer_id: null,
+            app_role_id: role.id,
+          },
+        });
+      }
+
+      await tx.audit_log.create({
+        data: {
+          actor_user_id: actorUserId,
+          action: "PLATFORM_ADMIN_GRANTED",
+          entity_type: "users",
+          entity_id: targetUser.id,
+          before_data: existing
+            ? { alreadyHadRole: true, appKey, roleKey }
+            : { alreadyHadRole: false, appKey, roleKey },
+          after_data: {
+            user: { id: targetUser.id, email: targetUser.email ?? null },
+            application: appKey,
+            role: roleKey,
+          },
+        },
+      });
+
+      return {
+        ok: true,
+        idempotent: Boolean(existing),
+        userId: targetUser.id,
+        appKey,
+        roleKey,
+      };
+    });
+  }
+
+  async revokePlatformAdmin(
+    input: { userId: string; appKey: string; roleKey: string },
+    actorSub: string | null,
+  ) {
+    const userId = input.userId.trim();
+    const appKey = (input.appKey ?? "PBI_EMBED").trim();
+    const roleKey = (input.roleKey ?? "platform_admin").trim();
+
+    const actorUserId = await this.resolveActorUserId(actorSub);
+
+    const user = await this.prisma.users.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true },
+    });
+    if (!user) throw new NotFoundException("User not found");
+
+    return this.prisma.$transaction(async (tx) => {
+      // Descobre app/role (cria se não existir)
+      const { app, role } = await this.ensureAppAndRoleTx(tx, { appKey, roleKey });
+
+      const existing = await tx.user_app_roles.findFirst({
+        where: {
+          user_id: userId,
+          application_id: app.id,
+          app_role_id: role.id,
+          customer_id: null,
+        },
+        select: { id: true, created_at: true },
+      });
+
+      // Idempotente: se não existe, no-op (mas audita tentativa)
+      if (!existing) {
+        await tx.audit_log.create({
+          data: {
+            actor_user_id: actorUserId,
+            action: "PLATFORM_ADMIN_REVOKED",
+            entity_type: "users",
+            entity_id: userId,
+            before_data: { hadRole: false, appKey, roleKey },
+            after_data: { ok: true, noOp: true },
+          },
+        });
+
+        return { ok: true, idempotent: true };
+      }
+
+      // Break-glass: impedir remover o último admin do app/role
+      const totalAdmins = await this.countPlatformAdminsTx(tx, { appKey, roleKey });
+      if (totalAdmins <= 1) {
+        throw new BadRequestException({ code: "LAST_PLATFORM_ADMIN", message: "Cannot revoke the last platform admin." });
+      }
+
+      await tx.user_app_roles.delete({ where: { id: existing.id } });
+
+      await tx.audit_log.create({
+        data: {
+          actor_user_id: actorUserId,
+          action: "PLATFORM_ADMIN_REVOKED",
+          entity_type: "users",
+          entity_id: userId,
+          before_data: {
+            hadRole: true,
+            grantedAt: existing.created_at,
+            application: appKey,
+            role: roleKey,
+          },
+          after_data: {
+            user: { id: userId, email: user.email ?? null },
+            application: appKey,
+            role: roleKey,
+          },
+        },
+      });
+
+      return { ok: true, idempotent: false };
+    });
+  }
 }

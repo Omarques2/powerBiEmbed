@@ -206,6 +206,13 @@
       </div>
 
       <!-- ========================= -->
+      <!-- TAB: SECURITY -->
+      <!-- ========================= -->
+      <div v-if="tab === 'security'" class="mt-6">
+        <SecurityPlatformAdminsPanel />
+      </div>
+
+      <!-- ========================= -->
       <!-- TAB: POWER BI OPS -->
       <!-- ========================= -->
       <div v-if="tab === 'powerbi'" class="mt-6">
@@ -549,6 +556,7 @@ import {
 import PowerBiOpsPanel from "../admin/PowerBiOpsPanel.vue";
 import CustomersPanel from "../admin/CustomersPanel.vue";
 import UserMembershipEditor from "../admin/UserMembershipEditor.vue";
+import SecurityPlatformAdminsPanel from "../admin/SecurityPlatformAdminsPanel.vue";
 
 const router = useRouter();
 
@@ -556,6 +564,7 @@ const tabs = [
   { key: "pending", label: "Pendentes" },
   { key: "customers", label: "Customers" },
   { key: "active", label: "Usuários ativos" },
+  { key: "security", label: "Security" },
   { key: "audit", label: "Auditoria" },
   { key: "powerbi", label: "Power BI" },
 ] as const;
@@ -922,6 +931,7 @@ async function reloadCurrentTab() {
   if (tab.value === "pending") return loadPending();
   if (tab.value === "customers") return loadCustomers();
   if (tab.value === "powerbi") return loadCustomers();
+  if (tab.value === "security") return; // o painel já tem refresh próprio (load onMounted + botões internos)
   if (tab.value === "active") {
     await loadActiveUsers(activePaged.value.page || 1);
     if (selectedActive.value) await reloadPerms();
@@ -941,6 +951,8 @@ watch(tab, async (t) => {
   if (t === "pending" && pending.value.length === 0) await loadPending();
   if (t === "active" && activePaged.value.rows.length === 0) await loadActiveUsers(1);
   if (t === "audit" && auditPaged.value.rows.length === 0) await loadAudit(1);
+
+  // security: não pre-carrega nada aqui para evitar dupla chamada (o componente carrega sozinho)
 });
 
 onMounted(async () => {
