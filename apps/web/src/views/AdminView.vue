@@ -91,30 +91,8 @@
           <!-- ========================= -->
           <!-- TAB: ACTIVE USERS + PERMS (extracted) -->
           <!-- ========================= -->
-          <ActiveUsersPermsTab
-            v-else-if="tab === 'active'"
-            :loadingActive="loadingActive"
-            :activeQuery="activeQuery"
-            :activePaged="activePaged"
-            :selectedActive="selectedActive"
-            :loadingPerms="loadingPerms"
-            :savingPerm="savingPerm"
-            :perms="perms"
-            :permsCustomerId="permsCustomerId"
-            :permsMembershipOptions="permsMembershipOptions"
-            :grantReportsOnWorkspaceEnable="grantReportsOnWorkspaceEnable"
-            :permMsg="permMsg"
-            :fmtDate="fmtDate"
-            @update:activeQuery="activeQuery = $event"
-            @loadActiveUsers="loadActiveUsers"
-            @selectActive="selectActive"
-            @reloadPerms="reloadPerms"
-            @refreshSelectedUser="refreshSelectedUser"
-            @update:permsCustomerId="permsCustomerId = $event"
-            @update:grantReportsOnWorkspaceEnable="grantReportsOnWorkspaceEnable = $event"
-            @toggleWorkspace="toggleWorkspace"
-            @toggleReport="toggleReport"
-          />
+          <ActiveUsersPermsPanel v-if="tab === 'active'" />
+
 
           <!-- ========================= -->
           <!-- TAB: AUDIT (extracted) -->
@@ -149,6 +127,7 @@ import PendingUsersTab from "../admin/tabs/PendingUsersTab.vue";
 import ActiveUsersPermsTab from "../admin/tabs/ActiveUsersPermsTab.vue";
 import AuditTab from "../admin/tabs/AuditTab.vue";
 import OverviewPanel from "../admin/OverviewPanel.vue";
+import ActiveUsersPermsPanel from "../admin/panels/ActiveUsersPermsPanel.vue";
 
 import {
   type CustomerRow,
