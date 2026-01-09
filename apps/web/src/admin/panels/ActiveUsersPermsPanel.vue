@@ -241,7 +241,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from "vue";
 import { useToast } from "../../ui/toast/useToast";
-import PermSwitch from "../components/PermSwitch.vue";
+import { PermSwitch } from "@/ui/toggles";
 import UserMembershipEditor from "../UserMembershipEditor.vue";
 
 import {

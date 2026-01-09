@@ -91,7 +91,7 @@
           <!-- ========================= -->
           <!-- TAB: ACTIVE USERS + PERMS (extracted) -->
           <!-- ========================= -->
-          <ActiveUsersPermsPanel v-if="tab === 'active'" />
+          <ActiveUsersPermsPanel v-else-if="tab === 'active'" />
 
 
           <!-- ========================= -->
@@ -124,7 +124,6 @@ import AdminSidebar, { type AdminTabKey } from "../admin/components/AdminSidebar
 import AdminTopBar from "../admin/components/AdminTopBar.vue";
 
 import PendingUsersTab from "../admin/tabs/PendingUsersTab.vue";
-import ActiveUsersPermsTab from "../admin/tabs/ActiveUsersPermsTab.vue";
 import AuditTab from "../admin/tabs/AuditTab.vue";
 import OverviewPanel from "../admin/OverviewPanel.vue";
 import ActiveUsersPermsPanel from "../admin/panels/ActiveUsersPermsPanel.vue";
@@ -138,8 +137,6 @@ import {
   listPendingUsers,
   listActiveUsers,
   getUserPermissions,
-  setWorkspacePermission,
-  setReportPermission,
   listAuditLogs,
   type ActiveUserRow,
 } from "../admin/adminApi";
@@ -367,17 +364,9 @@ const activePaged = ref({ page: 1, pageSize: 25, total: 0, rows: [] as ActiveUse
 const selectedActive = ref<ActiveUserRow | null>(null);
 
 const loadingPerms = ref(false);
-const savingPerm = ref(false);
 const perms = ref<UserPermissionsResponse | null>(null);
 const permsCustomerId = ref<string>("");
 const permMsg = ref("");
-const grantReportsOnWorkspaceEnable = ref(true);
-
-const permsMembershipOptions = computed<MembershipRow[]>(() => {
-  const ms = perms.value?.memberships ?? [];
-  const active = ms.filter((m: MembershipRow) => m.isActive);
-  return active.length ? active : ms;
-});
 
 async function loadActiveUsers(page = 1) {
   loadingActive.value = true;
@@ -398,12 +387,6 @@ async function loadActiveUsers(page = 1) {
   }
 }
 
-async function selectActive(u: ActiveUserRow) {
-  selectedActive.value = u;
-  permMsg.value = "";
-  await reloadPerms();
-}
-
 function pickDefaultCustomerId(memberships: MembershipRow[], preferred?: string): string {
   const active = memberships.filter((m) => m.isActive);
   const allowed = new Set(active.map((m) => m.customerId));
@@ -415,34 +398,6 @@ function pickDefaultCustomerId(memberships: MembershipRow[], preferred?: string)
 
   const firstAny = memberships[0];
   return firstAny?.customerId ?? "";
-}
-
-async function refreshSelectedUser() {
-  if (!selectedActive.value) return;
-
-  loadingPerms.value = true;
-  error.value = "";
-  permMsg.value = "";
-
-  const userId = selectedActive.value.id;
-  const currentCustomerId = permsCustomerId.value || undefined;
-
-  try {
-    const base = (await getUserPermissions(userId, currentCustomerId)) as unknown as UserPermissionsResponse;
-
-    const desired = pickDefaultCustomerId(base.memberships ?? [], permsCustomerId.value);
-    permsCustomerId.value = desired;
-
-    if (desired && desired !== currentCustomerId) {
-      perms.value = (await getUserPermissions(userId, desired)) as unknown as UserPermissionsResponse;
-    } else {
-      perms.value = base;
-    }
-  } catch (e: any) {
-    error.value = e?.response?.data?.message ?? e?.message ?? String(e);
-  } finally {
-    loadingPerms.value = false;
-  }
 }
 
 async function reloadPerms() {
@@ -473,47 +428,6 @@ async function reloadPerms() {
   }
 }
 
-async function toggleWorkspace(ws: WorkspacePermRow) {
-  if (!selectedActive.value) return;
-  savingPerm.value = true;
-  error.value = "";
-  permMsg.value = "";
-  try {
-    const next = !ws.canView;
-    const res = await setWorkspacePermission(
-      selectedActive.value.id,
-      ws.workspaceRefId,
-      next,
-      grantReportsOnWorkspaceEnable.value,
-    );
-
-    permMsg.value = next
-      ? `Workspace habilitado. Reports afetados: ${res.reportsAffected ?? 0}.`
-      : `Workspace desabilitado. Reports desabilitados: ${res.reportsAffected ?? 0}.`;
-
-    await reloadPerms();
-  } catch (e: any) {
-    error.value = e?.response?.data?.message ?? e?.message ?? String(e);
-  } finally {
-    savingPerm.value = false;
-  }
-}
-
-async function toggleReport(r: ReportPermRow) {
-  if (!selectedActive.value) return;
-  savingPerm.value = true;
-  error.value = "";
-  permMsg.value = "";
-  try {
-    await setReportPermission(selectedActive.value.id, r.reportRefId, !r.canView);
-    permMsg.value = !r.canView ? "Report habilitado." : "Report desabilitado.";
-    await reloadPerms();
-  } catch (e: any) {
-    error.value = e?.response?.data?.message ?? e?.message ?? String(e);
-  } finally {
-    savingPerm.value = false;
-  }
-}
 
 // ---------- AUDIT ----------
 const loadingAudit = ref(false);

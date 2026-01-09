@@ -191,7 +191,7 @@ import { useConfirm } from "../ui/confirm/useConfirm";
 
 import AddMembershipModal from "./components/AddMembershipModal.vue";
 import MembershipActionWizard from "./components/MembershipActionWizard.vue";
-import PermSwitch from "./components/PermSwitch.vue"; 
+import { PermSwitch } from "@/ui/toggles";
 
 const props = defineProps<{
   userId: string;
