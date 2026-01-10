@@ -1,3 +1,4 @@
+<!-- apps/web/src/admin/SecurityPlatformAdminsPanel.vue -->
 <template>
   <div class="space-y-4">
     <!-- Banner de risco -->
@@ -8,27 +9,27 @@
       </div>
     </div>
 
-    <!-- Controles -->
-    <div class="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+    <div class="min-w-0 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
       <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div class="min-w-0">
           <div class="text-sm font-semibold text-slate-900 dark:text-slate-100">Platform Admins</div>
           <div class="mt-1 text-xs text-slate-600 dark:text-slate-300">
-            Aplicação:
-            <span class="font-mono">{{ appKey }}</span>
+            Baseado em <span class="font-mono">app_roles + user_app_roles</span> para <span class="font-mono">{{ appKey }}</span>.
           </div>
         </div>
 
-        <div class="flex gap-2">
+        <div class="flex min-w-0 items-center gap-2">
           <input
             v-model="q"
-            placeholder="Buscar por nome/email..."
-            class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-800 dark:bg-slate-900 sm:w-72"
+            placeholder="Buscar..."
+            class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-800 dark:bg-slate-900 sm:w-[260px]"
           />
           <button
-            class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm hover:bg-slate-50 disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+            type="button"
+            class="shrink-0 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs hover:bg-slate-50
+                   disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
             :disabled="loading"
-            @click="load()"
+            @click="load"
           >
             {{ loading ? "Carregando..." : "Recarregar" }}
           </button>
@@ -41,72 +42,87 @@
           v-model="newEmail"
           placeholder="Email do usuário para conceder Platform Admin"
           class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-800 dark:bg-slate-900"
+          :disabled="granting"
+          @keydown.enter.prevent="onGrant"
         />
         <button
-          class="rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 disabled:opacity-60 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
-          :disabled="granting || !newEmail.trim()"
-          @click="onGrant()"
+          type="button"
+          class="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800
+                 disabled:opacity-60 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
+          :disabled="granting || !canGrant"
+          @click="onGrant"
         >
           {{ granting ? "Concedendo..." : "Conceder" }}
         </button>
       </div>
 
-      <div v-if="error" class="text-sm text-rose-600">{{ error }}</div>
-    </div>
+      <div v-if="error" class="rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700 dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-200">
+        {{ error }}
+      </div>
 
-    <!-- Table -->
-    <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-      <table class="w-full text-left text-sm">
-        <thead class="bg-slate-50 text-xs text-slate-600 dark:bg-slate-950 dark:text-slate-300">
-          <tr>
-            <th class="px-4 py-3">Nome</th>
-            <th class="px-4 py-3">Email</th>
-            <th class="px-4 py-3">Status</th>
-            <th class="px-4 py-3">Concedido em</th>
-            <th class="px-4 py-3 text-right">Ações</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="r in filtered" :key="r.userId" class="border-t border-slate-100 dark:border-slate-800">
-            <td class="px-4 py-3">
-              <div class="font-medium text-slate-900 dark:text-slate-100">{{ r.displayName ?? "—" }}</div>
-              <div class="mt-0.5 text-xs text-slate-500 dark:text-slate-400 font-mono">{{ r.userId }}</div>
-            </td>
-            <td class="px-4 py-3">{{ r.email ?? "—" }}</td>
-            <td class="px-4 py-3">
-              <span
-                class="inline-flex items-center rounded-full border px-2 py-0.5 text-xs"
-                :class="r.status === 'active'
-                  ? 'border-emerald-200 text-emerald-700 dark:border-emerald-900 dark:text-emerald-200'
-                  : 'border-slate-200 text-slate-600 dark:border-slate-800 dark:text-slate-300'"
-              >
-                {{ r.status }}
-              </span>
-            </td>
-            <td class="px-4 py-3">{{ fmt(r.grantedAt) }}</td>
-            <td class="px-4 py-3 text-right">
-              <button
-                class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs hover:bg-slate-50 disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
-                :disabled="revokingId === r.userId"
-                @click="onRevoke(r.userId, r.email)"
-              >
-                {{ revokingId === r.userId ? "Revogando..." : "Revogar" }}
-              </button>
-            </td>
-          </tr>
+      <!-- List -->
+      <div class="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-800">
+        <table class="w-full table-fixed text-left text-sm">
+          <thead class="bg-slate-50 text-xs text-slate-600 dark:bg-slate-950/40 dark:text-slate-300">
+            <tr>
+              <th class="px-4 py-3">Usuário</th>
+              <th class="w-28 px-4 py-3">Status</th>
+              <th class="w-44 px-4 py-3">Granted at</th>
+              <th class="w-32 px-4 py-3 text-right"></th>
+            </tr>
+          </thead>
 
-          <tr v-if="!loading && filtered.length === 0">
-            <td colspan="5" class="px-4 py-6 text-center text-sm text-slate-600 dark:text-slate-300">
-              Nenhum platform admin encontrado.
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+          <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
+            <tr v-for="r in filtered" :key="r.userId" class="hover:bg-slate-50/60 dark:hover:bg-slate-950/30">
+              <td class="px-4 py-3">
+                <div class="min-w-0">
+                  <div class="truncate font-medium text-slate-900 dark:text-slate-100">
+                    {{ r.displayName || r.email || r.userId }}
+                  </div>
+                  <div class="truncate text-[11px] text-slate-500 dark:text-slate-400">
+                    {{ r.email || "—" }} • {{ r.userId }}
+                  </div>
+                </div>
+              </td>
 
-    <!-- Footer: contagem / break-glass -->
-    <div class="text-xs text-slate-600 dark:text-slate-300">
-      Total: <span class="font-semibold">{{ rows.length }}</span> platform admins.
+              <td class="px-4 py-3">
+                <span class="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] text-slate-700 dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-200">
+                  {{ r.status }}
+                </span>
+              </td>
+
+              <td class="px-4 py-3 text-xs text-slate-700 dark:text-slate-200">
+                {{ fmtDate(r.grantedAt) }}
+              </td>
+
+              <td class="px-4 py-3">
+                <div class="flex justify-end">
+                  <button
+                    type="button"
+                    class="rounded-xl border border-rose-200 bg-rose-600 px-3 py-2 text-xs font-semibold text-white hover:bg-rose-500
+                           disabled:opacity-60 dark:border-rose-900/40 dark:bg-rose-700 dark:hover:bg-rose-600"
+                    :disabled="busy.isBusy(r.userId) || isLastAdmin"
+                    @click="onRevoke(r)"
+                    :title="isLastAdmin ? 'Não é permitido revogar o último platform admin' : 'Revogar Platform Admin'"
+                  >
+                    {{ busy.isBusy(r.userId) ? "..." : "Revogar" }}
+                  </button>
+                </div>
+              </td>
+            </tr>
+
+            <tr v-if="!filtered.length">
+              <td colspan="4" class="px-4 py-6 text-center text-xs text-slate-500 dark:text-slate-400">
+                Nenhum platform admin encontrado.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div v-if="isLastAdmin" class="text-xs text-amber-700 dark:text-amber-200">
+        Break-glass: você não pode revogar o último Platform Admin via UI.
+      </div>
     </div>
   </div>
 </template>
@@ -114,13 +130,18 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { grantPlatformAdmin, listPlatformAdmins, revokePlatformAdmin, type PlatformAdminRow } from "./adminApi";
-import { useToast } from "../ui/toast/useToast";
-import { useConfirm } from "../ui/confirm/useConfirm";
+import { useToast } from "@/ui/toast/useToast";
+import { useConfirm } from "@/ui/confirm/useConfirm";
+import { useBusyMap } from "@/ui/ops/useBusyMap";
+import { useOptimisticMutation } from "@/ui/ops/useOptimisticMutation";
+import { normalizeApiError } from "@/ui/ops/normalizeApiError";
 
 const appKey = "PBI_EMBED";
 
 const { push } = useToast();
 const { confirm } = useConfirm();
+const busy = useBusyMap();
+const { mutate } = useOptimisticMutation();
 
 const rows = ref<PlatformAdminRow[]>([]);
 const loading = ref(false);
@@ -129,23 +150,42 @@ const error = ref("");
 const q = ref("");
 const newEmail = ref("");
 const granting = ref(false);
-const revokingId = ref<string>("");
+
+const isLastAdmin = computed(() => rows.value.length <= 1);
 
 const filtered = computed(() => {
-  const s = q.value.trim().toLowerCase();
-  if (!s) return rows.value;
+  const needle = q.value.trim().toLowerCase();
+  if (!needle) return rows.value;
+
   return rows.value.filter((r) => {
-    const name = (r.displayName ?? "").toLowerCase();
-    const email = (r.email ?? "").toLowerCase();
-    return name.includes(s) || email.includes(s) || r.userId.toLowerCase().includes(s);
+    const hay = `${r.email ?? ""} ${r.displayName ?? ""} ${r.userId ?? ""}`.toLowerCase();
+    return hay.includes(needle);
   });
 });
 
-function fmt(iso: string) {
+const canGrant = computed(() => {
+  const email = newEmail.value.trim();
+  return email.length >= 5 && email.includes("@");
+});
+
+function fmtDate(iso: string) {
   try {
-    return new Date(iso).toLocaleString();
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return iso;
+    return d.toLocaleString();
   } catch {
     return iso;
+  }
+}
+
+function upsertLocal(row: PlatformAdminRow) {
+  const idx = rows.value.findIndex((x) => x.userId === row.userId);
+  if (idx >= 0) {
+    const next = [...rows.value];
+    next[idx] = row;
+    rows.value = next;
+  } else {
+    rows.value = [row, ...rows.value];
   }
 }
 
@@ -155,13 +195,14 @@ async function load() {
   try {
     rows.value = await listPlatformAdmins(appKey);
   } catch (e: any) {
-    error.value = e?.response?.data?.message ?? e?.message ?? String(e);
+    const ne = normalizeApiError(e);
+    error.value = ne.message;
     push({
       kind: "error",
-      title: "Falha ao carregar platform admins",
-      message: "Verifique permissões e tente novamente.",
-      details: e?.response?.data ?? e,
-      timeoutMs: 6500,
+      title: "Falha ao carregar Platform Admins",
+      message: ne.message,
+      details: ne.details,
+      timeoutMs: 9000,
     });
   } finally {
     loading.value = false;
@@ -169,43 +210,58 @@ async function load() {
 }
 
 async function onGrant() {
-  const email = newEmail.value.trim();
-  const ok = await confirm({
-    title: "Conceder Platform Admin?",
-    message: `Você está prestes a conceder Platform Admin para: ${email}. Esta ação dá acesso total ao Admin Panel.`,
-    confirmText: "Conceder",
-    cancelText: "Cancelar",
-    danger: true,
-  });
-
-  if (!ok) return;
+  const email = newEmail.value.trim().toLowerCase();
+  if (!email) return;
 
   granting.value = true;
   try {
-    await grantPlatformAdmin({ appKey, userEmail: email });
+    const res = await grantPlatformAdmin({ appKey, userEmail: email });
+
+    const maybeRow =
+      res && typeof res === "object" && "userId" in (res as any)
+        ? (res as PlatformAdminRow)
+        : null;
+
+    if (maybeRow) {
+      upsertLocal(maybeRow);
+    } else {
+      await load();
+    }
+
     push({ kind: "success", title: "Platform Admin concedido", message: email });
     newEmail.value = "";
-    await load();
   } catch (e: any) {
-    const data = e?.response?.data;
+    const ne = normalizeApiError(e);
     push({
       kind: "error",
       title: "Falha ao conceder Platform Admin",
-      message: data?.message ?? e?.message ?? "Erro desconhecido",
-      details: data ?? e,
-      timeoutMs: 8000,
+      message: ne.message,
+      details: ne.details,
+      timeoutMs: 9000,
     });
   } finally {
     granting.value = false;
   }
 }
 
-async function onRevoke(userId: string, email: string | null) {
-  const label = email ?? userId;
+async function onRevoke(row: PlatformAdminRow) {
+  if (isLastAdmin.value) {
+    push({
+      kind: "error",
+      title: "Operação bloqueada",
+      message: "Não é permitido revogar o último Platform Admin (break-glass).",
+      timeoutMs: 8000,
+    });
+    return;
+  }
+
+  const label = row.email ?? row.displayName ?? row.userId;
 
   const ok = await confirm({
     title: "Revogar Platform Admin?",
-    message: `Você está prestes a revogar Platform Admin de ${label}. Se este for o último platform admin, a operação será bloqueada.`,
+    message:
+      `Você está prestes a revogar Platform Admin de ${label}. ` +
+      "Essa ação remove acesso total ao Admin Panel e operações de Power BI.",
     confirmText: "Revogar",
     cancelText: "Cancelar",
     danger: true,
@@ -213,30 +269,25 @@ async function onRevoke(userId: string, email: string | null) {
 
   if (!ok) return;
 
-  revokingId.value = userId;
-  try {
-    await revokePlatformAdmin(userId, appKey);
-    push({ kind: "success", title: "Platform Admin revogado", message: label });
-    await load();
-  } catch (e: any) {
-    const data = e?.response?.data;
-    const code = data?.code ?? data?.message?.code;
-
-    const human =
-      code === "LAST_PLATFORM_ADMIN"
-        ? "Não é permitido revogar o último platform admin."
-        : (data?.message ?? e?.message ?? "Erro desconhecido");
-
-    push({
-      kind: "error",
-      title: "Falha ao revogar Platform Admin",
-      message: human,
-      details: data ?? e,
-      timeoutMs: 9000,
-    });
-  } finally {
-    revokingId.value = "";
-  }
+  await mutate<PlatformAdminRow[], any>({
+    key: row.userId,
+    busy,
+    optimistic: () => {
+      const snap = [...rows.value];
+      rows.value = rows.value.filter((x) => x.userId !== row.userId);
+      return snap;
+    },
+    request: async () => {
+      return await revokePlatformAdmin(row.userId, appKey);
+    },
+    rollback: (snap) => {
+      rows.value = snap;
+    },
+    toast: {
+      success: { title: "Platform Admin revogado", message: label },
+      error: { title: "Falha ao revogar Platform Admin" },
+    },
+  });
 }
 
 onMounted(load);

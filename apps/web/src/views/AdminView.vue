@@ -1,101 +1,105 @@
 <!-- apps/web/src/views/AdminView.vue -->
 <template>
-  <div class="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
-    <div class="mx-auto max-w-[1400px] px-3 py-4">
-      <div class="grid grid-cols-1 gap-4 lg:grid-cols-[260px_1fr]">
-        <!-- SIDEBAR (layout-only) -->
-        <AdminSidebar
-          :activeKey="tab"
-          :items="sidebarItems"
-          @select="onSelectTab"
-        />
+  <div class="min-h-screen bg-slate-50 dark:bg-slate-950">
+    <div class="w-full px-2 py-3 sm:px-4 sm:py-4 lg:px-6">
+      <!-- GLOBAL TOPBAR (spans sidebar + content) -->
+      <AdminTopBar
+        class="mb-3 sm:mb-4"
+        :section="title"
+        :subtitle="''"
+        :loadingAny="loadingAny"
+        :showSearch="false"
+        @reload="reloadCurrentTab"
+        @back="goBack"
+        @search="noopSearch"
+      />
 
-        <!-- MAIN -->
-        <main class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          <!-- TOP BAR (layout-only) -->
-          <AdminTopBar
-            :title="title"
-            :subtitle="subtitle"
-            :loadingAny="loadingAny"
-            :showSearch="false"
-            @reload="reloadCurrentTab"
-            @back="goBack"
-            @search="noopSearch"
+      <div class="flex flex-col gap-3 lg:flex-row lg:gap-4">
+        <!-- Sidebar -->
+        <aside class="lg:w-[260px] xl:w-[280px]">
+          <AdminSidebar
+            :items="sidebarItems"
+            :activeKey="tab"
+            @select="onSelectTab"
           />
+        </aside>
 
-          <!-- ERROR -->
+        <!-- Content -->
+        <main class="min-w-0 flex-1">
           <div
             v-if="error"
-            class="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700
+            class="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700
                    dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-200"
           >
             {{ error }}
           </div>
 
           <!-- ========================= -->
-          <!-- TAB: OVERVIEW (placeholder) -->
+          <!-- TAB: OVERVIEW -->
           <!-- ========================= -->
-          <div v-if="tab === 'overview'" class="mt-6">
+          <div v-if="tab === 'overview'">
             <OverviewPanel />
           </div>
 
           <!-- ========================= -->
-          <!-- TAB: PENDING USERS (extracted) -->
-          <!-- ========================= -->
-          <PendingUsersTab
-            v-else-if="tab === 'pending'"
-            :pending="pending"
-            :loadingPending="loadingPending"
-            :savingPending="savingPending"
-            :selectedPending="selectedPending"
-            :customers="customersActiveFirst"
-            :pendingCustomerId="pendingCustomerId"
-            :pendingRole="pendingRole"
-            :pendingGrantCustomerWorkspaces="pendingGrantCustomerWorkspaces"
-            :pendingActionMsg="pendingActionMsg"
-            :fmtDate="fmtDate"
-            @selectPending="selectPending"
-            @update:pendingCustomerId="pendingCustomerId = $event"
-            @update:pendingRole="pendingRole = $event"
-            @update:pendingGrantCustomerWorkspaces="pendingGrantCustomerWorkspaces = $event"
-            @approve="approvePending"
-            @disable="disablePending"
-          />
-
-          <!-- ========================= -->
           <!-- TAB: CUSTOMERS -->
           <!-- ========================= -->
-          <div v-else-if="tab === 'customers'" class="mt-6">
+          <div v-else-if="tab === 'customers'">
             <CustomersPanel
               :customers="customersActiveFirst"
               :loading="loadingCustomers"
               :error="error"
               :refresh="loadCustomers"
+              :upsertCustomerLocal="upsertCustomerLocal"
+              :patchCustomerLocal="patchCustomerLocal"
             />
           </div>
 
           <!-- ========================= -->
-          <!-- TAB: SECURITY -->
+          <!-- TAB: PENDING -->
           <!-- ========================= -->
-          <div v-else-if="tab === 'security'" class="mt-6">
-            <SecurityPlatformAdminsPanel />
+          <div v-else-if="tab === 'pending'">
+            <PendingUsersTab
+              :loadingPending="loadingPending"
+              :savingPending="savingPending"
+              :pending="pending"
+              :customers="customersActiveFirst"
+              :selectedPending="selectedPending"
+              :pendingCustomerId="pendingCustomerId"
+              :pendingRole="pendingRole"
+              :pendingGrantCustomerWorkspaces="pendingGrantCustomerWorkspaces"
+              :pendingActionMsg="pendingActionMsg"
+              :fmtDate="fmtDate"
+              @selectPending="selectedPending = $event"
+              @update:pendingCustomerId="pendingCustomerId = $event"
+              @update:pendingRole="pendingRole = $event"
+              @update:pendingGrantCustomerWorkspaces="pendingGrantCustomerWorkspaces = $event"
+              @approve="approvePending"
+              @disable="disablePending"
+            />
           </div>
 
           <!-- ========================= -->
           <!-- TAB: POWER BI OPS -->
           <!-- ========================= -->
-          <div v-else-if="tab === 'powerbi'" class="mt-6">
+          <div v-else-if="tab === 'powerbi'">
             <PowerBiOpsPanel :customers="customersActiveFirst" />
           </div>
 
           <!-- ========================= -->
-          <!-- TAB: ACTIVE USERS + PERMS (extracted) -->
+          <!-- TAB: SECURITY -->
+          <!-- ========================= -->
+          <div v-else-if="tab === 'security'">
+            <SecurityPlatformAdminsPanel />
+          </div>
+
+          <!-- ========================= -->
+          <!-- TAB: ACTIVE USERS + PERMS -->
           <!-- ========================= -->
           <ActiveUsersPermsPanel v-else-if="tab === 'active'" />
 
-
           <!-- ========================= -->
-          <!-- TAB: AUDIT (extracted) -->
+          <!-- TAB: AUDIT -->
           <!-- ========================= -->
           <AuditTab
             v-else-if="tab === 'audit'"
@@ -106,10 +110,6 @@
             @update:auditFilter="auditFilter = $event"
             @loadAudit="loadAudit"
           />
-
-          <div v-else class="mt-6 text-sm text-slate-600 dark:text-slate-300">
-            Aba desconhecida.
-          </div>
         </main>
       </div>
     </div>
@@ -131,136 +131,109 @@ import ActiveUsersPermsPanel from "../admin/panels/ActiveUsersPermsPanel.vue";
 import {
   type CustomerRow,
   type PendingUserRow,
-  activateUser,
-  disableUser,
+  type MembershipRole,
+  type AuditRow,
   listCustomers,
   listPendingUsers,
-  listActiveUsers,
-  getUserPermissions,
+  activateUser,
+  disableUser,
   listAuditLogs,
-  type ActiveUserRow,
 } from "../admin/adminApi";
 
 import PowerBiOpsPanel from "../admin/PowerBiOpsPanel.vue";
 import CustomersPanel from "../admin/CustomersPanel.vue";
 import SecurityPlatformAdminsPanel from "../admin/SecurityPlatformAdminsPanel.vue";
 
+import { useConfirm } from "@/ui/confirm/useConfirm";
+import { useToast } from "@/ui/toast/useToast";
+import { normalizeApiError } from "@/ui/ops/normalizeApiError";
+
 const router = useRouter();
+const { confirm } = useConfirm();
+const { push } = useToast();
 
 // ------------------------------------
 // Tabs (sidebar-driven)
 // ------------------------------------
 const sidebarItems: Array<{ key: AdminTabKey; label: string }> = [
   { key: "overview", label: "Overview" },
-  { key: "pending", label: "Identity · Pendentes" },
-  { key: "active", label: "Identity · Usuários ativos" },
   { key: "customers", label: "Customers" },
-  { key: "security", label: "Security" },
-  { key: "audit", label: "Audit" },
+  { key: "pending", label: "Pending users" },
   { key: "powerbi", label: "Power BI Ops" },
+  { key: "security", label: "Security" },
+  { key: "active", label: "Active users + perms" },
+  { key: "audit", label: "Audit" },
 ];
 
-const tab = ref<AdminTabKey>("pending");
+const tab = ref<AdminTabKey>("overview");
 
-function onSelectTab(k: AdminTabKey) {
-  tab.value = k;
+function onSelectTab(key: AdminTabKey) {
+  tab.value = key;
 }
 
+function patchCustomerLocal(customerId: string, patch: Partial<CustomerRow>) {
+  customers.value = customers.value.map((c) =>
+    c.id === customerId ? ({ ...c, ...patch } as CustomerRow) : c
+  );
+}
+
+function upsertCustomerLocal(row: CustomerRow) {
+  const idx = customers.value.findIndex((c) => c.id === row.id);
+  if (idx >= 0) {
+    const next = [...customers.value];
+    next[idx] = row;
+    customers.value = next;
+  } else {
+    customers.value = [row, ...customers.value];
+  }
+}
+
+// ------------------------------------
+// Header helpers
+// ------------------------------------
 const title = computed(() => {
   switch (tab.value) {
     case "overview": return "Overview";
-    case "pending": return "Usuários pendentes";
-    case "active": return "Usuários ativos";
     case "customers": return "Customers";
-    case "security": return "Security";
-    case "audit": return "Auditoria";
+    case "pending": return "Usuários pendentes";
     case "powerbi": return "Power BI Ops";
+    case "security": return "Security";
+    case "active": return "Usuários ativos + permissões";
+    case "audit": return "Auditoria";
     default: return "Admin";
   }
 });
 
-const subtitle = computed(() => {
-  switch (tab.value) {
-    case "overview": return "Centro operacional (em evolução).";
-    case "pending": return "Aprovar/ativar e atribuir memberships.";
-    case "active": return "Gerenciar memberships e permissões de Power BI.";
-    case "customers": return "Cadastro e status de customers.";
-    case "security": return "Platform admins e operações de risco.";
-    case "audit": return "Rastreabilidade de ações administrativas.";
-    case "powerbi": return "Sincronização e catálogo Power BI.";
-    default: return "";
-  }
-});
-
-function noopSearch() {
-  // Nesta fase mantive desligado (showSearch=false).
-  // Você pluga aqui GlobalSearchPalette quando estiver pronto.
-}
+function noopSearch() {}
 
 function goBack() {
   router.replace("/app");
 }
 
 // ------------------------------------
-// Shared state
+// Global-ish state
 // ------------------------------------
 const error = ref("");
 
-// ---------- typed perms payload ----------
-type MembershipRole = "owner" | "admin" | "member" | "viewer";
-
-type MembershipRow = {
-  customerId: string;
-  role: MembershipRole;
-  isActive: boolean;
-  customer: { id: string; code: string; name: string; status: string };
-};
-
-type ReportPermRow = {
-  reportRefId: string;
-  reportId: string;
-  name: string;
-  canView: boolean;
-};
-
-type WorkspacePermRow = {
-  workspaceRefId: string;
-  workspaceId: string;
-  name: string;
-  canView: boolean;
-  reports: ReportPermRow[];
-};
-
-type UserPermissionsResponse = {
-  memberships: MembershipRow[];
-  workspaces: WorkspacePermRow[];
-};
-
-// ---------- shared helpers ----------
-function fmtDate(iso: string) {
-  try { return new Date(iso).toLocaleString(); } catch { return iso; }
-}
-
-// customers are shared across tabs (pending/customers/powerbi)
+// ---------- CUSTOMERS ----------
 const loadingCustomers = ref(false);
 const customers = ref<CustomerRow[]>([]);
 
-const loadingAny = computed(() =>
-  loadingCustomers.value ||
-  loadingPending.value ||
-  loadingActive.value ||
-  loadingPerms.value ||
-  loadingAudit.value
-);
-
-// ---------- CUSTOMERS ----------
 async function loadCustomers() {
   loadingCustomers.value = true;
   error.value = "";
   try {
     customers.value = await listCustomers();
   } catch (e: any) {
-    error.value = e?.response?.data?.message ?? e?.message ?? String(e);
+    const ne = normalizeApiError(e);
+    error.value = ne.message;
+    push({
+      kind: "error",
+      title: "Falha ao carregar customers",
+      message: ne.message,
+      details: ne.details,
+      timeoutMs: 9000,
+    });
   } finally {
     loadingCustomers.value = false;
   }
@@ -286,16 +259,8 @@ const selectedPending = ref<PendingUserRow | null>(null);
 
 const pendingCustomerId = ref<string>("");
 const pendingRole = ref<MembershipRole>("viewer");
-const pendingGrantCustomerWorkspaces = ref(true);
+const pendingGrantCustomerWorkspaces = ref<boolean>(true);
 const pendingActionMsg = ref("");
-
-function selectPending(u: PendingUserRow) {
-  selectedPending.value = u;
-  pendingCustomerId.value = "";
-  pendingRole.value = "viewer";
-  pendingGrantCustomerWorkspaces.value = true;
-  pendingActionMsg.value = "";
-}
 
 async function loadPending() {
   loadingPending.value = true;
@@ -310,7 +275,15 @@ async function loadPending() {
       pendingCustomerId.value = "";
     }
   } catch (e: any) {
-    error.value = e?.response?.data?.message ?? e?.message ?? String(e);
+    const ne = normalizeApiError(e);
+    error.value = ne.message;
+    push({
+      kind: "error",
+      title: "Falha ao carregar pendências",
+      message: ne.message,
+      details: ne.details,
+      timeoutMs: 9000,
+    });
   } finally {
     loadingPending.value = false;
   }
@@ -322,16 +295,28 @@ async function approvePending() {
   savingPending.value = true;
   error.value = "";
   pendingActionMsg.value = "";
+
   try {
     await activateUser(selectedPending.value.id, {
       customerId: pendingCustomerId.value,
       role: pendingRole.value,
       grantCustomerWorkspaces: pendingGrantCustomerWorkspaces.value,
     });
+
     pendingActionMsg.value = "Usuário ativado com sucesso.";
+    push({ kind: "success", title: "Usuário ativado", message: selectedPending.value.email ?? selectedPending.value.id });
+
     await loadPending();
   } catch (e: any) {
-    error.value = e?.response?.data?.message ?? e?.message ?? String(e);
+    const ne = normalizeApiError(e);
+    error.value = ne.message;
+    push({
+      kind: "error",
+      title: "Falha ao ativar usuário",
+      message: ne.message,
+      details: ne.details,
+      timeoutMs: 9000,
+    });
   } finally {
     savingPending.value = false;
   }
@@ -339,139 +324,107 @@ async function approvePending() {
 
 async function disablePending() {
   if (!selectedPending.value) return;
-  const ok = window.confirm("Confirmar desativação deste usuário?");
+
+  const ok = await confirm({
+    title: "Desativar usuário?",
+    message: "Você está prestes a desativar este usuário. Esta ação é destrutiva e pode afetar acessos existentes.",
+    confirmText: "Desativar",
+    cancelText: "Cancelar",
+    danger: true,
+  });
   if (!ok) return;
 
   savingPending.value = true;
   error.value = "";
   pendingActionMsg.value = "";
+
   try {
     await disableUser(selectedPending.value.id);
     pendingActionMsg.value = "Usuário desativado.";
+    push({ kind: "success", title: "Usuário desativado", message: selectedPending.value.email ?? selectedPending.value.id });
+
     await loadPending();
   } catch (e: any) {
-    error.value = e?.response?.data?.message ?? e?.message ?? String(e);
+    const ne = normalizeApiError(e);
+    error.value = ne.message;
+    push({
+      kind: "error",
+      title: "Falha ao desativar usuário",
+      message: ne.message,
+      details: ne.details,
+      timeoutMs: 9000,
+    });
   } finally {
     savingPending.value = false;
   }
 }
 
-// ---------- ACTIVE + PERMS ----------
-const loadingActive = ref(false);
-const activeQuery = ref("");
-const activePaged = ref({ page: 1, pageSize: 25, total: 0, rows: [] as ActiveUserRow[] });
-
-const selectedActive = ref<ActiveUserRow | null>(null);
-
-const loadingPerms = ref(false);
-const perms = ref<UserPermissionsResponse | null>(null);
-const permsCustomerId = ref<string>("");
-const permMsg = ref("");
-
-async function loadActiveUsers(page = 1) {
-  loadingActive.value = true;
-  error.value = "";
-  try {
-    const data = await listActiveUsers(activeQuery.value, page, activePaged.value.pageSize);
-    activePaged.value = data as any;
-
-    if (selectedActive.value && !data.rows.find((x: any) => x.id === selectedActive.value!.id)) {
-      selectedActive.value = null;
-      perms.value = null;
-      permsCustomerId.value = "";
-    }
-  } catch (e: any) {
-    error.value = e?.response?.data?.message ?? e?.message ?? String(e);
-  } finally {
-    loadingActive.value = false;
-  }
-}
-
-function pickDefaultCustomerId(memberships: MembershipRow[], preferred?: string): string {
-  const active = memberships.filter((m) => m.isActive);
-  const allowed = new Set(active.map((m) => m.customerId));
-
-  if (preferred && (allowed.size === 0 || allowed.has(preferred))) return preferred;
-
-  const firstActive = active[0];
-  if (firstActive) return firstActive.customerId;
-
-  const firstAny = memberships[0];
-  return firstAny?.customerId ?? "";
-}
-
-async function reloadPerms() {
-  if (!selectedActive.value) return;
-
-  loadingPerms.value = true;
-  error.value = "";
-  permMsg.value = "";
-
-  const userId = selectedActive.value.id;
-  const preferredCustomerId = permsCustomerId.value || undefined;
-
-  try {
-    const base = (await getUserPermissions(userId, preferredCustomerId)) as unknown as UserPermissionsResponse;
-
-    const desired = pickDefaultCustomerId(base.memberships ?? [], permsCustomerId.value);
-    permsCustomerId.value = desired;
-
-    if (desired && desired !== preferredCustomerId) {
-      perms.value = (await getUserPermissions(userId, desired)) as unknown as UserPermissionsResponse;
-    } else {
-      perms.value = base;
-    }
-  } catch (e: any) {
-    error.value = e?.response?.data?.message ?? e?.message ?? String(e);
-  } finally {
-    loadingPerms.value = false;
-  }
-}
-
-
 // ---------- AUDIT ----------
 const loadingAudit = ref(false);
-const auditPaged = ref({ page: 1, pageSize: 50, total: 0, rows: [] as any[] });
 
-const auditFilter = ref({
+const auditFilter = ref<{ action: string; entityType: string; entityId: string }>({
   action: "",
   entityType: "",
   entityId: "",
 });
 
-async function loadAudit(page = 1) {
+const auditPaged = ref<{ page: number; pageSize: number; total: number; rows: AuditRow[] }>({
+  page: 1,
+  pageSize: 25,
+  total: 0,
+  rows: [],
+});
+
+function fmtDate(iso: string) {
+  try {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return iso;
+    return d.toLocaleString();
+  } catch {
+    return iso;
+  }
+}
+
+async function loadAudit(page: number) {
   loadingAudit.value = true;
   error.value = "";
   try {
-    const data = await listAuditLogs({
+    auditPaged.value = await listAuditLogs({
       page,
       pageSize: auditPaged.value.pageSize,
       action: auditFilter.value.action || undefined,
       entityType: auditFilter.value.entityType || undefined,
       entityId: auditFilter.value.entityId || undefined,
     });
-    auditPaged.value = data as any;
   } catch (e: any) {
-    error.value = e?.response?.data?.message ?? e?.message ?? String(e);
+    const ne = normalizeApiError(e);
+    error.value = ne.message;
+    push({
+      kind: "error",
+      title: "Falha ao carregar auditoria",
+      message: ne.message,
+      details: ne.details,
+      timeoutMs: 9000,
+    });
   } finally {
     loadingAudit.value = false;
   }
 }
 
-// ---------- tab lifecycle ----------
+// “any loading” (TopBar)
+const loadingAny = computed(() =>
+  loadingCustomers.value ||
+  loadingPending.value ||
+  savingPending.value ||
+  loadingAudit.value
+);
+
 async function reloadCurrentTab() {
   error.value = "";
   if (tab.value === "pending") return loadPending();
   if (tab.value === "customers") return loadCustomers();
   if (tab.value === "powerbi") return loadCustomers();
-  if (tab.value === "security") return;
-  if (tab.value === "active") {
-    await loadActiveUsers(activePaged.value.page || 1);
-    if (selectedActive.value) await reloadPerms();
-    return;
-  }
   if (tab.value === "audit") return loadAudit(auditPaged.value.page || 1);
-  if (tab.value === "overview") return;
 }
 
 watch(tab, async (t) => {
@@ -481,12 +434,16 @@ watch(tab, async (t) => {
     await loadCustomers();
   }
 
-  if (t === "pending" && pending.value.length === 0) await loadPending();
-  if (t === "active" && activePaged.value.rows.length === 0) await loadActiveUsers(1);
-  if (t === "audit" && auditPaged.value.rows.length === 0) await loadAudit(1);
+  if (t === "pending" && pending.value.length === 0 && !loadingPending.value) {
+    await loadPending();
+  }
+
+  if (t === "audit" && auditPaged.value.rows.length === 0 && !loadingAudit.value) {
+    await loadAudit(1);
+  }
 });
 
 onMounted(async () => {
-  await loadPending(); // já traz customers também
+  await loadPending();
 });
 </script>

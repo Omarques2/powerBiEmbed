@@ -8,9 +8,6 @@
     stroke-linejoin="round"
     v-bind="$attrs"
   >
-    <path d="M21 12a9 9 0 0 0-15.7-5.7" />
-    <path d="M3 12a9 9 0 0 0 15.7 5.7" />
-    <path d="M3 4v6h6" />
-    <path d="M21 20v-6h-6" />
+    <path d="M15 18l-6-6 6-6" />
   </svg>
 </template>

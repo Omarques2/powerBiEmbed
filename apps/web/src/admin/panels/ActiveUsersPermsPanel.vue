@@ -1,6 +1,6 @@
 <!-- apps/web/src/admin/panels/ActiveUsersPermsPanel.vue -->
 <template>
-  <div class="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
+  <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
     <!-- Left: active users -->
     <div class="lg:col-span-1">
       <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
@@ -82,7 +82,10 @@
 
     <!-- Right: permissions -->
     <div class="lg:col-span-2">
-      <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+      <div
+        class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 flex flex-col"
+          :class="selected ? 'min-h-0 lg:h-[calc(100vh-220px)] lg:overflow-hidden' : ''"
+      >
         <div class="flex items-center justify-between gap-3">
           <div>
             <div class="text-sm font-semibold text-slate-900 dark:text-slate-100">Permissões</div>
@@ -106,7 +109,7 @@
           Selecione um usuário ativo na lista à esquerda.
         </div>
 
-        <div v-else class="mt-4">
+        <div v-else class="mt-4 flex min-h-0 flex-1 flex-col">
           <div class="rounded-xl border border-slate-200 p-3 text-sm dark:border-slate-800">
             <div class="font-medium text-slate-900 dark:text-slate-100">{{ selected.display_name ?? "—" }}</div>
             <div class="text-xs text-slate-600 dark:text-slate-300">{{ selected.email ?? "sem email" }}</div>
@@ -121,7 +124,7 @@
             Carregando permissões...
           </div>
 
-          <div v-else-if="perms" class="mt-4 space-y-4">
+          <div v-else-if="perms" class="mt-4 flex min-h-0 flex-1 flex-col gap-4">
             <!-- Membership editor (sem reload global) -->
             <UserMembershipEditor
               :user-id="selected.id"
@@ -161,7 +164,12 @@
               Nenhum workspace ativo encontrado para o customer selecionado.
             </div>
 
-            <div class="space-y-2">
+            <!-- Desktop: scroll interno; Mobile: rola a página normalmente -->
+            <div
+              v-else
+              class="min-h-0 flex-1 space-y-2 overflow-x-hidden
+                     lg:overflow-auto lg:pr-1 lg:overscroll-contain"
+            >
               <div
                 v-for="ws in perms.workspaces"
                 :key="ws.workspaceRefId"

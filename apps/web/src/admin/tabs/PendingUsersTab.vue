@@ -1,6 +1,6 @@
 <!-- apps/web/src/admin/tabs/PendingUsersTab.vue -->
 <template>
-  <div class="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
+  <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
     <!-- LISTA -->
     <div class="lg:col-span-2">
       <div

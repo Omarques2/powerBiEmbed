@@ -102,52 +102,8 @@
                 Gerando embed token...
               </div>
 
-              <!-- Theme toggle -->
-              <button
-                class="group inline-flex h-10 items-center gap-2 rounded-full border px-3 text-sm font-medium
-                       border-slate-200 bg-white hover:bg-slate-50 active:scale-[0.98] transition
-                       dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
-                @click="toggleTheme"
-                :title="isDark ? 'Trocar para tema claro' : 'Trocar para tema escuro'"
-                aria-label="Alternar tema"
-              >
-                <span
-                  class="grid h-6 w-6 place-items-center rounded-full
-                         bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 transition"
-                >
-                  <svg
-                    v-if="isDark"
-                    class="h-4 w-4"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  >
-                    <circle cx="12" cy="12" r="4" />
-                    <path
-                      d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"
-                    />
-                  </svg>
-                  <svg
-                    v-else
-                    class="h-4 w-4"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  >
-                    <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z" />
-                  </svg>
-                </span>
-
-                <span class="hidden sm:inline text-slate-700 dark:text-slate-200">
-                  {{ isDark ? "Escuro" : "Claro" }}
-                </span>
-              </button>
+              <!-- Theme toggle (isolado em componente) -->
+              <ThemeToggle />
 
               <!-- Refresh -->
               <button
@@ -170,10 +126,6 @@
         <!-- Viewer area (centralizado + sem scroll) -->
         <div class="flex-1 min-h-0 overflow-hidden bg-slate-50 dark:bg-slate-950 p-2 sm:p-3 lg:p-4">
           <div class="h-full w-full overflow-hidden flex items-center justify-center">
-            <!-- Stage:
-                 - Mobile/tablet: aspect (altura vem da largura), mas com max-height do viewport -> nunca cria scroll.
-                 - Desktop lg+: ocupa h-full.
-            -->
             <div
               ref="stageEl"
               class="relative w-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm
@@ -183,10 +135,8 @@
                      sm:max-h-[calc(100dvh-var(--topbar-h)-1.5rem)]
                      lg:aspect-auto lg:h-full lg:max-h-full"
             >
-              <!-- Container real do Power BI -->
               <div ref="containerEl" class="absolute inset-0" />
 
-              <!-- Empty state -->
               <div v-if="!selectedReport" class="absolute inset-0 grid place-items-center p-6">
                 <div class="w-[min(760px,94%)]">
                   <div class="mb-4">
@@ -206,7 +156,6 @@
                 </div>
               </div>
 
-              <!-- Loading overlay -->
               <div
                 v-if="selectedReport && loadingEmbed"
                 class="absolute inset-0 z-10 grid place-items-center bg-white/70 dark:bg-slate-950/60 backdrop-blur-sm"
@@ -230,7 +179,6 @@
                 </div>
               </div>
 
-              <!-- Error banner -->
               <div
                 v-if="error && selectedReport"
                 class="absolute bottom-3 left-3 right-3 z-20 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 shadow
@@ -248,19 +196,27 @@
 
 <script setup lang="ts">
 import { onMounted, onBeforeUnmount, ref, watch } from "vue";
+import { useRouter } from "vue-router";
 import * as pbi from "powerbi-client";
+
+import ThemeToggle from "@/ui/theme/ThemeToggle.vue";
+
 import { http } from "../api/http";
 import { logout } from "../auth/auth";
 import HamburgerIcon from "../components/icons/HamburgerIcon.vue";
 import SidebarContent from "../components/SidebarContent.vue";
 import ReportSkeletonCard from "../components/ReportSkeletonCard.vue";
 import IconRefresh from "../components/icons/IconRefresh.vue";
-import { useRouter } from "vue-router";
-import { useTheme } from "../composables/useTheme";
 
 type Workspace = { id?: string; workspaceId?: string; name?: string };
 type Report = { id: string; name?: string; workspaceId?: string };
-type MeResponse = { email: string | null; displayName: string | null; status: "pending" | "active" | "disabled"; rawStatus?: string; memberships?: any[]; };
+type MeResponse = {
+  email: string | null;
+  displayName: string | null;
+  status: "pending" | "active" | "disabled";
+  rawStatus?: string;
+  memberships?: any[];
+};
 
 const router = useRouter();
 
@@ -289,14 +245,6 @@ let powerbiService: pbi.service.Service | null = null;
 let resizeObs: ResizeObserver | null = null;
 let embeddedReport: pbi.Report | null = null;
 
-/**
- * THEME (centralizado via useTheme)
- */
-const { isDark, toggle: toggleTheme } = useTheme();
-
-/**
- * Power BI helpers
- */
 function createPowerBiService() {
   return new pbi.service.Service(
     pbi.factories.hpmFactory,
@@ -322,9 +270,7 @@ async function applyReportLayout() {
       layoutType: pbi.models.LayoutType.Custom,
       customLayout: { displayOption },
     } as any);
-  } catch {
-    // ignora
-  }
+  } catch {}
 }
 
 function resizeEmbedded() {
@@ -531,9 +477,7 @@ onMounted(async () => {
     return;
   }
 
-  // detecta admin (silencioso)
   await checkAdmin();
-
   await loadWorkspaces();
 });
 

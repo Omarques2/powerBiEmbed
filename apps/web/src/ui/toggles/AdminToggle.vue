@@ -4,9 +4,9 @@
     :modelValue="modelValue"
     :onLabel="onLabel"
     :offLabel="offLabel"
-    :loading="loading"
     :disabled="disabled"
-    @update:modelValue="(v: boolean) => emit('update:modelValue', v)"
+    :loading="loading"
+    @toggle="handleToggle"
   />
 </template>
 
@@ -18,21 +18,30 @@ const props = withDefaults(
     modelValue: boolean;
     onLabel?: string;
     offLabel?: string;
-    loading?: boolean;
     disabled?: boolean;
+    loading?: boolean;
   }>(),
   {
     onLabel: "Ativo",
     offLabel: "Inativo",
-    loading: false,
     disabled: false,
-  }
+    loading: false,
+  },
 );
 
 const emit = defineEmits<{
   (e: "update:modelValue", v: boolean): void;
+  /**
+   * Evento “sem payload” útil quando o pai não usa v-model e quer apenas reagir.
+   */
+  (e: "toggle"): void;
 }>();
 
-// props existe para TS e consistência, ainda que o template use diretamente
-void props;
+function handleToggle() {
+  // PermSwitch emite apenas `toggle`, então aqui é onde de fato implementamos o v-model.
+  emit("update:modelValue", !props.modelValue);
+  emit("toggle");
+}
+
+const { modelValue, onLabel, offLabel, disabled, loading } = props;
 </script>

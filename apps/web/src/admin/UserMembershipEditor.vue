@@ -42,42 +42,50 @@
     </div>
 
     <!-- Lista de memberships (compacta) -->
-    <div class="mt-4 overflow-x-auto">
-      <table class="min-w-full text-left text-xs">
-        <thead class="text-slate-500 dark:text-slate-400">
+    <div class="mt-4 overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-800">
+      <table class="w-full table-fixed text-left text-sm">
+        <thead class="bg-slate-50 text-xs text-slate-600 dark:bg-slate-950/40 dark:text-slate-300">
           <tr>
-            <th class="py-2 pr-4">Customer</th>
-            <th class="py-2 pr-4">Acesso efetivo</th>
-            <th class="py-2 pr-4">Role</th>
-            <th class="py-2 pr-4">Ativo</th>
-            <th class="py-2 pr-0 text-right">Ações</th>
+            <th class="px-4 py-3">Customer</th>
+            <th class="w-40 px-4 py-3">Acesso efetivo</th>
+            <th class="w-44 px-4 py-3">Role</th>
+            <th class="w-36 px-4 py-3">Ativo</th>
+            <th class="w-44 px-4 py-3 text-right">Ações</th>
           </tr>
         </thead>
 
-        <tbody class="text-slate-800 dark:text-slate-100">
-          <tr v-for="m in memberships" :key="m.customerId" class="border-t border-slate-100 dark:border-slate-800">
-            <td class="py-2 pr-4">
-              <div class="font-medium">{{ m.customer?.name ?? m.customerId }}</div>
-              <div class="text-[11px] text-slate-500 dark:text-slate-400">{{ m.customer?.code ?? "" }}</div>
+        <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
+          <tr
+            v-for="m in memberships"
+            :key="m.customerId"
+            class="hover:bg-slate-50/60 dark:hover:bg-slate-950/30"
+          >
+            <td class="px-4 py-3 text-slate-900 dark:text-slate-100">
+              <div class="truncate font-medium">
+                {{ m.customer?.name ?? m.customerId }}
+              </div>
+              <div class="truncate font-mono text-xs text-slate-500 dark:text-slate-400">
+                {{ m.customer?.code ?? "" }}
+              </div>
             </td>
 
-            <td class="py-2 pr-4">
+            <td class="px-4 py-3">
               <span
-                class="inline-flex items-center rounded-lg px-2 py-1 text-[11px]"
+                class="inline-flex items-center rounded-full border px-2 py-1 text-[11px]"
                 :class="effectiveAccess(m)
-                  ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200'
-                  : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200'"
+                  ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/40 dark:text-emerald-200'
+                  : 'border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-200'"
               >
                 {{ effectiveAccess(m) ? "permitido" : "bloqueado" }}
               </span>
-              <div class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+              <div class="mt-1 truncate text-[11px] text-slate-500 dark:text-slate-400">
                 customer: {{ m.customer?.status ?? "—" }}
               </div>
             </td>
 
-            <td class="py-2 pr-4">
+            <td class="px-4 py-3">
               <select
-                class="w-36 rounded-xl border border-slate-200 bg-white px-2 py-2 text-xs
+                class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs
                        disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900"
                 :disabled="!!busyByCustomer[m.customerId]"
                 :value="m.role"
@@ -90,7 +98,7 @@
               </select>
             </td>
 
-            <td class="py-2 pr-4 align-middle">
+            <td class="px-4 py-3 align-middle">
               <div class="inline-flex items-center">
                 <PermSwitch
                   :model-value="m.isActive"
@@ -103,31 +111,33 @@
               </div>
             </td>
 
-            <td class="py-2 pr-0 text-right">
-              <button
-                type="button"
-                class="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700 hover:bg-rose-100
-                       disabled:opacity-60 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200 dark:hover:bg-rose-950/50"
-                :disabled="!!busyByCustomer[m.customerId]"
-                @click="openRemoveWizard(m.customerId)"
-              >
-                Remover
-              </button>
+            <td class="px-4 py-3">
+              <div class="flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  class="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700 hover:bg-rose-100
+                         disabled:opacity-60 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200 dark:hover:bg-rose-950/50"
+                  :disabled="!!busyByCustomer[m.customerId]"
+                  @click="openRemoveWizard(m.customerId)"
+                >
+                  Remover
+                </button>
 
-              <button
-                type="button"
-                class="ml-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs hover:bg-slate-50
-                       disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
-                :disabled="!!busyByCustomer[m.customerId]"
-                @click="openTransferWizard(m.customerId)"
-              >
-                Transferir
-              </button>
+                <button
+                  type="button"
+                  class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs hover:bg-slate-50
+                         disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+                  :disabled="!!busyByCustomer[m.customerId]"
+                  @click="openTransferWizard(m.customerId)"
+                >
+                  Transferir
+                </button>
+              </div>
             </td>
           </tr>
 
           <tr v-if="!memberships.length">
-            <td colspan="5" class="py-3 text-xs text-slate-500 dark:text-slate-400">
+            <td colspan="5" class="px-4 py-6 text-center text-xs text-slate-500 dark:text-slate-400">
               Nenhum membership encontrado para este usuário.
             </td>
           </tr>

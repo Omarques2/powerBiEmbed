@@ -1,6 +1,6 @@
 <!-- apps/web/src/admin/tabs/AuditTab.vue -->
 <template>
-  <div class="mt-6">
+  <div>
     <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
       <div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>

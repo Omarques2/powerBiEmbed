@@ -1,126 +1,112 @@
 <!-- apps/web/src/admin/CustomersPanel.vue -->
 <template>
-  <section class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-    <div class="flex flex-wrap items-center justify-between gap-3">
-      <div>
+  <section class="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div class="min-w-0">
         <div class="text-sm font-semibold text-slate-900 dark:text-slate-100">Customers</div>
         <div class="mt-1 text-xs text-slate-600 dark:text-slate-300">
-          CRUD de customers (soft delete via status) + auditoria.
+          Criar/editar customers e ativar/inativar com padrão operacional (optimistic + rollback + toast + busy por item).
         </div>
       </div>
 
-      <div class="flex items-center gap-2">
+      <div class="flex shrink-0 items-center gap-2">
         <button
+          type="button"
           class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs hover:bg-slate-50
-                 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
-          :disabled="loading"
-          @click="refresh()"
+                 disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+          :disabled="!!loading"
+          @click="refreshSafe"
         >
           {{ loading ? "Carregando..." : "Recarregar" }}
         </button>
 
         <button
-          class="rounded-xl bg-slate-900 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800
+          type="button"
+          class="rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800
                  disabled:opacity-60 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
-          @click="openCreate()"
+          @click="openCreate"
         >
-          Novo customer
+          + Novo customer
         </button>
       </div>
     </div>
 
-    <div
-      v-if="error"
-      class="mt-3 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700
-             dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-200"
-    >
-      {{ error }}
+    <div v-if="errorText" class="mt-3 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700 dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-200">
+      {{ errorText }}
     </div>
 
-    <div class="mt-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-      <div class="flex-1">
-        <label class="block text-xs font-medium text-slate-700 dark:text-slate-300">Buscar</label>
-        <input
-          v-model="q"
-          type="text"
-          placeholder="Filtrar por code, name ou status..."
-          class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
-                 dark:border-slate-800 dark:bg-slate-900"
-        />
-      </div>
-
-      <div class="text-xs text-slate-500 dark:text-slate-400">
-        Total: <span class="font-medium">{{ filtered.length }}</span>
+    <div class="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
+      <input
+        v-model="q"
+        class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-800 dark:bg-slate-900"
+        placeholder="Buscar por code/nome"
+      />
+      <div class="shrink-0 text-xs text-slate-500 dark:text-slate-400">
+        {{ filtered.length }} / {{ customers.length }}
       </div>
     </div>
 
-    <div class="mt-4 overflow-auto rounded-xl border border-slate-200 dark:border-slate-800">
-      <table class="min-w-[860px] w-full text-left text-xs">
-        <thead class="bg-slate-50 text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+    <div class="mt-4 overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-800">
+      <table class="w-full table-fixed text-left text-sm">
+        <thead class="bg-slate-50 text-xs text-slate-600 dark:bg-slate-950/40 dark:text-slate-300">
           <tr>
-            <th class="px-3 py-2">Code</th>
-            <th class="px-3 py-2">Name</th>
-            <th class="px-3 py-2">Status</th>
-            <th class="px-3 py-2">Created</th>
-            <th class="px-3 py-2">ID</th>
-            <th class="px-3 py-2 text-right">Ações</th>
+            <th class="w-40 px-4 py-3">Code</th>
+            <th class="px-4 py-3">Nome</th>
+            <th class="w-28 px-4 py-3">Status</th>
+            <th class="w-44 px-4 py-3 text-right"></th>
           </tr>
         </thead>
 
-        <tbody>
-          <tr
-            v-for="c in filtered"
-            :key="c.id"
-            class="border-t border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
-          >
-            <td class="px-3 py-2 font-medium text-slate-900 dark:text-slate-100">
-              {{ c.code }}
+        <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
+          <tr v-for="c in filtered" :key="c.id" class="hover:bg-slate-50/60 dark:hover:bg-slate-950/30">
+            <td class="px-4 py-3 font-mono text-xs text-slate-900 dark:text-slate-100">
+              <div class="truncate">{{ c.code }}</div>
             </td>
-            <td class="px-3 py-2 text-slate-700 dark:text-slate-200">
-              {{ c.name }}
+
+            <td class="px-4 py-3 text-slate-900 dark:text-slate-100">
+              <div class="truncate">{{ c.name }}</div>
             </td>
-            <td class="px-3 py-2">
+
+            <td class="px-4 py-3">
               <span
-                class="rounded-lg px-2 py-1 text-[11px]"
+                class="inline-flex items-center rounded-full border px-2 py-1 text-[11px]"
                 :class="c.status === 'active'
-                  ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200'
-                  : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200'"
+                  ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/40 dark:text-emerald-200'
+                  : 'border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-200'"
               >
                 {{ c.status }}
               </span>
             </td>
-            <td class="px-3 py-2 text-slate-600 dark:text-slate-300">
-              {{ formatDate(c.createdAt) }}
-            </td>
-            <td class="px-3 py-2 font-mono text-[11px] text-slate-500 dark:text-slate-400">
-              {{ c.id }}
-            </td>
-            <td class="px-3 py-2 text-right">
-              <div class="inline-flex items-center gap-2">
+
+            <td class="px-4 py-3">
+              <div class="flex items-center justify-end gap-2">
                 <button
-                  class="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] hover:bg-slate-50
-                         dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+                  type="button"
+                  class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs hover:bg-slate-50
+                         disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+                  :disabled="busy.isBusy(c.id)"
                   @click="openEdit(c)"
                 >
                   Editar
                 </button>
 
                 <button
-                  class="rounded-lg border px-2 py-1 text-[11px]"
+                  type="button"
+                  class="rounded-xl px-3 py-2 text-xs font-semibold disabled:opacity-60"
                   :class="c.status === 'active'
-                    ? 'border-red-200 bg-red-50 text-red-700 hover:bg-red-100 dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-200'
-                    : 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-900/40 dark:bg-emerald-950/40 dark:text-emerald-200'"
-                  :disabled="busyId === c.id"
+                    ? 'border border-rose-200 bg-rose-600 text-white hover:bg-rose-500 dark:border-rose-900/40 dark:bg-rose-700 dark:hover:bg-rose-600'
+                    : 'border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-900/40 dark:bg-emerald-950/40 dark:text-emerald-200'"
+                  :disabled="busy.isBusy(c.id)"
                   @click="toggleStatus(c)"
                 >
-                  {{ busyId === c.id ? "..." : (c.status === "active" ? "Desativar" : "Ativar") }}
+                  {{ busy.isBusy(c.id) ? "..." : (c.status === "active" ? "Desativar" : "Ativar") }}
                 </button>
               </div>
             </td>
           </tr>
 
-          <tr v-if="filtered.length === 0">
-            <td colspan="6" class="px-3 py-6 text-center text-slate-500 dark:text-slate-400">
+          <tr v-if="!filtered.length">
+            <td colspan="4" class="px-4 py-6 text-center text-xs text-slate-500 dark:text-slate-400">
               Nenhum customer encontrado.
             </td>
           </tr>
@@ -128,284 +114,285 @@
       </table>
     </div>
 
-    <!-- Modal (Create/Edit) -->
-    <div
-      v-if="modal.open"
-      class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-      @click.self="closeModal()"
-    >
-      <div class="w-full max-w-lg rounded-2xl bg-white p-4 shadow-xl dark:bg-slate-900">
+    <!-- MODAL create/edit -->
+    <div v-if="modalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
+      <div class="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-800 dark:bg-slate-900">
         <div class="flex items-start justify-between gap-3">
-          <div>
+          <div class="min-w-0">
             <div class="text-sm font-semibold text-slate-900 dark:text-slate-100">
-              {{ modal.mode === "create" ? "Novo customer" : "Editar customer" }}
+              {{ editing ? "Editar customer" : "Novo customer" }}
             </div>
             <div class="mt-1 text-xs text-slate-600 dark:text-slate-300">
-              Code: 3-32 chars, A-Z/0-9/_/-. Name: 2-120 chars.
+              {{ editing ? "Atualiza nome/código." : "Cria um novo customer." }}
             </div>
           </div>
 
           <button
-            class="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs hover:bg-slate-50
-                   dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
-            @click="closeModal()"
+            type="button"
+            class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs hover:bg-slate-50
+                   disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+            :disabled="saving"
+            @click="closeModal"
           >
             Fechar
           </button>
         </div>
 
-        <div
-          v-if="modalError"
-          class="mt-3 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700
-                 dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-200"
-        >
-          {{ modalError }}
-        </div>
-
-        <div class="mt-4 space-y-3">
+        <div class="mt-4 grid grid-cols-1 gap-3">
           <div>
-            <label class="block text-xs font-medium text-slate-700 dark:text-slate-300">Code</label>
+            <label class="text-xs font-medium text-slate-700 dark:text-slate-300">Code</label>
             <input
               v-model="form.code"
-              type="text"
-              placeholder="EX: ACME_FARM"
-              class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
-                     dark:border-slate-800 dark:bg-slate-900"
-              :disabled="modal.mode === 'edit' && lockCodeOnEdit"
+              class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-800 dark:bg-slate-900"
+              :disabled="saving || (!!editing && lockCodeOnEdit)"
+              placeholder="ex: ACME"
             />
-            <div
-              v-if="modal.mode === 'edit' && lockCodeOnEdit"
-              class="mt-1 text-[11px] text-slate-500 dark:text-slate-400"
-            >
-              Code está travado no modo edit (recomendado). Se quiser permitir edição do code, desative
-              <span class="font-mono">lockCodeOnEdit</span> no componente.
-            </div>
           </div>
 
           <div>
-            <label class="block text-xs font-medium text-slate-700 dark:text-slate-300">Name</label>
+            <label class="text-xs font-medium text-slate-700 dark:text-slate-300">Nome</label>
             <input
               v-model="form.name"
-              type="text"
-              placeholder="Nome do customer"
-              class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
-                     dark:border-slate-800 dark:bg-slate-900"
+              class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-800 dark:bg-slate-900"
+              :disabled="saving"
+              placeholder="ex: ACME Ltda"
             />
           </div>
+        </div>
 
-          <div v-if="modal.mode === 'create'">
-            <label class="block text-xs font-medium text-slate-700 dark:text-slate-300">Status inicial</label>
-            <select
-              v-model="form.status"
-              class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
-                     dark:border-slate-800 dark:bg-slate-900"
-            >
-              <option value="active">active</option>
-              <option value="inactive">inactive</option>
-            </select>
-          </div>
+        <div class="mt-4 flex items-center justify-end gap-2">
+          <button
+            type="button"
+            class="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm hover:bg-slate-50
+                   disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+            :disabled="saving"
+            @click="closeModal"
+          >
+            Cancelar
+          </button>
 
-          <div class="flex gap-2 pt-2">
-            <button
-              class="flex-1 rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800
-                     disabled:opacity-60 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
-              :disabled="saving"
-              @click="save()"
-            >
-              {{ saving ? "Salvando..." : "Salvar" }}
-            </button>
-
-            <button
-              class="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm hover:bg-slate-50
-                     disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
-              :disabled="saving"
-              @click="closeModal()"
-            >
-              Cancelar
-            </button>
-          </div>
+          <button
+            type="button"
+            class="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800
+                   disabled:opacity-60 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
+            :disabled="saving || !canSubmit"
+            @click="save"
+          >
+            {{ saving ? "Salvando..." : "Salvar" }}
+          </button>
         </div>
       </div>
     </div>
-
   </section>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, reactive, ref } from "vue";
 import type { CustomerRow } from "./adminApi";
-import { createCustomer, updateCustomer, setCustomerStatus } from "./adminApi";
-import { useToast } from "../ui/toast/useToast";
+import { createCustomer, setCustomerStatus, updateCustomer } from "./adminApi";
+import { useConfirm } from "@/ui/confirm/useConfirm";
+import { useBusyMap } from "@/ui/ops/useBusyMap";
+import { useOptimisticMutation } from "@/ui/ops/useOptimisticMutation";
+import { normalizeApiError } from "@/ui/ops/normalizeApiError";
+import { useToast } from "@/ui/toast/useToast";
 
+const { confirm } = useConfirm();
 const { push } = useToast();
+const busy = useBusyMap();
+const { mutate } = useOptimisticMutation();
 
 const props = defineProps<{
   customers: CustomerRow[];
   loading?: boolean;
   error?: string;
+
   refresh: () => Promise<void> | void;
+  upsertCustomerLocal: (row: CustomerRow) => void;
+  patchCustomerLocal: (customerId: string, patch: Partial<CustomerRow>) => void;
 }>();
 
 const lockCodeOnEdit = true;
 
+// ---------- list / filter ----------
 const q = ref("");
 
-const error = computed(() => props.error ?? "");
-const loading = computed(() => Boolean(props.loading));
+const errorText = computed(() => props.error ?? "");
+const loading = computed(() => props.loading ?? false);
+const customers = computed(() => props.customers ?? []);
 
 const filtered = computed(() => {
-  const s = q.value.trim().toLowerCase();
-  if (!s) return props.customers;
+  const needle = q.value.trim().toLowerCase();
+  if (!needle) return customers.value;
 
-  return props.customers.filter((c) => {
-    return (
-      c.code.toLowerCase().includes(s) ||
-      c.name.toLowerCase().includes(s) ||
-      String(c.status).toLowerCase().includes(s) ||
-      c.id.toLowerCase().includes(s)
-    );
+  return customers.value.filter((c) => {
+    const hay = `${c.code ?? ""} ${c.name ?? ""}`.toLowerCase();
+    return hay.includes(needle);
   });
 });
 
-function formatDate(iso: string) {
-  try {
-    const d = new Date(iso);
-    return d.toLocaleString();
-  } catch {
-    return iso;
-  }
-}
+// ---------- modal create/edit ----------
+const modalOpen = ref(false);
+const saving = ref(false);
+const editing = ref<CustomerRow | null>(null);
 
-const modal = ref<{ open: boolean; mode: "create" | "edit"; customerId?: string }>({
-  open: false,
-  mode: "create",
-});
-
-const form = ref<{ code: string; name: string; status: "active" | "inactive" }>(/* */{
+const form = reactive({
   code: "",
   name: "",
-  status: "active",
 });
 
-const modalError = ref("");
-const saving = ref(false);
-const busyId = ref<string>("");
+const canSubmit = computed(() => {
+  const code = form.code.trim();
+  const name = form.name.trim();
+  return code.length >= 2 && name.length >= 2;
+});
 
 function openCreate() {
-  modal.value = { open: true, mode: "create" };
-  form.value = { code: "", name: "", status: "active" };
-  modalError.value = "";
+  editing.value = null;
+  form.code = "";
+  form.name = "";
+  modalOpen.value = true;
 }
 
 function openEdit(c: CustomerRow) {
-  modal.value = { open: true, mode: "edit", customerId: c.id };
-  form.value = { code: c.code, name: c.name, status: (c.status as any) ?? "active" };
-  modalError.value = "";
+  editing.value = c;
+  form.code = c.code ?? "";
+  form.name = c.name ?? "";
+  modalOpen.value = true;
 }
 
 function closeModal() {
-  modal.value.open = false;
-  modalError.value = "";
+  if (saving.value) return;
+  modalOpen.value = false;
 }
 
-function validateLocal() {
-  const code = form.value.code.trim().toUpperCase();
-  const name = form.value.name.trim();
-
-  if (!/^[A-Z0-9][A-Z0-9_-]{2,31}$/.test(code)) {
-    throw new Error("Code inválido. Use 3-32 chars: A-Z, 0-9, '_' ou '-', começando com alfanumérico.");
-  }
-  if (name.length < 2 || name.length > 120) {
-    throw new Error("Name inválido. Use 2-120 caracteres.");
-  }
-}
-
-function extractErrMessage(e: any): string {
-  return e?.response?.data?.message ?? e?.message ?? "Erro desconhecido";
-}
-
-async function save() {
-  modalError.value = "";
-  saving.value = true;
-
+async function refreshSafe() {
   try {
-    validateLocal();
-
-    const code = form.value.code.trim().toUpperCase();
-    const name = form.value.name.trim();
-
-    if (modal.value.mode === "create") {
-      await createCustomer({ code, name, status: form.value.status });
-      push({
-        kind: "success",
-        title: "Customer criado",
-        message: `${code} — ${name}`,
-        timeoutMs: 3500,
-      });
-    } else {
-      const customerId = modal.value.customerId!;
-      const payload: any = { name };
-
-      // code (opcional no edit; padrão travado)
-      if (!lockCodeOnEdit) payload.code = code;
-
-      await updateCustomer(customerId, payload);
-      push({
-        kind: "success",
-        title: "Customer atualizado",
-        message: `${code} — ${name}`,
-        timeoutMs: 3500,
-      });
-    }
-
-    await props.refresh();
-    closeModal();
+    await props.refresh?.();
   } catch (e: any) {
-    const msg = extractErrMessage(e);
-    modalError.value = msg;
-
-    // P0: toast global padronizado (sem perder o erro inline do modal)
+    const ne = normalizeApiError(e);
     push({
       kind: "error",
-      title: "Falha ao salvar customer",
-      message: msg,
-      details: e?.response?.data ?? e,
-      timeoutMs: 8000,
+      title: "Falha ao recarregar customers",
+      message: ne.message,
+      details: ne.details,
+      timeoutMs: 9000,
     });
-  } finally {
-    saving.value = false;
   }
 }
 
 async function toggleStatus(c: CustomerRow) {
-  busyId.value = c.id;
+  const next: "active" | "inactive" = c.status === "active" ? "inactive" : "active";
 
-  try {
-    const next = c.status === "active" ? "inactive" : "active";
-    await setCustomerStatus(c.id, next as any);
-
-    push({
-      kind: "success",
-      title: "Customer atualizado",
-      message: `Status: ${next}`,
-      timeoutMs: 3500,
+  if (next === "inactive") {
+    const ok = await confirm({
+      title: "Inativar customer?",
+      message:
+        "Inativar um customer pode desativar workspaces/reports e afetar acesso de usuários. " +
+        "Confirme que esta ação é realmente desejada.",
+      confirmText: "Inativar",
+      cancelText: "Cancelar",
+      danger: true,
     });
-
-    await props.refresh();
-  } catch (e: any) {
-    push({
-      kind: "error",
-      title: "Falha ao atualizar customer",
-      message: extractErrMessage(e),
-      details: e?.response?.data ?? e,
-      timeoutMs: 8000,
-    });
-  } finally {
-    busyId.value = "";
+    if (!ok) return;
   }
+
+  await mutate<{ prevStatus: string }, { ok: boolean; status: string; workspacesDeactivated?: number; reportsDeactivated?: number }>({
+    key: c.id,
+    busy,
+    optimistic: () => {
+      const prevStatus = c.status;
+      props.patchCustomerLocal(c.id, { status: next });
+      return { prevStatus };
+    },
+    request: async () => {
+      return await setCustomerStatus(c.id, next);
+    },
+    rollback: (snap) => {
+      props.patchCustomerLocal(c.id, { status: snap.prevStatus });
+    },
+    onSuccess: (res) => {
+      if (res?.status) props.patchCustomerLocal(c.id, { status: res.status as any });
+    },
+    toast: {
+      success: {
+        title: next === "active" ? "Customer ativado" : "Customer inativado",
+        message:
+          next === "active"
+            ? `${c.code} foi ativado.`
+            : `${c.code} foi inativado.` +
+              (typeof (arguments as any)[0]?.workspacesDeactivated === "number"
+                ? ""
+                : ""),
+      },
+      error: {
+        title: next === "active" ? "Falha ao ativar customer" : "Falha ao inativar customer",
+      },
+    },
+  });
 }
 
-async function refresh() {
-  await props.refresh();
+async function save() {
+  if (!canSubmit.value) return;
+
+  const payload = {
+    code: form.code.trim(),
+    name: form.name.trim(),
+  };
+
+  saving.value = true;
+
+  try {
+    if (!editing.value) {
+      const created = await createCustomer({ code: payload.code, name: payload.name, status: "active" });
+      props.upsertCustomerLocal(created);
+
+      push({
+        kind: "success",
+        title: "Customer criado",
+        message: `${created.code} — ${created.name}`,
+      });
+
+      modalOpen.value = false;
+      return;
+    }
+
+    const target = editing.value;
+    const prev = { code: target.code, name: target.name };
+
+    await mutate<typeof prev, { ok: boolean; customer: CustomerRow }>({
+      key: target.id,
+      busy,
+      optimistic: () => {
+        props.patchCustomerLocal(target.id, { code: payload.code, name: payload.name });
+        return prev;
+      },
+      request: async () => {
+        return await updateCustomer(target.id, { code: payload.code, name: payload.name });
+      },
+      rollback: (snap) => {
+        props.patchCustomerLocal(target.id, { code: snap.code, name: snap.name });
+      },
+      onSuccess: (res) => {
+        if (res?.customer) props.upsertCustomerLocal(res.customer);
+      },
+      toast: {
+        success: { title: "Customer atualizado", message: `${payload.code} — ${payload.name}` },
+        error: { title: "Falha ao atualizar customer" },
+      },
+    });
+
+    modalOpen.value = false;
+  } catch (e: any) {
+    const ne = normalizeApiError(e);
+    push({
+      kind: "error",
+      title: "Falha ao salvar customer",
+      message: ne.message,
+      details: ne.details,
+      timeoutMs: 9000,
+    });
+  } finally {
+    saving.value = false;
+  }
 }
 </script>
