@@ -87,7 +87,7 @@
               <select
                 class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs
                        disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900"
-                :disabled="!!busyByCustomer[m.customerId]"
+                :disabled="!!busy.map[m.customerId]"
                 :value="m.role"
                 @change="onChangeRole(m.customerId, ($event.target as HTMLSelectElement).value)"
               >
@@ -102,8 +102,8 @@
               <div class="inline-flex items-center">
                 <PermSwitch
                   :model-value="m.isActive"
-                  :loading="!!busyByCustomer[m.customerId]"
-                  :disabled="!!busyByCustomer[m.customerId] || (m.customer?.status !== 'active' && !m.isActive)"
+                  :loading="!!busy.map[m.customerId]"
+                  :disabled="!!busy.map[m.customerId] || (m.customer?.status !== 'active' && !m.isActive)"
                   onLabel="Ativo"
                   offLabel="Inativo"
                   @toggle="toggleActive(m.customerId, m.isActive)"
@@ -117,7 +117,7 @@
                   type="button"
                   class="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700 hover:bg-rose-100
                          disabled:opacity-60 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200 dark:hover:bg-rose-950/50"
-                  :disabled="!!busyByCustomer[m.customerId]"
+                  :disabled="!!busy.map[m.customerId]"
                   @click="openRemoveWizard(m.customerId)"
                 >
                   Remover
@@ -127,7 +127,7 @@
                   type="button"
                   class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs hover:bg-slate-50
                          disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
-                  :disabled="!!busyByCustomer[m.customerId]"
+                  :disabled="!!busy.map[m.customerId]"
                   @click="openTransferWizard(m.customerId)"
                 >
                   Transferir
@@ -187,7 +187,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import {
   listCustomers,
   patchUserMembership,
@@ -198,6 +198,7 @@ import {
 } from "./adminApi";
 import { useToast } from "../ui/toast/useToast";
 import { useConfirm } from "../ui/confirm/useConfirm";
+import { normalizeApiError, useBusyMap, useOptimisticMutation } from "@/ui/ops";
 
 import AddMembershipModal from "./components/AddMembershipModal.vue";
 import MembershipActionWizard from "./components/MembershipActionWizard.vue";
@@ -220,6 +221,8 @@ const emit = defineEmits<{
 
 const { push } = useToast();
 const { confirm } = useConfirm();
+const busy = useBusyMap();
+const { mutate } = useOptimisticMutation();
 
 const error = ref<string>("");
 
@@ -233,9 +236,9 @@ async function refreshCustomers() {
   try {
     customers.value = await listCustomers();
   } catch (e: any) {
-    const msg = e?.response?.data?.message ?? e?.message ?? String(e);
-    error.value = msg;
-    push({ kind: "error", title: "Falha ao carregar customers", message: msg });
+    const ne = normalizeApiError(e);
+    error.value = ne.message;
+    push({ kind: "error", title: "Falha ao carregar customers", message: ne.message, details: ne.details });
   } finally {
     loadingCustomers.value = false;
   }
@@ -249,13 +252,6 @@ function effectiveAccess(m: { isActive: boolean; customer?: { status: string } }
 }
 
 const existingCustomerIds = computed(() => props.memberships.map((m) => m.customerId));
-
-// busy por customer
-const busyByCustomer = reactive<Record<string, boolean>>({});
-
-function setBusy(customerId: string, v: boolean) {
-  busyByCustomer[customerId] = v;
-}
 
 // Add (modal)
 const addOpen = ref(false);
@@ -287,53 +283,70 @@ async function handleAddSubmit(payload: { customerId: string; role: MembershipRo
 
     push({ kind: "success", title: "Membership adicionada", message: c ? `${c.name} (${c.code})` : payload.customerId });
   } catch (e: any) {
-    const msg = e?.response?.data?.message ?? e?.message ?? String(e);
-    addError.value = msg;
-    push({ kind: "error", title: "Falha ao adicionar membership", message: msg });
+    const ne = normalizeApiError(e);
+    addError.value = ne.message;
+    push({ kind: "error", title: "Falha ao adicionar membership", message: ne.message, details: ne.details });
   } finally {
     addBusy.value = false;
   }
 }
 
+function updateMembership(customerId: string, patch: Partial<{ role: MembershipRole; isActive: boolean }>) {
+  const next = props.memberships.map((m) => (m.customerId === customerId ? { ...m, ...patch } : m));
+  emit("update:memberships", next);
+  emit("changed");
+}
+
+function getMembership(customerId: string) {
+  return props.memberships.find((m) => m.customerId === customerId);
+}
+
 // Patch role
 async function onChangeRole(customerId: string, role: string) {
-  setBusy(customerId, true);
-  try {
-    await patchUserMembership(props.userId, customerId, { role: role as MembershipRole });
-
-    const next = props.memberships.map((m) => (m.customerId === customerId ? { ...m, role: role as MembershipRole } : m));
-    emit("update:memberships", next);
-    emit("changed");
-
-    push({ kind: "success", title: "Role atualizada" });
-  } catch (e: any) {
-    const msg = e?.response?.data?.message ?? e?.message ?? String(e);
-    push({ kind: "error", title: "Falha ao atualizar role", message: msg });
-  } finally {
-    setBusy(customerId, false);
-  }
+  await mutate<{ prevRole: MembershipRole | null }, void>({
+    key: customerId,
+    busy,
+    optimistic: () => {
+      const current = getMembership(customerId);
+      updateMembership(customerId, { role: role as MembershipRole });
+      return { prevRole: current?.role ?? null };
+    },
+    request: () => patchUserMembership(props.userId, customerId, { role: role as MembershipRole }),
+    rollback: (snapshot) => {
+      if (!snapshot.prevRole) return;
+      updateMembership(customerId, { role: snapshot.prevRole });
+    },
+    toast: {
+      success: { title: "Role atualizada" },
+      error: { title: "Falha ao atualizar role" },
+    },
+  });
 }
 
 // Toggle active
 async function onToggleActive(customerId: string, isActive: boolean) {
-  setBusy(customerId, true);
-  try {
-    await patchUserMembership(props.userId, customerId, {
-      isActive,
-      revokeCustomerPermissions: !isActive,
-    });
-
-    const next = props.memberships.map((m) => (m.customerId === customerId ? { ...m, isActive } : m));
-    emit("update:memberships", next);
-    emit("changed");
-
-    push({ kind: "success", title: isActive ? "Membership reativada" : "Membership desativada" });
-  } catch (e: any) {
-    const msg = e?.response?.data?.message ?? e?.message ?? String(e);
-    push({ kind: "error", title: "Falha ao atualizar membership", message: msg });
-  } finally {
-    setBusy(customerId, false);
-  }
+  await mutate<{ prevIsActive: boolean | null }, void>({
+    key: customerId,
+    busy,
+    optimistic: () => {
+      const current = getMembership(customerId);
+      updateMembership(customerId, { isActive });
+      return { prevIsActive: current?.isActive ?? null };
+    },
+    request: () =>
+      patchUserMembership(props.userId, customerId, {
+        isActive,
+        revokeCustomerPermissions: !isActive,
+      }),
+    rollback: (snapshot) => {
+      if (snapshot.prevIsActive === null) return;
+      updateMembership(customerId, { isActive: snapshot.prevIsActive });
+    },
+    toast: {
+      success: { title: isActive ? "Membership reativada" : "Membership desativada" },
+      error: { title: "Falha ao atualizar membership" },
+    },
+  });
 }
 
 // Wizards: remove/transfer
@@ -363,8 +376,21 @@ function openTransferWizard(customerId: string) {
   transferOpen.value = true;
 }
 
-function toggleActive(customerId: string, current: boolean) {
+async function toggleActive(customerId: string, current: boolean) {
   const next = !current;
+  if (!next) {
+    const m = getMembership(customerId);
+    const label = m?.customer?.name ? `${m.customer.name} (${m.customer.code ?? ""})` : customerId;
+
+    const ok = await confirm({
+      title: "Desativar membership?",
+      message: `Você está prestes a desativar o membership de ${label}. Isso pode revogar permissões do customer.`,
+      confirmText: "Desativar",
+      cancelText: "Cancelar",
+      danger: true,
+    });
+    if (!ok) return;
+  }
   onToggleActive(customerId, next);
 }
 
@@ -397,9 +423,9 @@ async function handleRemoveSubmit(payload: { customerId: string; revokeCustomerP
     push({ kind: "success", title: "Membership removida", message: label });
     closeWizard();
   } catch (e: any) {
-    const msg = e?.response?.data?.message ?? e?.message ?? String(e);
-    wizardError.value = msg;
-    push({ kind: "error", title: "Falha ao remover membership", message: msg });
+    const ne = normalizeApiError(e);
+    wizardError.value = ne.message;
+    push({ kind: "error", title: "Falha ao remover membership", message: ne.message, details: ne.details });
   } finally {
     wizardBusy.value = false;
   }
@@ -444,9 +470,9 @@ async function handleTransferSubmit(payload: {
     push({ kind: "success", title: "Transferência concluída" });
     closeWizard();
   } catch (e: any) {
-    const msg = e?.response?.data?.message ?? e?.message ?? String(e);
-    wizardError.value = msg;
-    push({ kind: "error", title: "Falha ao transferir membership", message: msg });
+    const ne = normalizeApiError(e);
+    wizardError.value = ne.message;
+    push({ kind: "error", title: "Falha ao transferir membership", message: ne.message, details: ne.details });
   } finally {
     wizardBusy.value = false;
   }
