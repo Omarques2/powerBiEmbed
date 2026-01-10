@@ -21,8 +21,8 @@
           class="inline-flex items-center justify-center rounded-xl border border-slate-900 bg-white px-4 py-2 text-sm
                  hover:bg-slate-50 active:scale-[0.98] transition
                  dark:border-slate-800 dark:bg-slate-300 dark:hover:bg-slate-200"
-          @click="checkNow"
           :disabled="checking"
+          @click="checkNow"
         >
           {{ checking ? "Verificando..." : "Verificar agora" }}
         </button>

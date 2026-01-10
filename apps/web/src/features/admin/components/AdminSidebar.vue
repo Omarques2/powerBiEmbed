@@ -39,8 +39,8 @@
             :class="activeKey === i.key
               ? 'border-slate-900 bg-slate-900 text-white dark:border-slate-100 dark:bg-slate-100 dark:text-slate-900'
               : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800'"
-            @click="$emit('select', i.key)"
             :aria-current="activeKey === i.key ? 'page' : undefined"
+            @click="$emit('select', i.key)"
           >
             {{ i.label }}
           </button>
@@ -68,8 +68,8 @@
           :class="activeKey === i.key
             ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900'
             : 'text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800'"
-          @click="$emit('select', i.key)"
           :aria-current="activeKey === i.key ? 'page' : undefined"
+          @click="$emit('select', i.key)"
         >
           {{ i.label }}
         </button>

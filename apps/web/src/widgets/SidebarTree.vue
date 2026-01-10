@@ -4,8 +4,8 @@
       <h2 class="text-sm font-semibold text-slate-900">Workspaces</h2>
       <button
         class="text-xs px-2 py-1 rounded-lg border bg-white text-slate-700 hover:bg-slate-50"
-        @click="loadWorkspaces"
         :disabled="loadingWorkspaces"
+        @click="loadWorkspaces"
       >
         {{ loadingWorkspaces ? "..." : "Recarregar" }}
       </button>
@@ -31,8 +31,8 @@
         <h3 class="text-sm font-semibold text-slate-900">Reports</h3>
         <button
           class="text-xs px-2 py-1 rounded-lg border bg-white text-slate-700 hover:bg-slate-50"
-          @click="loadReports(selectedWorkspaceId)"
           :disabled="loadingReports"
+          @click="loadReports(selectedWorkspaceId)"
         >
           {{ loadingReports ? "..." : "Recarregar" }}
         </button>

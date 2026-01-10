@@ -35,7 +35,7 @@
 
           <div v-else-if="user">
             <UserMembershipEditor
-              :userId="user.id"
+              :user-id="user.id"
               :memberships="memberships"
               @refresh="reload()"
             />

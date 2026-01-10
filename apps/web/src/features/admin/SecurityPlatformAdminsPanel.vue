@@ -102,8 +102,8 @@
                     class="rounded-xl border border-rose-200 bg-rose-600 px-3 py-2 text-xs font-semibold text-white hover:bg-rose-500
                            disabled:opacity-60 dark:border-rose-900/40 dark:bg-rose-700 dark:hover:bg-rose-600"
                     :disabled="busy.isBusy(r.userId) || isLastAdmin"
-                    @click="onRevoke(r)"
                     :title="isLastAdmin ? 'Não é permitido revogar o último platform admin' : 'Revogar Platform Admin'"
+                    @click="onRevoke(r)"
                   >
                     {{ busy.isBusy(r.userId) ? "..." : "Revogar" }}
                   </button>

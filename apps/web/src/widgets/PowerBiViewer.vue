@@ -55,7 +55,9 @@ function reset() {
     if (powerbiService && containerEl.value) {
       powerbiService.reset(containerEl.value);
     }
-  } catch {}
+  } catch {
+    // ignore reset errors
+  }
   currentEmbed = null;
 }
 

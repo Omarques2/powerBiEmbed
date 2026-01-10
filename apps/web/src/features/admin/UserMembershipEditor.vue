@@ -25,8 +25,8 @@
           class="rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800
                  disabled:opacity-60 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
           :disabled="loadingCustomers"
-          @click="addOpen = true"
           title="Adicionar customer"
+          @click="addOpen = true"
         >
           + Adicionar
         </button>
@@ -104,8 +104,8 @@
                   :model-value="m.isActive"
                   :loading="!!busy.map[m.customerId]"
                   :disabled="!!busy.map[m.customerId] || (m.customer?.status !== 'active' && !m.isActive)"
-                  onLabel="Ativo"
-                  offLabel="Inativo"
+                  on-label="Ativo"
+                  off-label="Inativo"
                   @toggle="toggleActive(m.customerId, m.isActive)"
                 />
               </div>
@@ -150,7 +150,7 @@
       :open="addOpen"
       :busy="addBusy"
       :customers="customers"
-      :existingCustomerIds="existingCustomerIds"
+      :existing-customer-ids="existingCustomerIds"
       :error="addError"
       @close="addOpen = false"
       @submit="handleAddSubmit"
@@ -164,7 +164,7 @@
       :error="wizardError"
       :customers="customers"
       :memberships="memberships"
-      :initialCustomerId="wizardInitialCustomerId"
+      :initial-customer-id="wizardInitialCustomerId"
       @close="closeWizard"
       @submit-remove="handleRemoveSubmit"
       @submit-transfer="noopTransfer"
@@ -178,7 +178,7 @@
       :error="wizardError"
       :customers="customers"
       :memberships="memberships"
-      :initialCustomerId="wizardInitialCustomerId"
+      :initial-customer-id="wizardInitialCustomerId"
       @close="closeWizard"
       @submit-remove="noopRemove"
       @submit-transfer="handleTransferSubmit"

@@ -211,8 +211,8 @@
                     ? 'border-emerald-300 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-900/15 dark:border-emerald-900/40'
                     : 'border-slate-200 bg-white hover:bg-slate-50 dark:bg-slate-950'"
                   :disabled="savingPerm || !ws.canView"
-                  @click="$emit('toggleReport', r)"
                   :title="!ws.canView ? 'Habilite o workspace primeiro' : ''"
+                  @click="$emit('toggleReport', r)"
                 >
                   <div class="truncate font-medium text-slate-900 dark:text-slate-100">
                     {{ r.name }}

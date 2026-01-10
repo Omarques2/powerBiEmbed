@@ -5,9 +5,9 @@
            border-slate-200 bg-white hover:bg-slate-50 active:scale-[0.98] transition
            dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
     :class="btnSize"
-    @click="toggle"
     :title="isDark ? 'Trocar para tema claro' : 'Trocar para tema escuro'"
     aria-label="Alternar tema"
+    @click="toggle"
   >
     <span
       class="grid place-items-center rounded-full transition

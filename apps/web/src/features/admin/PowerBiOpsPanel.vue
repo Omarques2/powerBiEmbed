@@ -35,7 +35,7 @@
 
       <div class="mt-3 flex items-center justify-between gap-2">
         <label class="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-200">
-          <input type="checkbox" v-model="selectAllRemote" @change="toggleSelectAll" />
+          <input v-model="selectAllRemote" type="checkbox" @change="toggleSelectAll" />
           Selecionar todos
         </label>
 
@@ -52,7 +52,7 @@
         >
           <div class="flex items-center justify-between gap-2">
             <label class="min-w-0 flex items-center gap-2 text-xs text-slate-700 dark:text-slate-200">
-              <input type="checkbox" :value="w.id" v-model="selectedWorkspaceIds" />
+              <input v-model="selectedWorkspaceIds" type="checkbox" :value="w.id" />
               <span class="truncate">{{ w.name }}</span>
             </label>
 
@@ -116,7 +116,7 @@
         </div>
 
         <label class="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-200">
-          <input type="checkbox" v-model="deactivateMissing" :disabled="!customerId || syncing" />
+          <input v-model="deactivateMissing" type="checkbox" :disabled="!customerId || syncing" />
           Deactivate missing (destrutivo)
         </label>
 
@@ -179,8 +179,8 @@
               class="shrink-0 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs hover:bg-slate-50
                      disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
               :disabled="loadingCatalog"
-              @click="loadCatalog({ applyAutoSelection: false })"
               title="Atualizar catálogo"
+              @click="loadCatalog({ applyAutoSelection: false })"
             >
               {{ loadingCatalog ? "..." : "Atualizar" }}
             </button>
@@ -261,8 +261,8 @@
                     class="rounded-xl border border-rose-200 bg-rose-600 px-3 py-2 text-[11px] font-semibold text-white hover:bg-rose-500
                           disabled:opacity-60 dark:border-rose-900/40 dark:bg-rose-700 dark:hover:bg-rose-600"
                     :disabled="!w.isActive || busyUnlink.isBusy(w.workspaceRefId)"
-                    @click.stop="unlinkWorkspace(w.workspaceRefId)"
                     title="Desvincular (desativa workspace/reports e revoga permissões)"
+                    @click.stop="unlinkWorkspace(w.workspaceRefId)"
                   >
                     {{ busyUnlink.isBusy(w.workspaceRefId) ? "..." : "Desvincular" }}
                   </button>
@@ -339,7 +339,7 @@ import { useBusyMap } from "@/ui/ops/useBusyMap";
 import { useOptimisticMutation } from "@/ui/ops/useOptimisticMutation";
 import { normalizeApiError } from "@/ui/ops/normalizeApiError";
 
-const props = defineProps<{
+defineProps<{
   customers: CustomerRow[];
 }>();
 

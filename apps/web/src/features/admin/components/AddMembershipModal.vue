@@ -40,9 +40,9 @@
           <div>
             <div class="mb-1 text-xs text-slate-600 dark:text-slate-300">Customer</div>
             <select
+              v-model="customerId"
               class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
                      dark:border-slate-800 dark:bg-slate-950"
-              v-model="customerId"
               :disabled="busy"
             >
               <option value="">Selecione…</option>
@@ -58,9 +58,9 @@
           <div>
             <div class="mb-1 text-xs text-slate-600 dark:text-slate-300">Role</div>
             <select
+              v-model="role"
               class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
                      dark:border-slate-800 dark:bg-slate-950"
-              v-model="role"
               :disabled="busy"
             >
               <option value="viewer">viewer</option>
@@ -72,7 +72,7 @@
 
           <div class="md:col-span-2">
             <label class="inline-flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
-              <input type="checkbox" class="h-4 w-4" v-model="grantAll" :disabled="busy" />
+              <input v-model="grantAll" type="checkbox" class="h-4 w-4" :disabled="busy" />
               Conceder workspaces/reports do customer automaticamente
             </label>
           </div>

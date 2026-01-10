@@ -1,9 +1,9 @@
 <!-- apps/web/src/ui/toggles/AdminToggle.vue -->
 <template>
   <PermSwitch
-    :modelValue="modelValue"
-    :onLabel="onLabel"
-    :offLabel="offLabel"
+    :model-value="modelValue"
+    :on-label="onLabel"
+    :off-label="offLabel"
     :disabled="disabled"
     :loading="loading"
     @toggle="handleToggle"

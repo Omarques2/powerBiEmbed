@@ -14,9 +14,9 @@
           class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white
                  hover:bg-slate-50 active:scale-[0.98] transition
                  dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
-          @click="$emit('toggleCollapsed')"
           :aria-label="collapsed ? 'Expandir menu' : 'Colapsar menu'"
           :title="collapsed ? 'Expandir' : 'Colapsar'"
+          @click="$emit('toggleCollapsed')"
         >
           <HamburgerIcon class="h-5 w-5" />
         </button>
@@ -42,11 +42,12 @@
           class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white
                  hover:bg-slate-50 active:scale-[0.98] transition
                  dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
-          @click="$emit('close')"
           aria-label="Fechar"
           title="Fechar"
+          @click="$emit('close')"
         >
-          <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          <svg
+class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                stroke-linecap="round" stroke-linejoin="round">
             <path d="M18 6 6 18M6 6l12 12" />
           </svg>
@@ -70,10 +71,10 @@
                active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed disabled:active:scale-100
                bg-slate-900 text-white hover:bg-slate-800
                dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
-        @click="loadWorkspaces()"
         :disabled="loadingWorkspaces"
         :title="collapsed ? (loadingWorkspaces ? 'Carregando…' : 'Recarregar workspaces') : ''"
         :aria-busy="loadingWorkspaces ? 'true' : 'false'"
+        @click="loadWorkspaces()"
       >
         <span v-if="!collapsed" class="inline-flex items-center justify-center gap-2">
           <svg v-if="loadingWorkspaces" class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
@@ -84,7 +85,8 @@
         </span>
 
         <span v-else class="mx-auto inline-flex items-center justify-center">
-          <svg class="h-5 w-5" :class="loadingWorkspaces ? 'animate-spin' : ''" viewBox="0 0 24 24"
+          <svg
+class="h-5 w-5" :class="loadingWorkspaces ? 'animate-spin' : ''" viewBox="0 0 24 24"
                fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M21 12a9 9 0 0 1-9 9 9 9 0 0 1-6.36-2.64" />
             <path d="M3 12a9 9 0 0 1 15.36-6.36" />
@@ -121,8 +123,8 @@
           :key="w.workspaceId ?? w.id"
           class="group w-full rounded-xl px-2 py-2 text-left hover:bg-slate-50 dark:hover:bg-slate-800"
           :class="(selectedWorkspaceId === (w.workspaceId ?? w.id)) ? 'bg-slate-100 dark:bg-slate-800' : ''"
-          @click="handleSelectWorkspace(w)"
           :title="collapsed ? (w.name ?? w.workspaceId ?? w.id) : ''"
+          @click="handleSelectWorkspace(w)"
         >
           <div class="flex items-center justify-between gap-2">
             <div class="min-w-0">
@@ -159,12 +161,13 @@
                      hover:bg-slate-50 active:scale-[0.98] transition
                      disabled:opacity-60 disabled:cursor-not-allowed disabled:active:scale-100
                      dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
-              @click="loadReports(selectedWorkspaceId)"
               :disabled="loadingReports"
               title="Recarregar reports"
               :aria-busy="loadingReports ? 'true' : 'false'"
+              @click="loadReports(selectedWorkspaceId)"
             >
-              <svg class="h-5 w-5" :class="loadingReports ? 'animate-spin' : ''"
+              <svg
+class="h-5 w-5" :class="loadingReports ? 'animate-spin' : ''"
                    viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                    stroke-linecap="round" stroke-linejoin="round">
                 <path d="M21 12a9 9 0 0 1-9 9 9 9 0 0 1-6.36-2.64" />
@@ -204,10 +207,11 @@
             class="mx-auto grid h-10 w-10 place-items-center rounded-lg border border-slate-200 bg-white hover:bg-slate-50
                    dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
             :class="selectedReport?.id === r.id ? 'border-slate-400 bg-slate-50 dark:border-slate-600 dark:bg-slate-800' : ''"
-            @click="handleOpenReport(r)"
             :title="r.name ?? r.id"
+            @click="handleOpenReport(r)"
           >
-            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            <svg
+class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                  stroke-linecap="round" stroke-linejoin="round">
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
               <path d="M14 2v6h6" />
@@ -227,13 +231,14 @@
                  active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed disabled:active:scale-100
                  border border-slate-200 bg-white hover:bg-slate-50
                  dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
-          @click="handleGoAdmin"
           :disabled="!goAdmin"
           :title="collapsed ? 'Painel admin' : ''"
           aria-label="Painel admin"
+          @click="handleGoAdmin"
         >
           <span v-if="!collapsed" class="inline-flex items-center justify-center gap-2">
-            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            <svg
+class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                  stroke-linecap="round" stroke-linejoin="round">
               <path d="M12 2l8 4v6c0 5-3.5 9.5-8 10-4.5-.5-8-5-8-10V6l8-4z" />
               <path d="M9 12l2 2 4-4" />
@@ -242,7 +247,8 @@
           </span>
 
           <span v-else class="mx-auto inline-flex items-center justify-center">
-            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            <svg
+class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                  stroke-linecap="round" stroke-linejoin="round">
               <path d="M12 2l8 4v6c0 5-3.5 9.5-8 10-4.5-.5-8-5-8-10V6l8-4z" />
               <path d="M9 12l2 2 4-4" />
@@ -261,12 +267,13 @@
                 ? 'mx-auto grid h-12 w-12 place-items-center rounded-full border-0 bg-transparent hover:bg-transparent'
                 : 'w-full rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800'
             "
-            @click.stop="userMenuOpen = !userMenuOpen"
             :title="isCollapsedDesktop ? userEmailOrFallback : ''"
             aria-label="Menu do usuário"
+            @click.stop="userMenuOpen = !userMenuOpen"
           >
             <template v-if="isCollapsedDesktop">
-              <div class="grid h-10 w-10 place-items-center rounded-full border border-slate-200 bg-white text-sm font-semibold
+              <div
+class="grid h-10 w-10 place-items-center rounded-full border border-slate-200 bg-white text-sm font-semibold
                           dark:border-slate-800 dark:bg-slate-900">
                 {{ userInitials }}
               </div>
@@ -274,7 +281,8 @@
 
             <template v-else>
               <div class="flex items-center gap-3">
-                <div class="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-slate-200 bg-white text-sm font-semibold
+                <div
+class="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-slate-200 bg-white text-sm font-semibold
                             dark:border-slate-800 dark:bg-slate-900">
                   {{ userInitials }}
                 </div>
@@ -289,7 +297,8 @@
                 </div>
 
                 <div class="shrink-0 text-slate-500 dark:text-slate-400">
-                  <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                  <svg
+class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                        stroke-linecap="round" stroke-linejoin="round">
                     <path d="M6 9l6 6 6-6" />
                   </svg>

@@ -14,21 +14,21 @@
           :collapsed="!sidebarOpen"
           :workspaces="workspaces"
           :reports="reports"
-          :selectedWorkspaceId="selectedWorkspaceId"
-          :selectedReport="selectedReport"
-          :loadingWorkspaces="loadingWorkspaces"
-          :loadingReports="loadingReports"
+          :selected-workspace-id="selectedWorkspaceId"
+          :selected-report="selectedReport"
+          :loading-workspaces="loadingWorkspaces"
+          :loading-reports="loadingReports"
           :error="error"
-          :loadWorkspaces="loadWorkspaces"
-          :loadReports="loadReports"
-          :selectWorkspace="selectWorkspace"
-          :openReport="openReport"
-          :isAdmin="isAdmin"
-          :goAdmin="goAdmin"
-          :onLogout="onLogout"
-          :userName="me?.displayName ?? null"
-          :userEmail="me?.email ?? null"
-          @toggleCollapsed="sidebarOpen = !sidebarOpen"
+          :load-workspaces="loadWorkspaces"
+          :load-reports="loadReports"
+          :select-workspace="selectWorkspace"
+          :open-report="openReport"
+          :is-admin="isAdmin"
+          :go-admin="goAdmin"
+          :on-logout="onLogout"
+          :user-name="me?.displayName ?? null"
+          :user-email="me?.email ?? null"
+          @toggle-collapsed="sidebarOpen = !sidebarOpen"
         />
       </aside>
 
@@ -49,20 +49,20 @@
           :collapsed="false"
           :workspaces="workspaces"
           :reports="reports"
-          :selectedWorkspaceId="selectedWorkspaceId"
-          :selectedReport="selectedReport"
-          :loadingWorkspaces="loadingWorkspaces"
-          :loadingReports="loadingReports"
+          :selected-workspace-id="selectedWorkspaceId"
+          :selected-report="selectedReport"
+          :loading-workspaces="loadingWorkspaces"
+          :loading-reports="loadingReports"
           :error="error"
-          :loadWorkspaces="loadWorkspaces"
-          :loadReports="loadReports"
-          :selectWorkspace="selectWorkspace"
-          :openReport="openReport"
-          :isAdmin="isAdmin"
-          :goAdmin="goAdmin"
-          :onLogout="onLogout"
-          :userName="me?.displayName ?? null"
-          :userEmail="me?.email ?? null"
+          :load-workspaces="loadWorkspaces"
+          :load-reports="loadReports"
+          :select-workspace="selectWorkspace"
+          :open-report="openReport"
+          :is-admin="isAdmin"
+          :go-admin="goAdmin"
+          :on-logout="onLogout"
+          :user-name="me?.displayName ?? null"
+          :user-email="me?.email ?? null"
           @close="drawerOpen = false"
         />
       </aside>
@@ -79,9 +79,9 @@
               class="shrink-0 inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white
                      hover:bg-slate-50 active:scale-[0.98] transition
                      dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800 lg:hidden"
-              @click="drawerOpen = !drawerOpen"
               aria-label="Abrir menu"
               title="Menu"
+              @click="drawerOpen = !drawerOpen"
             >
               <HamburgerIcon class="h-5 w-5" />
             </button>
@@ -111,8 +111,8 @@
                        border-slate-200 bg-white hover:bg-slate-50 active:scale-[0.98] transition
                        disabled:opacity-60 disabled:cursor-not-allowed
                        dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
-                @click="refreshEmbed"
                 :disabled="!selectedReport || loadingEmbed"
+                @click="refreshEmbed"
               >
                 <IconRefresh class="h-5 w-5" :class="loadingEmbed ? 'animate-spin' : ''" />
                 <span class="hidden md:inline">
@@ -256,7 +256,9 @@ function createPowerBiService() {
 function resetEmbed() {
   try {
     if (powerbiService && containerEl.value) powerbiService.reset(containerEl.value);
-  } catch {}
+  } catch {
+    // ignore reset errors
+  }
   embeddedReport = null;
 }
 
@@ -270,7 +272,9 @@ async function applyReportLayout() {
       layoutType: pbi.models.LayoutType.Custom,
       customLayout: { displayOption },
     } as any);
-  } catch {}
+  } catch {
+    // ignore layout errors
+  }
 }
 
 function resizeEmbedded() {
@@ -282,7 +286,9 @@ function resizeEmbedded() {
       svc.resize(containerEl.value);
     }
     void applyReportLayout();
-  } catch {}
+  } catch {
+    // ignore resize errors
+  }
 }
 
 function addResizeHandlers() {

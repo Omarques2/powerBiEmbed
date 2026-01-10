@@ -28,7 +28,8 @@
           </button>
         </div>
 
-        <div v-if="errActive" class="mt-3 rounded-xl border border-rose-200 bg-rose-50 p-2 text-xs text-rose-700
+        <div
+v-if="errActive" class="mt-3 rounded-xl border border-rose-200 bg-rose-50 p-2 text-xs text-rose-700
                                      dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-200">
           {{ errActive }}
         </div>
@@ -115,7 +116,8 @@
             <div class="text-xs text-slate-600 dark:text-slate-300">{{ selected.email ?? "sem email" }}</div>
           </div>
 
-          <div v-if="errPerms" class="mt-3 rounded-xl border border-rose-200 bg-rose-50 p-2 text-xs text-rose-700
+          <div
+v-if="errPerms" class="mt-3 rounded-xl border border-rose-200 bg-rose-50 p-2 text-xs text-rose-700
                                       dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-200">
             {{ errPerms }}
           </div>
@@ -127,8 +129,8 @@
           <div v-else-if="perms" class="mt-4 flex min-h-0 flex-1 flex-col gap-4">
             <!-- Membership editor (sem reload global) -->
             <UserMembershipEditor
-              :user-id="selected.id"
               v-model:memberships="perms.memberships"
+              :user-id="selected.id"
               @changed="onMembershipsChanged"
             />
 
@@ -153,7 +155,7 @@
 
               <div class="flex items-end">
                 <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
-                  <input type="checkbox" class="h-4 w-4" v-model="grantReportsOnWorkspaceEnable" />
+                  <input v-model="grantReportsOnWorkspaceEnable" type="checkbox" class="h-4 w-4" />
                   Ao habilitar um workspace, conceder reports automaticamente
                 </label>
               </div>
@@ -190,8 +192,8 @@
                       :model-value="ws.canView"
                       :loading="!!wsBusy[ws.workspaceRefId]"
                       :disabled="savingAny"
-                      onLabel="Workspace: ON"
-                      offLabel="Workspace: OFF"
+                      on-label="Workspace: ON"
+                      off-label="Workspace: OFF"
                       @toggle="toggleWorkspace(ws.workspaceRefId)"
                     />
                     <button
@@ -221,8 +223,8 @@
                       :model-value="r.canView"
                       :loading="!!rBusy[r.reportRefId]"
                       :disabled="savingAny || (!ws.canView && !r.canView)"
-                      onLabel="ON"
-                      offLabel="OFF"
+                      on-label="ON"
+                      off-label="OFF"
                       @toggle="toggleReport(ws.workspaceRefId, r.reportRefId)"
                     />
                   </div>

@@ -62,9 +62,9 @@
             <div>
               <div class="mb-1 text-xs text-slate-600 dark:text-slate-300">Customer</div>
               <select
+                v-model="rmCustomerId"
                 class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
                        dark:border-slate-800 dark:bg-slate-950"
-                v-model="rmCustomerId"
                 :disabled="busy"
               >
                 <option value="">Selecione…</option>
@@ -76,7 +76,7 @@
 
             <div class="flex items-end">
               <label class="inline-flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
-                <input type="checkbox" class="h-4 w-4" v-model="rmRevoke" :disabled="busy" />
+                <input v-model="rmRevoke" type="checkbox" class="h-4 w-4" :disabled="busy" />
                 Revogar permissões do customer (recomendado)
               </label>
             </div>
@@ -87,9 +87,9 @@
             <div>
               <div class="mb-1 text-xs text-slate-600 dark:text-slate-300">From</div>
               <select
+                v-model="trFromCustomerId"
                 class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
                        dark:border-slate-800 dark:bg-slate-950"
-                v-model="trFromCustomerId"
                 :disabled="busy"
               >
                 <option value="">Selecione…</option>
@@ -102,9 +102,9 @@
             <div>
               <div class="mb-1 text-xs text-slate-600 dark:text-slate-300">To</div>
               <select
+                v-model="trToCustomerId"
                 class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
                        dark:border-slate-800 dark:bg-slate-950"
-                v-model="trToCustomerId"
                 :disabled="busy"
               >
                 <option value="">Selecione…</option>
@@ -117,9 +117,9 @@
             <div>
               <div class="mb-1 text-xs text-slate-600 dark:text-slate-300">Role no destino</div>
               <select
+                v-model="trToRole"
                 class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
                        dark:border-slate-800 dark:bg-slate-950"
-                v-model="trToRole"
                 :disabled="busy"
               >
                 <option value="viewer">viewer</option>
@@ -131,11 +131,11 @@
 
             <div class="flex flex-col justify-end gap-2">
               <label class="inline-flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
-                <input type="checkbox" class="h-4 w-4" v-model="trRevokeFrom" :disabled="busy" />
+                <input v-model="trRevokeFrom" type="checkbox" class="h-4 w-4" :disabled="busy" />
                 Revogar permissões do “from” (recomendado)
               </label>
               <label class="inline-flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
-                <input type="checkbox" class="h-4 w-4" v-model="trGrantTo" :disabled="busy" />
+                <input v-model="trGrantTo" type="checkbox" class="h-4 w-4" :disabled="busy" />
                 Conceder permissões no “to”
               </label>
             </div>

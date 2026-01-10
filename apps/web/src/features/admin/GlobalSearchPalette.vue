@@ -39,28 +39,28 @@
               <SearchSection
                 title="Users"
                 :items="items.users"
-                :activeIndex="activeIndex"
+                :active-index="activeIndex"
                 :offset="offsets.users"
                 @pick="pick"
               />
               <SearchSection
                 title="Customers"
                 :items="items.customers"
-                :activeIndex="activeIndex"
+                :active-index="activeIndex"
                 :offset="offsets.customers"
                 @pick="pick"
               />
               <SearchSection
                 title="Power BI · Workspaces"
                 :items="items.workspaces"
-                :activeIndex="activeIndex"
+                :active-index="activeIndex"
                 :offset="offsets.workspaces"
                 @pick="pick"
               />
               <SearchSection
                 title="Power BI · Reports"
                 :items="items.reports"
-                :activeIndex="activeIndex"
+                :active-index="activeIndex"
                 :offset="offsets.reports"
                 @pick="pick"
               />

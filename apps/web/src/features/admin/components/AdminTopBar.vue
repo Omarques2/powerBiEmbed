@@ -13,9 +13,9 @@
           class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-xs
                  hover:bg-slate-50 active:scale-[0.98] transition
                  dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
-          @click="$emit('back')"
           title="Voltar para o App"
           aria-label="Voltar para o App"
+          @click="$emit('back')"
         >
           <IconArrowLeft class="h-4 w-4" />
           <span class="hidden sm:inline">App</span>
@@ -50,9 +50,9 @@
                    disabled:opacity-60 disabled:cursor-not-allowed
                    dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
             :disabled="loadingAny"
-            @click="$emit('reload')"
             title="Recarregar"
             aria-label="Recarregar"
+            @click="$emit('reload')"
           >
             <IconRefresh class="h-4 w-4" :class="loadingAny ? 'animate-spin' : ''" />
             <span class="hidden sm:inline">{{ loadingAny ? "Carregando..." : "Recarregar" }}</span>
@@ -68,7 +68,7 @@
             Buscar (Ctrl+K)
           </button>
 
-          <ThemeToggle :showLabel="true" size="sm" />
+          <ThemeToggle :show-label="true" size="sm" />
         </div>
       </div>
     </div>
@@ -98,8 +98,10 @@ const props = withDefaults(
     showSearch?: boolean;
   }>(),
   {
+    section: "",
     showSearch: false,
     subtitle: "",
+    title: "",
   }
 );
 

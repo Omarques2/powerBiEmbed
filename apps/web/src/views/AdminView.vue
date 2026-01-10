@@ -7,8 +7,8 @@
         class="mb-3 sm:mb-4"
         :section="title"
         :subtitle="''"
-        :loadingAny="loadingAny"
-        :showSearch="false"
+        :loading-any="loadingAny"
+        :show-search="false"
         @reload="reloadCurrentTab"
         @back="goBack"
         @search="noopSearch"
@@ -19,7 +19,7 @@
         <aside class="lg:w-[260px] xl:w-[280px]">
           <AdminSidebar
             :items="sidebarItems"
-            :activeKey="tab"
+            :active-key="tab"
             @select="onSelectTab"
           />
         </aside>
@@ -50,8 +50,8 @@
               :loading="loadingCustomers"
               :error="error"
               :refresh="loadCustomers"
-              :upsertCustomerLocal="upsertCustomerLocal"
-              :patchCustomerLocal="patchCustomerLocal"
+              :upsert-customer-local="upsertCustomerLocal"
+              :patch-customer-local="patchCustomerLocal"
             />
           </div>
 
@@ -60,20 +60,20 @@
           <!-- ========================= -->
           <div v-else-if="tab === 'pending'">
             <PendingUsersTab
-              :loadingPending="loadingPending"
-              :savingPending="savingPending"
+              :loading-pending="loadingPending"
+              :saving-pending="savingPending"
               :pending="pending"
               :customers="customersActiveFirst"
-              :selectedPending="selectedPending"
-              :pendingCustomerId="pendingCustomerId"
-              :pendingRole="pendingRole"
-              :pendingGrantCustomerWorkspaces="pendingGrantCustomerWorkspaces"
-              :pendingActionMsg="pendingActionMsg"
-              :fmtDate="fmtDate"
-              @selectPending="selectedPending = $event"
-              @update:pendingCustomerId="pendingCustomerId = $event"
-              @update:pendingRole="pendingRole = $event"
-              @update:pendingGrantCustomerWorkspaces="pendingGrantCustomerWorkspaces = $event"
+              :selected-pending="selectedPending"
+              :pending-customer-id="pendingCustomerId"
+              :pending-role="pendingRole"
+              :pending-grant-customer-workspaces="pendingGrantCustomerWorkspaces"
+              :pending-action-msg="pendingActionMsg"
+              :fmt-date="fmtDate"
+              @select-pending="selectedPending = $event"
+              @update:pending-customer-id="pendingCustomerId = $event"
+              @update:pending-role="pendingRole = $event"
+              @update:pending-grant-customer-workspaces="pendingGrantCustomerWorkspaces = $event"
               @approve="approvePending"
               @disable="disablePending"
             />
@@ -103,12 +103,12 @@
           <!-- ========================= -->
           <AuditTab
             v-else-if="tab === 'audit'"
-            :loadingAudit="loadingAudit"
-            :auditPaged="auditPaged"
-            :auditFilter="auditFilter"
-            :fmtDate="fmtDate"
-            @update:auditFilter="auditFilter = $event"
-            @loadAudit="loadAudit"
+            :loading-audit="loadingAudit"
+            :audit-paged="auditPaged"
+            :audit-filter="auditFilter"
+            :fmt-date="fmtDate"
+            @update:audit-filter="auditFilter = $event"
+            @load-audit="loadAudit"
           />
         </main>
       </div>
