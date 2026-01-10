@@ -94,6 +94,7 @@ model customers {
   bi_workspaces             bi_workspaces[]
   user_app_roles            user_app_roles[]
   user_customer_memberships user_customer_memberships[]
+  rls_rules rls_rule[]
 }
 
 model user_app_roles {
@@ -167,6 +168,41 @@ model audit_log {
   @@index([actor_user_id], map: "idx_audit_actor")
 }
 
+
+model rls_target {
+  id               String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  dataset_id       String               @db.Uuid
+  target_key       String
+  display_name     String
+  fact_table       String
+  fact_column      String
+  value_type       rls_value_type
+  default_behavior rls_default_behavior @default(allow)
+  status           rls_target_status    @default(draft)
+  created_at       DateTime             @default(now()) @db.Timestamptz(6)
+  rls_rules        rls_rule[]
+
+  @@unique([dataset_id, target_key])
+  @@index([dataset_id], map: "idx_rls_target_dataset")
+  @@index([target_key], map: "idx_rls_target_key")
+}
+
+model rls_rule {
+  id          String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  target_id   String      @db.Uuid
+  customer_id String      @db.Uuid
+  op          rls_rule_op
+  value_text  String?
+  value_int   Int?
+  value_uuid  String?     @db.Uuid
+  created_at  DateTime    @default(now()) @db.Timestamptz(6)
+  rls_target  rls_target  @relation(fields: [target_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  customers   customers   @relation(fields: [customer_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([target_id], map: "idx_rls_rule_target")
+  @@index([customer_id], map: "idx_rls_rule_customer")
+}
+
 enum user_status {
   pending
   active
@@ -179,3 +215,25 @@ enum membership_role {
   member
   viewer
 }
+
+enum rls_value_type {
+  text
+  int
+  uuid
+}
+
+enum rls_default_behavior {
+  allow
+  deny
+}
+
+enum rls_target_status {
+  draft
+  active
+}
+
+enum rls_rule_op {
+  include
+  exclude
+}
+
