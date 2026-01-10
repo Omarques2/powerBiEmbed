@@ -16,7 +16,7 @@
         class="rounded-xl border border-slate-200 px-3 py-2 text-xs hover:bg-slate-50
                disabled:opacity-60 dark:border-slate-800 dark:hover:bg-slate-800"
         :disabled="loading"
-        @click="load"
+        @click="refresh"
       >
         Atualizar
       </button>
@@ -72,16 +72,22 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { listPendingUsers, type PendingUserRow } from "../adminApi";
+import { useToast } from "@/ui/toast/useToast";
+import { normalizeApiError, useBusyMap } from "@/ui/ops";
 
 defineEmits<{
   (e: "openUser", userId: string): void;
 }>();
 
-const loading = ref(false);
+const { push } = useToast();
+const busy = useBusyMap();
+const loadingInitial = ref(false);
+const loading = computed(() => loadingInitial.value || !!busy.map.refresh);
 const err = ref("");
 const rows = ref<PendingUserRow[]>([]);
+const hasLoaded = ref(false);
 
 function formatDate(iso: string | null | undefined) {
   if (!iso) return "—";
@@ -89,17 +95,32 @@ function formatDate(iso: string | null | undefined) {
   return Number.isNaN(d.getTime()) ? "—" : d.toLocaleString();
 }
 
-async function load() {
-  loading.value = true;
-  err.value = "";
+async function load(opts?: { source?: "initial" | "action" }) {
+  const source = opts?.source ?? "action";
+  const isInitial = source === "initial";
+  if (isInitial) {
+    err.value = "";
+    loadingInitial.value = true;
+  }
   try {
     rows.value = await listPendingUsers();
+    err.value = "";
+    hasLoaded.value = true;
   } catch (e: any) {
-    err.value = e?.message ?? "Falha ao listar pendentes";
+    const ne = normalizeApiError(e);
+    if (!hasLoaded.value && isInitial) {
+      err.value = ne.message;
+    } else {
+      push({ kind: "error", title: "Falha ao listar pendentes", message: ne.message, details: ne.details });
+    }
   } finally {
-    loading.value = false;
+    if (isInitial) loadingInitial.value = false;
   }
 }
 
-onMounted(load);
+async function refresh() {
+  await busy.run("refresh", () => load({ source: "action" }));
+}
+
+onMounted(() => load({ source: "initial" }));
 </script>

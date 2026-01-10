@@ -14,7 +14,7 @@
         class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs hover:bg-slate-50
                disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
         :disabled="loading"
-        @click="load()"
+        @click="refresh"
       >
         Atualizar
       </button>
@@ -123,14 +123,18 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
 import { getAdminOverview, type AdminOverviewDTO } from "./adminApi";
+import { useToast } from "@/ui/toast/useToast";
+import { normalizeApiError } from "@/ui/ops";
 
 defineEmits<{
   (e: "navigate", payload: any): void;
 }>();
 
+const { push } = useToast();
 const loading = ref(false);
 const error = ref<string>("");
 const overview = ref<AdminOverviewDTO | null>(null);
+const hasLoaded = ref(false);
 
 function fmt(iso: string) {
   try {
@@ -140,17 +144,30 @@ function fmt(iso: string) {
   }
 }
 
-async function load() {
-  error.value = "";
+async function load(opts?: { source?: "initial" | "action" }) {
+  const source = opts?.source ?? "action";
+  const isInitial = source === "initial";
+  if (isInitial) error.value = "";
   loading.value = true;
   try {
     overview.value = await getAdminOverview();
+    error.value = "";
+    hasLoaded.value = true;
   } catch (e: any) {
-    error.value = e?.message ?? "Falha ao carregar overview";
+    const ne = normalizeApiError(e);
+    if (!hasLoaded.value && isInitial) {
+      error.value = ne.message;
+    } else {
+      push({ kind: "error", title: "Falha ao carregar overview", message: ne.message, details: ne.details });
+    }
   } finally {
     loading.value = false;
   }
 }
 
-onMounted(load);
+async function refresh() {
+  await load({ source: "action" });
+}
+
+onMounted(() => load({ source: "initial" }));
 </script>

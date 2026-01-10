@@ -19,15 +19,15 @@
           class="w-64 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs outline-none
                  dark:border-slate-800 dark:bg-slate-900"
           placeholder="Buscar por email/nome…"
-          @keydown.enter.prevent="load(1)"
+          @keydown.enter.prevent="runSearch"
         />
 
         <button
           type="button"
           class="rounded-xl border border-slate-200 px-3 py-2 text-xs hover:bg-slate-50
                  disabled:opacity-60 dark:border-slate-800 dark:hover:bg-slate-800"
-          :disabled="loading"
-          @click="load(1)"
+          :disabled="loadingInitial || !!busy.map.search"
+          @click="runSearch"
         >
           Buscar
         </button>
@@ -83,8 +83,8 @@
       <button
         type="button"
         class="rounded-lg border px-2 py-1 disabled:opacity-60 dark:border-slate-800"
-        :disabled="loading || page <= 1"
-        @click="load(page - 1)"
+        :disabled="loadingInitial || page <= 1 || !!busy.map['page-prev']"
+        @click="loadPrev"
       >
         ←
       </button>
@@ -94,28 +94,33 @@
       <button
         type="button"
         class="rounded-lg border px-2 py-1 disabled:opacity-60 dark:border-slate-800"
-        :disabled="loading || page * pageSize >= total"
-        @click="load(page + 1)"
+        :disabled="loadingInitial || page * pageSize >= total || !!busy.map['page-next']"
+        @click="loadNext"
       >
         →
       </button>
     </div>
 
-    <div v-if="loading" class="text-xs text-slate-500 dark:text-slate-400">
+    <div v-if="loadingAny" class="text-xs text-slate-500 dark:text-slate-400">
       Carregando…
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { listActiveUsers, type ActiveUserRow } from "../adminApi";
+import { useToast } from "@/ui/toast/useToast";
+import { normalizeApiError, useBusyMap } from "@/ui/ops";
 
 defineEmits<{
   (e: "openUser", userId: string): void;
 }>();
 
-const loading = ref(false);
+const { push } = useToast();
+const busy = useBusyMap();
+const loadingInitial = ref(false);
+const loadingAny = computed(() => loadingInitial.value || Object.keys(busy.map).length > 0);
 const err = ref("");
 const q = ref("");
 
@@ -123,6 +128,8 @@ const rows = ref<ActiveUserRow[]>([]);
 const page = ref(1);
 const pageSize = ref(25);
 const total = ref(0);
+const hasLoaded = ref(false);
+let requestId = 0;
 
 function formatDate(iso: string | null | undefined) {
   if (!iso) return "—";
@@ -130,20 +137,49 @@ function formatDate(iso: string | null | undefined) {
   return Number.isNaN(d.getTime()) ? "—" : d.toLocaleString();
 }
 
-async function load(p = 1) {
-  loading.value = true;
-  err.value = "";
+async function load(p = 1, opts?: { source?: "initial" | "action" }) {
+  const source = opts?.source ?? "action";
+  const isInitial = source === "initial";
+  const currentRequest = ++requestId;
+
+  if (isInitial) {
+    err.value = "";
+    loadingInitial.value = true;
+  }
   try {
     const res = await listActiveUsers(q.value, p, pageSize.value);
+    if (currentRequest !== requestId) return;
     rows.value = res.rows ?? [];
     total.value = res.total ?? 0;
     page.value = res.page ?? p;
+    err.value = "";
+    hasLoaded.value = true;
   } catch (e: any) {
-    err.value = e?.message ?? "Falha ao listar usuários ativos";
+    if (currentRequest !== requestId) return;
+    const ne = normalizeApiError(e);
+    if (!hasLoaded.value && isInitial) {
+      err.value = ne.message;
+    } else {
+      push({ kind: "error", title: "Falha ao listar usuarios ativos", message: ne.message, details: ne.details });
+    }
   } finally {
-    loading.value = false;
+    if (isInitial) loadingInitial.value = false;
   }
 }
 
-onMounted(() => load(1));
+async function runSearch() {
+  await busy.run("search", () => load(1, { source: "action" }));
+}
+
+async function loadPrev() {
+  if (page.value <= 1) return;
+  await busy.run("page-prev", () => load(page.value - 1, { source: "action" }));
+}
+
+async function loadNext() {
+  if (page.value * pageSize.value >= total.value) return;
+  await busy.run("page-next", () => load(page.value + 1, { source: "action" }));
+}
+
+onMounted(() => load(1, { source: "initial" }));
 </script>

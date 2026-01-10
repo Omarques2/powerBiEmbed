@@ -88,6 +88,8 @@
 import { computed, nextTick, reactive, ref, watch } from "vue";
 import { globalSearch } from "./adminApi";
 import SearchSection, { type SearchItem } from "./components/SearchSection.vue";
+import { useToast } from "@/ui/toast/useToast";
+import { normalizeApiError } from "@/ui/ops";
 
 const props = defineProps<{ modelValue: boolean }>();
 const emit = defineEmits<{
@@ -97,6 +99,8 @@ const emit = defineEmits<{
 
 const open = computed(() => props.modelValue);
 const inputEl = ref<HTMLInputElement | null>(null);
+
+const { push } = useToast();
 
 const q = ref("");
 const loading = ref(false);
@@ -220,7 +224,9 @@ async function doSearch() {
 
     activeIndex.value = 0;
   } catch (e: any) {
-    error.value = e?.message ?? "Falha ao buscar";
+    const ne = normalizeApiError(e);
+    error.value = ne.message;
+    push({ kind: "error", title: "Falha ao buscar", message: ne.message, details: ne.details });
   } finally {
     loading.value = false;
   }

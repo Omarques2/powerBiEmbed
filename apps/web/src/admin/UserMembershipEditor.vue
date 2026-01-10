@@ -224,6 +224,8 @@ const { confirm } = useConfirm();
 const busy = useBusyMap();
 const { mutate } = useOptimisticMutation();
 
+type PatchMembershipResult = Awaited<ReturnType<typeof patchUserMembership>>;
+
 const error = ref<string>("");
 
 // customers cache
@@ -303,7 +305,7 @@ function getMembership(customerId: string) {
 
 // Patch role
 async function onChangeRole(customerId: string, role: string) {
-  await mutate<{ prevRole: MembershipRole | null }, void>({
+  await mutate<{ prevRole: MembershipRole | null }, PatchMembershipResult>({
     key: customerId,
     busy,
     optimistic: () => {
@@ -325,7 +327,7 @@ async function onChangeRole(customerId: string, role: string) {
 
 // Toggle active
 async function onToggleActive(customerId: string, isActive: boolean) {
-  await mutate<{ prevIsActive: boolean | null }, void>({
+  await mutate<{ prevIsActive: boolean | null }, PatchMembershipResult>({
     key: customerId,
     busy,
     optimistic: () => {
