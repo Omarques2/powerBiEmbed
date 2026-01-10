@@ -1,5 +1,5 @@
 // apps/web/src/auth/me.ts
-import { http } from "../api/http";
+import { http } from "@/api/http";
 
 export type MeResponse = {
   email: string | null;

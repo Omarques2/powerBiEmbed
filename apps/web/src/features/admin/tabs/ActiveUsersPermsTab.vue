@@ -240,7 +240,7 @@
 
 <script setup lang="ts">
 import UserMembershipEditor from "../UserMembershipEditor.vue";
-import type { ActiveUserRow } from "../adminApi";
+import type { ActiveUserRow } from "@/features/admin/api";
 
 export type MembershipRole = "owner" | "admin" | "member" | "viewer";
 

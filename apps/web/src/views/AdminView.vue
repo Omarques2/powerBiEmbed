@@ -120,13 +120,13 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 
-import AdminSidebar, { type AdminTabKey } from "../admin/components/AdminSidebar.vue";
-import AdminTopBar from "../admin/components/AdminTopBar.vue";
+import AdminSidebar, { type AdminTabKey } from "@/features/admin/components/AdminSidebar.vue";
+import AdminTopBar from "@/features/admin/components/AdminTopBar.vue";
 
-import PendingUsersTab from "../admin/tabs/PendingUsersTab.vue";
-import AuditTab from "../admin/tabs/AuditTab.vue";
-import OverviewPanel from "../admin/OverviewPanel.vue";
-import ActiveUsersPermsPanel from "../admin/panels/ActiveUsersPermsPanel.vue";
+import PendingUsersTab from "@/features/admin/tabs/PendingUsersTab.vue";
+import AuditTab from "@/features/admin/tabs/AuditTab.vue";
+import OverviewPanel from "@/features/admin/OverviewPanel.vue";
+import ActiveUsersPermsPanel from "@/features/admin/panels/ActiveUsersPermsPanel.vue";
 
 import {
   type CustomerRow,
@@ -138,11 +138,11 @@ import {
   activateUser,
   disableUser,
   listAuditLogs,
-} from "../admin/adminApi";
+} from "@/features/admin/api";
 
-import PowerBiOpsPanel from "../admin/PowerBiOpsPanel.vue";
-import CustomersPanel from "../admin/CustomersPanel.vue";
-import SecurityPlatformAdminsPanel from "../admin/SecurityPlatformAdminsPanel.vue";
+import PowerBiOpsPanel from "@/features/admin/PowerBiOpsPanel.vue";
+import CustomersPanel from "@/features/admin/CustomersPanel.vue";
+import SecurityPlatformAdminsPanel from "@/features/admin/SecurityPlatformAdminsPanel.vue";
 
 import { useConfirm } from "@/ui/confirm/useConfirm";
 import { useToast } from "@/ui/toast/useToast";

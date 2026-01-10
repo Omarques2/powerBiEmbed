@@ -201,7 +201,7 @@ import * as pbi from "powerbi-client";
 
 import ThemeToggle from "@/ui/theme/ThemeToggle.vue";
 
-import { http } from "../api/http";
+import { http } from "@/api/http";
 import { logout } from "../auth/auth";
 import HamburgerIcon from "../components/icons/HamburgerIcon.vue";
 import SidebarContent from "../components/SidebarContent.vue";

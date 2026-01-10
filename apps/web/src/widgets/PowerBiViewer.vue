@@ -26,7 +26,7 @@
 <script setup lang="ts">
 import { onBeforeUnmount, ref, watch } from "vue";
 import * as pbi from "powerbi-client";
-import { http } from "../api/http";
+import { http } from "@/api/http";
 
 const props = defineProps<{
   workspaceId: string | null;

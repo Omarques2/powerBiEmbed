@@ -149,7 +149,7 @@
 </template>
 
 <script setup lang="ts">
-import type { CustomerRow, PendingUserRow } from "../adminApi";
+import type { CustomerRow, PendingUserRow } from "@/features/admin/api";
 
 export type MembershipRole = "owner" | "admin" | "member" | "viewer";
 

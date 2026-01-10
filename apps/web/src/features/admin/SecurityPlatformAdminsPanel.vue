@@ -129,7 +129,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { grantPlatformAdmin, listPlatformAdmins, revokePlatformAdmin, type PlatformAdminRow } from "./adminApi";
+import { grantPlatformAdmin, listPlatformAdmins, revokePlatformAdmin, type PlatformAdminRow } from "@/features/admin/api";
 import { useToast } from "@/ui/toast/useToast";
 import { useConfirm } from "@/ui/confirm/useConfirm";
 import { useBusyMap } from "@/ui/ops/useBusyMap";

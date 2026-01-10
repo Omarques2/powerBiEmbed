@@ -195,9 +195,9 @@ import {
   transferUserMembership,
   upsertUserMembership,
   type MembershipRole,
-} from "./adminApi";
-import { useToast } from "../ui/toast/useToast";
-import { useConfirm } from "../ui/confirm/useConfirm";
+} from "@/features/admin/api";
+import { useToast } from "@/ui/toast/useToast";
+import { useConfirm } from "@/ui/confirm/useConfirm";
 import { normalizeApiError, useBusyMap, useOptimisticMutation } from "@/ui/ops";
 
 import AddMembershipModal from "./components/AddMembershipModal.vue";

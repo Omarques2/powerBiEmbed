@@ -73,7 +73,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { listPendingUsers, type PendingUserRow } from "../adminApi";
+import { listPendingUsers, type PendingUserRow } from "@/features/admin/api";
 import { useToast } from "@/ui/toast/useToast";
 import { normalizeApiError, useBusyMap } from "@/ui/ops";
 

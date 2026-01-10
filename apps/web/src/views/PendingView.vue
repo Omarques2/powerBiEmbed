@@ -43,7 +43,7 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
-import { http } from "../api/http";
+import { http } from "@/api/http";
 import { logout } from "../auth/auth";
 
 type MeResponse = {

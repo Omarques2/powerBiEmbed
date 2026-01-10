@@ -60,7 +60,7 @@
 
 <script setup lang="ts">
 import { onMounted, ref, watch } from "vue";
-import { http } from "../api/http";
+import { http } from "@/api/http";
 
 type Workspace = { workspaceId: string; name: string; customerId?: string };
 type Report = { id: string; name: string; datasetId?: string; workspaceId: string };

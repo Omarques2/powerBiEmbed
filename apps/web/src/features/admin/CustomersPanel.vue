@@ -188,8 +188,8 @@
 
 <script setup lang="ts">
 import { computed, reactive, ref } from "vue";
-import type { CustomerRow } from "./adminApi";
-import { createCustomer, setCustomerStatus, updateCustomer } from "./adminApi";
+import type { CustomerRow } from "@/features/admin/api";
+import { createCustomer, setCustomerStatus, updateCustomer } from "@/features/admin/api";
 import { useConfirm } from "@/ui/confirm/useConfirm";
 import { useBusyMap } from "@/ui/ops/useBusyMap";
 import { useOptimisticMutation } from "@/ui/ops/useOptimisticMutation";

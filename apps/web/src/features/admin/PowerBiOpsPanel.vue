@@ -325,14 +325,14 @@
 
 <script setup lang="ts">
 import { onMounted, reactive, ref, watch } from "vue";
-import type { CustomerCatalog, CustomerRow } from "./adminApi";
+import type { CustomerCatalog, CustomerRow } from "@/features/admin/api";
 import {
   getPowerBiCatalog,
   listRemoteReports,
   listRemoteWorkspaces,
   syncPowerBiCatalog,
   unlinkCustomerWorkspace,
-} from "./adminApi";
+} from "@/features/admin/api";
 import { useConfirm } from "@/ui/confirm/useConfirm";
 import { useToast } from "@/ui/toast/useToast";
 import { useBusyMap } from "@/ui/ops/useBusyMap";

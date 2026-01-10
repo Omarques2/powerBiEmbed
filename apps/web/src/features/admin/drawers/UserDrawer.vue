@@ -53,7 +53,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import UserMembershipEditor from "../UserMembershipEditor.vue";
-import { getUserById, getUserPermissions, type ActiveUserRow, type UserPermissionsResponse } from "../adminApi";
+import { getUserById, getUserPermissions, type ActiveUserRow, type UserPermissionsResponse } from "@/features/admin/api";
 
 const props = defineProps<{
   modelValue: boolean;

@@ -122,7 +122,7 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
-import { getAdminOverview, type AdminOverviewDTO } from "./adminApi";
+import { getAdminOverview, type AdminOverviewDTO } from "@/features/admin/api";
 import { useToast } from "@/ui/toast/useToast";
 import { normalizeApiError } from "@/ui/ops";
 

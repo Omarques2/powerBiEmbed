@@ -248,7 +248,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from "vue";
-import { useToast } from "../../ui/toast/useToast";
+import { useToast } from "@/ui/toast/useToast";
 import { PermSwitch } from "@/ui/toggles";
 import UserMembershipEditor from "../UserMembershipEditor.vue";
 
@@ -259,7 +259,7 @@ import {
   setReportPermission,
   type ActiveUserRow,
   type UserPermissionsResponse,
-} from "../adminApi";
+} from "@/features/admin/api";
 
 const { push } = useToast();
 

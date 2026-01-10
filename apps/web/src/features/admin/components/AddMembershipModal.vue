@@ -106,7 +106,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import type { MembershipRole } from "../adminApi";
+import type { MembershipRole } from "@/features/admin/api";
 
 type CustomerRow = { id: string; code: string; name: string; status: string };
 

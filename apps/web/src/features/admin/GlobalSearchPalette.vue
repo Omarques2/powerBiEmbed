@@ -86,7 +86,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, reactive, ref, watch } from "vue";
-import { globalSearch } from "./adminApi";
+import { globalSearch } from "@/features/admin/api";
 import SearchSection, { type SearchItem } from "./components/SearchSection.vue";
 import { useToast } from "@/ui/toast/useToast";
 import { normalizeApiError } from "@/ui/ops";
