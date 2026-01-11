@@ -105,6 +105,36 @@
               <!-- Theme toggle (isolado em componente) -->
               <ThemeToggle />
 
+              <!-- Print BI -->
+              <button
+                class="inline-flex h-10 items-center justify-center gap-2 rounded-xl border px-3 text-sm font-medium
+                       border-slate-200 bg-white hover:bg-slate-50 active:scale-[0.98] transition
+                       disabled:opacity-60 disabled:cursor-not-allowed
+                       dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+                :disabled="!selectedReport || loadingEmbed || printing || !reportReady"
+                @click="printBiArea"
+              >
+                <svg
+                  class="h-5 w-5"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M6 9V4h12v5" />
+                  <path d="M6 18h12v2H6z" />
+                  <path d="M6 14h12v4H6z" />
+                  <path d="M6 11H5a3 3 0 0 0-3 3v3h4" />
+                  <path d="M18 11h1a3 3 0 0 1 3 3v3h-4" />
+                </svg>
+                <span class="hidden md:inline">
+                  {{ printing ? "Abrindo..." : "Imprimir PDF" }}
+                </span>
+              </button>
+
               <!-- Refresh -->
               <button
                 class="inline-flex h-10 items-center justify-center gap-2 rounded-xl border px-3 text-sm font-medium
@@ -128,7 +158,7 @@
           <div class="h-full w-full overflow-hidden flex items-center justify-center">
             <div
               ref="stageEl"
-              class="relative w-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm
+              class="print-bi-area relative w-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm
                      dark:border-slate-800 dark:bg-slate-900
                      aspect-video
                      max-h-[calc(100dvh-var(--topbar-h)-1rem)]
@@ -240,6 +270,9 @@ const error = ref("");
 
 const stageEl = ref<HTMLDivElement | null>(null);
 const containerEl = ref<HTMLDivElement | null>(null);
+const printing = ref(false);
+const reportReady = ref(false);
+const lastRenderAt = ref(0);
 
 let powerbiService: pbi.service.Service | null = null;
 let resizeObs: ResizeObserver | null = null;
@@ -305,6 +338,59 @@ function removeResizeHandlers() {
   if (resizeObs) {
     resizeObs.disconnect();
     resizeObs = null;
+  }
+}
+
+function waitForReportRender(timeoutMs = 8000): Promise<boolean> {
+  if (reportReady.value && Date.now() - lastRenderAt.value < 15_000) {
+    return Promise.resolve(true);
+  }
+
+  if (!embeddedReport) return Promise.resolve(false);
+
+  return new Promise((resolve) => {
+    let done = false;
+    const timer = window.setTimeout(() => {
+      if (done) return;
+      done = true;
+      embeddedReport?.off("rendered", onRendered);
+      resolve(false);
+    }, timeoutMs);
+
+    const onRendered = () => {
+      if (done) return;
+      done = true;
+      window.clearTimeout(timer);
+      embeddedReport?.off("rendered", onRendered);
+      resolve(true);
+    };
+
+    embeddedReport.on("rendered", onRendered);
+  });
+}
+
+async function printBiArea() {
+  if (!selectedReport.value || loadingEmbed.value) return;
+  if (printing.value) return;
+  printing.value = true;
+
+  const ready = await waitForReportRender();
+  if (!ready) {
+    error.value = "Relatorio ainda esta carregando. Tente novamente em alguns segundos.";
+    printing.value = false;
+    return;
+  }
+
+  try {
+    if (embeddedReport && typeof embeddedReport.print === "function") {
+      await embeddedReport.print();
+      return;
+    }
+    throw new Error("Print nao suportado pelo embed.");
+  } catch (e: any) {
+    error.value = `Falha ao imprimir: ${e?.message ?? String(e)}`;
+  } finally {
+    printing.value = false;
   }
 }
 
@@ -379,6 +465,7 @@ async function openReport(r: Report) {
   error.value = "";
   selectedReport.value = r;
   loadingEmbed.value = true;
+  reportReady.value = false;
 
   try {
     resetEmbed();
@@ -421,6 +508,8 @@ async function openReport(r: Report) {
 
     report.on("rendered", () => {
       loadingEmbed.value = false;
+      reportReady.value = true;
+      lastRenderAt.value = Date.now();
       window.setTimeout(() => resizeEmbedded(), 0);
     });
 
@@ -428,10 +517,12 @@ async function openReport(r: Report) {
       console.error("Power BI error:", event?.detail ?? event);
       error.value = `Erro do Power BI: ${JSON.stringify(event?.detail ?? event)}`;
       loadingEmbed.value = false;
+      reportReady.value = false;
     });
   } catch (e: any) {
     error.value = `Falha ao embutir report: ${e?.response?.data?.message ?? e?.message ?? String(e)}`;
     loadingEmbed.value = false;
+    reportReady.value = false;
   }
 }
 
