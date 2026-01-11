@@ -9,7 +9,12 @@
     >
       <div class="flex items-start justify-between gap-3">
         <div class="min-w-0">
-          <div class="text-sm font-semibold text-slate-900 dark:text-slate-100">
+          <div class="flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-slate-100">
+            <span
+              v-if="t.loading"
+              class="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-slate-300 border-t-slate-700 dark:border-slate-700 dark:border-t-slate-200"
+              aria-hidden="true"
+            />
             {{ t.title }}
           </div>
           <div v-if="t.message" class="mt-1 text-sm text-slate-700 dark:text-slate-200">

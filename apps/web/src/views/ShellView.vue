@@ -112,7 +112,7 @@
                        disabled:opacity-60 disabled:cursor-not-allowed
                        dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
                 :disabled="!selectedReport || loadingEmbed || printing || !reportReady"
-                @click="printBiArea"
+                @click="openExportModal"
               >
                 <svg
                   class="h-5 w-5"
@@ -131,7 +131,7 @@
                   <path d="M18 11h1a3 3 0 0 1 3 3v3h-4" />
                 </svg>
                 <span class="hidden md:inline">
-                  {{ printing ? "Abrindo..." : "Imprimir PDF" }}
+                  {{ printing ? "Gerando..." : "Exportar" }}
                 </span>
               </button>
 
@@ -221,6 +221,67 @@
         </div>
       </main>
     </div>
+
+    <div
+      v-if="exportModalOpen"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      @click.self="closeExportModal"
+    >
+      <div
+        class="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-xl dark:border-slate-800 dark:bg-slate-900"
+      >
+        <div class="flex items-center justify-between gap-4">
+          <div class="text-base font-semibold text-slate-900 dark:text-slate-100">Exportar report</div>
+          <button
+            class="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+            @click="closeExportModal"
+          >
+            Fechar
+          </button>
+        </div>
+
+        <div class="mt-4 space-y-4">
+          <div>
+            <div class="text-sm font-semibold text-slate-600 dark:text-slate-300">Formato</div>
+            <div class="mt-2">
+              <PillToggle v-model="exportFormat" :options="exportFormatOptions" class="max-w-[280px]" />
+            </div>
+          </div>
+
+          <div>
+            <div class="text-sm font-semibold text-slate-600 dark:text-slate-300">Escopo</div>
+            <div class="mt-2">
+              <PillToggle v-model="exportScope" :options="exportScopeOptions" class="max-w-[280px]" />
+            </div>
+            <div
+              v-if="exportFormat === 'PNG' && exportScope === 'all'"
+              class="mt-2 text-sm text-amber-600 dark:text-amber-400"
+            >
+              PNG com todas as abas gera um arquivo ZIP.
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-5 flex justify-end gap-2">
+          <button
+            class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 hover:bg-slate-50
+                   dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+            :disabled="printing"
+            @click="closeExportModal"
+          >
+            Cancelar
+          </button>
+          <button
+            class="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-60
+                   dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
+            :disabled="printing"
+            @click="confirmExport"
+          >
+            {{ printing ? "Gerando..." : "Exportar" }}
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -230,6 +291,8 @@ import { useRouter } from "vue-router";
 import * as pbi from "powerbi-client";
 
 import ThemeToggle from "@/ui/theme/ThemeToggle.vue";
+import { useToast } from "@/ui/toast/useToast";
+import PillToggle from "@/ui/toggles/PillToggle.vue";
 
 import { http } from "@/api/http";
 import { logout } from "../auth/auth";
@@ -249,6 +312,7 @@ type MeResponse = {
 };
 
 const router = useRouter();
+const { push, remove } = useToast();
 
 const me = ref<MeResponse | null>(null);
 const isAdmin = ref(false);
@@ -274,6 +338,48 @@ const printing = ref(false);
 const reportReady = ref(false);
 const lastRenderAt = ref(0);
 
+const exportModalOpen = ref(false);
+
+const EXPORT_FORMAT_KEY = "pbi_export_format";
+const EXPORT_SCOPE_KEY = "pbi_export_scope";
+
+function loadExportPref<T extends string>(key: string, fallback: T, allowed: T[]): T {
+  if (typeof window === "undefined") return fallback;
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return fallback;
+    return allowed.includes(raw as T) ? (raw as T) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function saveExportPref(key: string, value: string) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(key, value);
+  } catch {
+    // ignore storage errors
+  }
+}
+
+const exportFormat = ref<"PDF" | "PNG">(
+  loadExportPref(EXPORT_FORMAT_KEY, "PDF", ["PDF", "PNG"]),
+);
+const exportScope = ref<"active" | "all">(
+  loadExportPref(EXPORT_SCOPE_KEY, "active", ["active", "all"]),
+);
+
+const exportFormatOptions = [
+  { value: "PDF", label: "PDF" },
+  { value: "PNG", label: "PNG" },
+];
+
+const exportScopeOptions = [
+  { value: "active", label: "Aba atual" },
+  { value: "all", label: "Todas as abas" },
+];
+
 let powerbiService: pbi.service.Service | null = null;
 let resizeObs: ResizeObserver | null = null;
 let embeddedReport: pbi.Report | null = null;
@@ -294,6 +400,17 @@ function resetEmbed() {
   }
   embeddedReport = null;
 }
+
+function openExportModal() {
+  exportModalOpen.value = true;
+}
+
+function closeExportModal() {
+  if (printing.value) return;
+  exportModalOpen.value = false;
+}
+
+ 
 
 async function applyReportLayout() {
   if (!embeddedReport) return;
@@ -346,14 +463,15 @@ function waitForReportRender(timeoutMs = 8000): Promise<boolean> {
     return Promise.resolve(true);
   }
 
-  if (!embeddedReport) return Promise.resolve(false);
+  const report = embeddedReport;
+  if (!report) return Promise.resolve(false);
 
   return new Promise((resolve) => {
     let done = false;
     const timer = window.setTimeout(() => {
       if (done) return;
       done = true;
-      embeddedReport?.off("rendered", onRendered);
+      report.off("rendered", onRendered);
       resolve(false);
     }, timeoutMs);
 
@@ -361,34 +479,233 @@ function waitForReportRender(timeoutMs = 8000): Promise<boolean> {
       if (done) return;
       done = true;
       window.clearTimeout(timer);
-      embeddedReport?.off("rendered", onRendered);
+      report.off("rendered", onRendered);
       resolve(true);
     };
 
-    embeddedReport.on("rendered", onRendered);
+    report.on("rendered", onRendered);
   });
 }
 
-async function printBiArea() {
-  if (!selectedReport.value || loadingEmbed.value) return;
-  if (printing.value) return;
-  printing.value = true;
+function formatPdfDate(date = new Date()) {
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const year = date.getFullYear();
+  return `${day}-${month}-${year}`;
+}
 
-  const ready = await waitForReportRender();
-  if (!ready) {
-    error.value = "Relatorio ainda esta carregando. Tente novamente em alguns segundos.";
-    printing.value = false;
-    return;
+function sanitizeFilenameSegment(value: string | undefined, fallback: string) {
+  if (!value) return fallback;
+  const cleaned = value
+    .replace(/[\\/:*?"<>|]+/g, "-")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/[. ]+$/, "");
+  return cleaned.length > 0 ? cleaned : fallback;
+}
+
+function buildExportFilename(format: "PDF" | "PNG" | "ZIP") {
+  const workspaceName = sanitizeFilenameSegment(selectedWorkspace.value?.name, "workspace");
+  const reportName = sanitizeFilenameSegment(selectedReport.value?.name, "report");
+  const ext = format.toLowerCase();
+  return `${workspaceName}.${reportName}_${formatPdfDate()}.${ext}`;
+}
+
+function triggerDownload(url: string, filename: string) {
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.rel = "noopener";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+}
+
+function parseErrorText(text: string | null | undefined) {
+  if (!text) return null;
+  try {
+    const data = JSON.parse(text);
+    if (typeof data === "string") return data;
+    if (typeof data === "object" && data) {
+      return data.message ?? data.error?.message ?? data.error ?? null;
+    }
+  } catch {
+    // ignore parse errors
+  }
+  return null;
+}
+
+async function extractErrorMessage(err: any): Promise<string> {
+  const fallback = err?.message ?? String(err);
+  const data = err?.response?.data;
+  if (!data) return fallback;
+
+  if (data instanceof Blob) {
+    const text = await data.text();
+    return parseErrorText(text) ?? text ?? fallback;
   }
 
+  if (typeof data === "string") {
+    return parseErrorText(data) ?? data;
+  }
+
+  if (typeof data === "object") {
+    return data.message ?? data.error?.message ?? fallback;
+  }
+
+  return fallback;
+}
+
+async function isPdfBlob(blob: Blob, relaxed = false): Promise<boolean> {
+  if (!blob || blob.size < 5) return false;
+  const headSize = relaxed ? Math.min(blob.size, 1024) : 5;
+  const head = new Uint8Array(await blob.slice(0, headSize).arrayBuffer());
+  const signature = [0x25, 0x50, 0x44, 0x46, 0x2d];
+  if (!relaxed) {
+    return signature.every((value, index) => head[index] === value);
+  }
+  for (let i = 0; i <= head.length - signature.length; i += 1) {
+    if (signature.every((value, index) => head[i + index] === value)) return true;
+  }
+  return false;
+}
+
+async function isPngBlob(blob: Blob): Promise<boolean> {
+  if (!blob || blob.size < 8) return false;
+  const head = new Uint8Array(await blob.slice(0, 8).arrayBuffer());
+  return (
+    head[0] === 0x89 &&
+    head[1] === 0x50 &&
+    head[2] === 0x4e &&
+    head[3] === 0x47 &&
+    head[4] === 0x0d &&
+    head[5] === 0x0a &&
+    head[6] === 0x1a &&
+    head[7] === 0x0a
+  );
+}
+
+async function isZipBlob(blob: Blob): Promise<boolean> {
+  if (!blob || blob.size < 4) return false;
+  const head = new Uint8Array(await blob.slice(0, 4).arrayBuffer());
+  return (
+    (head[0] === 0x50 && head[1] === 0x4b && head[2] === 0x03 && head[3] === 0x04) ||
+    (head[0] === 0x50 && head[1] === 0x4b && head[2] === 0x05 && head[3] === 0x06)
+  );
+}
+
+function resolveExportKind(contentType: string | undefined, fallback: "PDF" | "PNG" | "ZIP") {
+  const ct = (contentType ?? "").toLowerCase();
+  if (ct.includes("application/zip")) return "ZIP";
+  if (ct.includes("image/png")) return "PNG";
+  if (ct.includes("application/pdf")) return "PDF";
+  return fallback;
+}
+
+async function confirmExport() {
+  if (printing.value) return;
+  closeExportModal();
+  await exportReport();
+}
+
+async function exportReport() {
+  if (!selectedReport.value || !selectedWorkspaceId.value || loadingEmbed.value) return;
+  if (printing.value) return;
+  printing.value = true;
+  error.value = "";
+
+  const toastId = push({
+    kind: "info",
+    title: "Gerando arquivo",
+    message: exportFormat.value === "PNG" ? "Gerando imagem do report." : "Gerando PDF do report.",
+    loading: true,
+    timeoutMs: 0,
+  });
   try {
-    if (embeddedReport && typeof embeddedReport.print === "function") {
-      await embeddedReport.print();
-      return;
+    const ready = await waitForReportRender(2000);
+    let bookmarkState: string | undefined;
+    let pageName: string | undefined;
+
+    if (ready && embeddedReport?.bookmarksManager?.capture) {
+      try {
+        const bookmark = await embeddedReport.bookmarksManager.capture();
+        bookmarkState = bookmark?.state;
+      } catch {
+        bookmarkState = undefined;
+      }
     }
-    throw new Error("Print nao suportado pelo embed.");
+
+    const exportActivePage = exportScope.value === "active";
+    if (exportActivePage && ready && embeddedReport?.getActivePage) {
+      try {
+        const page = await embeddedReport.getActivePage();
+        pageName = page?.name;
+      } catch {
+        pageName = undefined;
+      }
+    }
+
+    const res = await http.post(
+      "/powerbi/export/pdf",
+      {
+        workspaceId: selectedWorkspaceId.value,
+        reportId: selectedReport.value.id,
+        bookmarkState,
+        format: exportFormat.value,
+        pageName,
+      },
+      { responseType: "blob" },
+    );
+
+    const expectedKind =
+      exportFormat.value === "PNG" && exportScope.value === "all" ? "ZIP" : exportFormat.value;
+    const actualKind = resolveExportKind(res.headers?.["content-type"], expectedKind);
+    const filename = buildExportFilename(actualKind);
+    const contentType =
+      actualKind === "ZIP"
+        ? "application/zip"
+        : actualKind === "PNG"
+          ? "image/png"
+          : "application/pdf";
+    const blob = res.data instanceof Blob ? res.data : new Blob([res.data], { type: contentType });
+    if (actualKind === "PDF" && !(await isPdfBlob(blob, true))) {
+      const text = await blob.text();
+      const message = parseErrorText(text) ?? "Resposta nao e um PDF valido.";
+      throw new Error(message);
+    }
+    if (actualKind === "PNG" && !(await isPngBlob(blob))) {
+      const text = await blob.text();
+      const message = parseErrorText(text) ?? "Resposta nao e um PNG valido.";
+      throw new Error(message);
+    }
+    if (actualKind === "ZIP" && !(await isZipBlob(blob))) {
+      const text = await blob.text();
+      const message = parseErrorText(text) ?? "Resposta nao e um ZIP valido.";
+      throw new Error(message);
+    }
+    const url = URL.createObjectURL(blob);
+
+    triggerDownload(url, filename);
+
+    window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    if (toastId) remove(toastId);
+    push({
+      kind: "success",
+      title:
+        actualKind === "ZIP" ? "ZIP pronto" : actualKind === "PNG" ? "PNG pronto" : "PDF pronto",
+      message: "Arquivo baixado.",
+      timeoutMs: 4000,
+    });
   } catch (e: any) {
-    error.value = `Falha ao imprimir: ${e?.message ?? String(e)}`;
+    if (toastId) remove(toastId);
+    const message = await extractErrorMessage(e);
+    error.value = `Falha ao gerar ${exportFormat.value}: ${message}`;
+    push({
+      kind: "error",
+      title: "Falha ao gerar arquivo",
+      message,
+      timeoutMs: 8000,
+    });
   } finally {
     printing.value = false;
   }
@@ -400,6 +717,14 @@ watch(sidebarOpen, () => {
 
 watch(drawerOpen, () => {
   window.setTimeout(() => resizeEmbedded(), 80);
+});
+
+watch(exportFormat, (value) => {
+  saveExportPref(EXPORT_FORMAT_KEY, value);
+});
+
+watch(exportScope, (value) => {
+  saveExportPref(EXPORT_SCOPE_KEY, value);
 });
 
 watch(sidebarOpen, (open) => {

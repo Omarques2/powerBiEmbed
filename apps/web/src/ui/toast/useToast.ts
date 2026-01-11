@@ -9,6 +9,7 @@ export type ToastItem = {
   title: string;
   message?: string;
   details?: any;
+  loading?: boolean;
   createdAt: number;
   timeoutMs: number;
 };
@@ -26,6 +27,7 @@ function uid() {
 
 export function useToast() {
   function push(t: ToastInput) {
+    const timeoutMs = t.timeoutMs ?? 4500;
     const item: ToastItem = {
       id: uid(),
       createdAt: Date.now(),
@@ -33,15 +35,20 @@ export function useToast() {
       title: t.title,
       message: t.message,
       details: t.details,
-      timeoutMs: t.timeoutMs ?? 4500,
+      loading: t.loading,
+      timeoutMs,
     };
 
     state.items.push(item);
 
-    window.setTimeout(() => {
-      const idx = state.items.findIndex((x) => x.id === item.id);
-      if (idx >= 0) state.items.splice(idx, 1);
-    }, item.timeoutMs);
+    if (timeoutMs > 0) {
+      window.setTimeout(() => {
+        const idx = state.items.findIndex((x) => x.id === item.id);
+        if (idx >= 0) state.items.splice(idx, 1);
+      }, timeoutMs);
+    }
+
+    return item.id;
   }
 
   function remove(id: string) {
