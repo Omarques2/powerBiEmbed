@@ -9,3 +9,4 @@ export * from "./powerbi";
 export * from "./security";
 export * from "./overview";
 export * from "./search";
+export * from "./rls";
