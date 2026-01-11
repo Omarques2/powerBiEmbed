@@ -38,6 +38,12 @@ export class PowerBiController {
   ) {
     const user = await this.usersService.upsertFromClaims(req.user ?? {});
     await this.biAuthz.assertCanViewReport(user.id, workspaceId, reportId);
-    return this.svc.getEmbedConfig(workspaceId, reportId);
+    const customerId = await this.biAuthz.getWorkspaceCustomerId(user.id, workspaceId);
+    const username = user.email ?? user.id;
+    return this.svc.getEmbedConfig(workspaceId, reportId, {
+      username,
+      roles: ["CustomerRLS"],
+      customData: customerId,
+    });
   }
 }

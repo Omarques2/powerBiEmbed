@@ -79,6 +79,29 @@ export class BiAuthzService {
     }));
   }
 
+  async getWorkspaceCustomerId(userId: string, workspaceId: string) {
+    const wsPerm = await this.prisma.bi_workspace_permissions.findFirst({
+      where: {
+        user_id: userId,
+        can_view: true,
+        bi_workspaces: {
+          workspace_id: workspaceId,
+          is_active: true,
+          customers: { status: 'active' },
+        },
+      },
+      select: {
+        bi_workspaces: { select: { customer_id: true } },
+      },
+    });
+
+    if (!wsPerm?.bi_workspaces?.customer_id) {
+      throw new ForbiddenException('No access to workspace');
+    }
+
+    return wsPerm.bi_workspaces.customer_id;
+  }
+
   async assertCanViewReport(userId: string, workspaceId: string, reportId: string) {
     const ok = await this.prisma.bi_report_permissions.findFirst({
       where: {

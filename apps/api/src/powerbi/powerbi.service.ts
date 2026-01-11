@@ -70,6 +70,17 @@ export class PowerBiService {
     return res.data;
   }
 
+  async refreshDatasetInGroup(workspaceId: string, datasetId: string) {
+    return this.pbiPost<any>(`/groups/${workspaceId}/datasets/${datasetId}/refreshes`, {});
+  }
+
+  async listDatasetRefreshesInGroup(workspaceId: string, datasetId: string) {
+    const res = await this.pbiGet<{ value: any[] }>(
+      `/groups/${workspaceId}/datasets/${datasetId}/refreshes?$top=10`
+    );
+    return res.value ?? [];
+  }
+
   async listWorkspaces() {
     const res = await this.pbiGet<{ value: any[] }>(`/groups`);
     return res.value.map(g => ({
@@ -92,7 +103,11 @@ export class PowerBiService {
     }
 
   // 2) Gerar embed config para um report (workspace + report)
-  async getEmbedConfig(workspaceId: string, reportId: string) {
+  async getEmbedConfig(
+    workspaceId: string,
+    reportId: string,
+    opts?: { username: string; roles?: string[]; customData?: string; forceIdentity?: boolean },
+  ) {
     // 2.1 Buscar metadados do relatório para pegar embedUrl e datasetId
     // GET /groups/{groupId}/reports/{reportId}
     const report = await this.pbiGet<any>(`/groups/${workspaceId}/reports/${reportId}`);
@@ -108,11 +123,50 @@ export class PowerBiService {
 
     // 2.2 Gerar embed token
     // POST /GenerateToken
-    const tokenRes = await this.pbiPost<any>(`/GenerateToken`, {
+    const tokenPayload: any = {
       reports: [{ id: reportId }],
       datasets: [{ id: datasetId }],
       targetWorkspaces: [{ id: workspaceId }],
-    });
+    };
+
+    if (opts?.username) {
+      let includeIdentity = opts.forceIdentity === true;
+      let roles = opts.roles ?? [];
+
+      if (!includeIdentity) {
+        try {
+          const ds = await this.pbiGet<any>(`/groups/${workspaceId}/datasets/${datasetId}`);
+          const requiresIdentity = !!ds?.isEffectiveIdentityRequired;
+          const requiresRoles = !!ds?.isEffectiveIdentityRolesRequired;
+          includeIdentity = requiresIdentity || requiresRoles;
+          if (!requiresRoles) roles = [];
+        } catch (_err: any) {
+          includeIdentity = true;
+        }
+      }
+
+      if (includeIdentity) {
+        tokenPayload.identities = [
+          {
+            username: opts.username,
+            roles,
+            datasets: [datasetId],
+            customData: opts.customData,
+          },
+        ];
+      }
+    }
+
+    let tokenRes: any;
+    try {
+      tokenRes = await this.pbiPost<any>(`/GenerateToken`, tokenPayload);
+    } catch (err: any) {
+      const status = err?.response?.status;
+      const data = err?.response?.data;
+      throw new InternalServerErrorException(
+        `Falha ao gerar embed token: ${status ?? 'unknown'} ${JSON.stringify(data ?? {})}`
+      );
+    }
 
     const embedToken = tokenRes?.token;
     const expiresOn = tokenRes?.expiration;

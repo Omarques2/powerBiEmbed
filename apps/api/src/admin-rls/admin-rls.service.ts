@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
+import { RlsRefreshService } from "./rls-refresh.service";
 
 type ValueType = "text" | "int" | "uuid";
 type DefaultBehavior = "allow" | "deny";
@@ -74,7 +75,10 @@ function isPrismaUnique(err: unknown): boolean {
 
 @Injectable()
 export class AdminRlsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly refreshSvc: RlsRefreshService,
+  ) {}
 
   async listTargets(datasetIdRaw: string) {
     const datasetId = ensureUuid("datasetId", datasetIdRaw);
@@ -278,6 +282,19 @@ export class AdminRlsService {
     }
   }
 
+  async refreshDataset(datasetIdRaw: string) {
+    const datasetId = ensureUuid("datasetId", datasetIdRaw);
+    const workspaceId = await this.resolveWorkspaceIdForDataset(datasetId);
+    return this.refreshSvc.requestRefresh(workspaceId, datasetId);
+  }
+
+  async listDatasetRefreshes(datasetIdRaw: string) {
+    const datasetId = ensureUuid("datasetId", datasetIdRaw);
+    const workspaceId = await this.resolveWorkspaceIdForDataset(datasetId);
+    const items = await this.refreshSvc.listRefreshes(workspaceId, datasetId);
+    return { items };
+  }
+
   private normalizeRuleItem(item: CreateRuleInput, index: number, valueType: ValueType) {
     const customerId = ensureUuid("customerId", item?.customerId);
     const op = String(item?.op ?? "").trim() as RuleOp;
@@ -342,5 +359,26 @@ export class AdminRlsService {
       valueUuid: row.value_uuid,
       createdAt: row.created_at?.toISOString ? row.created_at.toISOString() : row.created_at,
     };
+  }
+
+  private async resolveWorkspaceIdForDataset(datasetId: string) {
+    const row = await this.prisma.bi_reports.findFirst({
+      where: {
+        dataset_id: datasetId,
+        bi_workspaces: { is_active: true },
+      },
+      select: {
+        bi_workspaces: {
+          select: { workspace_id: true },
+        },
+      },
+      orderBy: { created_at: "asc" },
+    });
+
+    const workspaceId = row?.bi_workspaces?.workspace_id;
+    if (!workspaceId) {
+      throw new NotFoundException("Dataset not found in catalog");
+    }
+    return workspaceId;
   }
 }

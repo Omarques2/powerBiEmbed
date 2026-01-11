@@ -62,4 +62,14 @@ export class AdminRlsController {
   deleteRule(@Param("ruleId") ruleId: string) {
     return this.svc.deleteRule(ruleId);
   }
+
+  @Post("datasets/:datasetId/refresh")
+  refreshDataset(@Param("datasetId") datasetId: string) {
+    return this.svc.refreshDataset(datasetId);
+  }
+
+  @Get("datasets/:datasetId/refreshes")
+  listRefreshes(@Param("datasetId") datasetId: string) {
+    return this.svc.listDatasetRefreshes(datasetId);
+  }
 }

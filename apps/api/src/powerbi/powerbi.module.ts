@@ -11,5 +11,6 @@ import { PowerBiCatalogSyncService } from "./powerbi-catalog-sync.service";
   imports: [AuthModule, UsersModule, BiAuthzModule],
   controllers: [PowerBiController, AdminPowerBiController],
   providers: [PowerBiService, PowerBiCatalogSyncService],
+  exports: [PowerBiService],
 })
 export class PowerbiModule {}

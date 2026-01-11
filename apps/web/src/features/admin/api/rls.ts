@@ -85,3 +85,19 @@ export async function deleteRlsRule(ruleId: string) {
   const res = await http.delete(`/admin/rls/rules/${encodeURIComponent(ruleId)}`);
   return res.data as { ok: boolean };
 }
+
+export async function refreshRlsDataset(datasetId: string) {
+  const res = await http.post(`/admin/rls/datasets/${encodeURIComponent(datasetId)}/refresh`);
+  return res.data as {
+    status: "queued" | "scheduled" | "running";
+    pending?: boolean;
+    scheduledAt?: string;
+    scheduledInMs?: number;
+    refresh?: unknown;
+  };
+}
+
+export async function listRlsRefreshes(datasetId: string) {
+  const res = await http.get(`/admin/rls/datasets/${encodeURIComponent(datasetId)}/refreshes`);
+  return res.data as { items: any[] };
+}
