@@ -1,7 +1,8 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, UseGuards } from "@nestjs/common";
 import { AuthGuard } from "../auth/auth.guard";
 import { PlatformAdminGuard } from "../auth/platform-admin.guard";
 import { AdminRlsService } from "./admin-rls.service";
+import type { AuthedRequest } from "../auth/authed-request.type";
 
 type CreateTargetInput = {
   targetKey: string;
@@ -34,18 +35,21 @@ export class AdminRlsController {
   }
 
   @Post("datasets/:datasetId/targets")
-  createTarget(@Param("datasetId") datasetId: string, @Body() body: CreateTargetInput) {
-    return this.svc.createTarget(datasetId, body);
+  createTarget(@Req() req: AuthedRequest, @Param("datasetId") datasetId: string, @Body() body: CreateTargetInput) {
+    const actorSub = req.user?.sub ? String(req.user.sub) : null;
+    return this.svc.createTarget(datasetId, body, actorSub);
   }
 
   @Patch("targets/:targetId")
-  updateTarget(@Param("targetId") targetId: string, @Body() body: UpdateTargetInput) {
-    return this.svc.updateTarget(targetId, body);
+  updateTarget(@Req() req: AuthedRequest, @Param("targetId") targetId: string, @Body() body: UpdateTargetInput) {
+    const actorSub = req.user?.sub ? String(req.user.sub) : null;
+    return this.svc.updateTarget(targetId, body, actorSub);
   }
 
   @Delete("targets/:targetId")
-  deleteTarget(@Param("targetId") targetId: string) {
-    return this.svc.deleteTarget(targetId);
+  deleteTarget(@Req() req: AuthedRequest, @Param("targetId") targetId: string) {
+    const actorSub = req.user?.sub ? String(req.user.sub) : null;
+    return this.svc.deleteTarget(targetId, actorSub);
   }
 
   @Get("targets/:targetId/rules")
@@ -54,22 +58,39 @@ export class AdminRlsController {
   }
 
   @Post("targets/:targetId/rules")
-  createRules(@Param("targetId") targetId: string, @Body() body: { items: CreateRuleInput[] }) {
-    return this.svc.createRules(targetId, body?.items ?? []);
+  createRules(
+    @Req() req: AuthedRequest,
+    @Param("targetId") targetId: string,
+    @Body() body: { items: CreateRuleInput[] },
+  ) {
+    const actorSub = req.user?.sub ? String(req.user.sub) : null;
+    return this.svc.createRules(targetId, body?.items ?? [], actorSub);
   }
 
   @Delete("rules/:ruleId")
-  deleteRule(@Param("ruleId") ruleId: string) {
-    return this.svc.deleteRule(ruleId);
+  deleteRule(@Req() req: AuthedRequest, @Param("ruleId") ruleId: string) {
+    const actorSub = req.user?.sub ? String(req.user.sub) : null;
+    return this.svc.deleteRule(ruleId, actorSub);
   }
 
   @Post("datasets/:datasetId/refresh")
-  refreshDataset(@Param("datasetId") datasetId: string) {
-    return this.svc.refreshDataset(datasetId);
+  refreshDataset(@Req() req: AuthedRequest, @Param("datasetId") datasetId: string) {
+    const actorSub = req.user?.sub ? String(req.user.sub) : null;
+    return this.svc.refreshDataset(datasetId, actorSub);
   }
 
   @Get("datasets/:datasetId/refreshes")
   listRefreshes(@Param("datasetId") datasetId: string) {
     return this.svc.listDatasetRefreshes(datasetId);
+  }
+
+  @Get("datasets/:datasetId/snapshot")
+  snapshot(
+    @Req() req: AuthedRequest,
+    @Param("datasetId") datasetId: string,
+    @Query("format") format?: string,
+  ) {
+    const actorSub = req.user?.sub ? String(req.user.sub) : null;
+    return this.svc.getDatasetSnapshot(datasetId, format, actorSub);
   }
 }

@@ -89,4 +89,5 @@ describe("PowerBiService", () => {
     expect(capturedPayload).toBeTruthy();
     expect(capturedPayload.identities).toBeUndefined();
   });
+
 });

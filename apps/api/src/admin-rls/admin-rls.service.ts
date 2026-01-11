@@ -1,7 +1,9 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
+import type { rls_rule } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { RlsRefreshService } from "./rls-refresh.service";
+import { buildSnapshotCsv, RlsSnapshot, RlsSnapshotRule, RlsSnapshotTarget } from "./rls-snapshot";
 
 type ValueType = "text" | "int" | "uuid";
 type DefaultBehavior = "allow" | "deny";
@@ -35,6 +37,7 @@ const VALUE_TYPES = new Set<ValueType>(["text", "int", "uuid"]);
 const DEFAULT_BEHAVIORS = new Set<DefaultBehavior>(["allow", "deny"]);
 const TARGET_STATUSES = new Set<TargetStatus>(["draft", "active"]);
 const RULE_OPS = new Set<RuleOp>(["include", "exclude"]);
+
 
 function isUuid(v: string): boolean {
   return UUID_RE.test(v);
@@ -89,7 +92,7 @@ export class AdminRlsService {
     return { items: rows.map((row) => this.toTargetDto(row)) };
   }
 
-  async createTarget(datasetIdRaw: string, input: CreateTargetInput) {
+  async createTarget(datasetIdRaw: string, input: CreateTargetInput, actorSub?: string | null) {
     const datasetId = ensureUuid("datasetId", datasetIdRaw);
     const targetKey = ensureTargetKey(input?.targetKey);
     const displayName = ensureText("displayName", input?.displayName);
@@ -110,18 +113,34 @@ export class AdminRlsService {
     });
     if (existing) throw new BadRequestException("targetKey already exists for dataset");
 
+    const actorUserId = await this.resolveActorUserId(actorSub ?? null);
+
     try {
-      const created = await this.prisma.rls_target.create({
-        data: {
-          dataset_id: datasetId,
-          target_key: targetKey,
-          display_name: displayName,
-          fact_table: factTable,
-          fact_column: factColumn,
-          value_type: valueType,
-          default_behavior: defaultBehavior,
-          status,
-        },
+      const created = await this.prisma.$transaction(async (tx) => {
+        const row = await tx.rls_target.create({
+          data: {
+            dataset_id: datasetId,
+            target_key: targetKey,
+            display_name: displayName,
+            fact_table: factTable,
+            fact_column: factColumn,
+            value_type: valueType,
+            default_behavior: defaultBehavior,
+            status,
+          },
+        });
+
+        await tx.audit_log.create({
+          data: {
+            actor_user_id: actorUserId,
+            action: "RLS_TARGET_CREATED",
+            entity_type: "rls_target",
+            entity_id: row.id,
+            after_data: this.toTargetDto(row),
+          },
+        });
+
+        return row;
       });
       return this.toTargetDto(created);
     } catch (err) {
@@ -130,7 +149,7 @@ export class AdminRlsService {
     }
   }
 
-  async updateTarget(targetIdRaw: string, input: UpdateTargetInput) {
+  async updateTarget(targetIdRaw: string, input: UpdateTargetInput, actorSub?: string | null) {
     const targetId = ensureUuid("targetId", targetIdRaw);
     const target = await this.prisma.rls_target.findUnique({ where: { id: targetId } });
     if (!target) throw new NotFoundException("Target not found");
@@ -181,8 +200,24 @@ export class AdminRlsService {
       throw new BadRequestException("No changes provided");
     }
 
+    const actorUserId = await this.resolveActorUserId(actorSub ?? null);
+    const before = this.toTargetDto(target);
+
     try {
-      const updated = await this.prisma.rls_target.update({ where: { id: targetId }, data: patch });
+      const updated = await this.prisma.$transaction(async (tx) => {
+        const row = await tx.rls_target.update({ where: { id: targetId }, data: patch });
+        await tx.audit_log.create({
+          data: {
+            actor_user_id: actorUserId,
+            action: "RLS_TARGET_UPDATED",
+            entity_type: "rls_target",
+            entity_id: row.id,
+            before_data: before,
+            after_data: this.toTargetDto(row),
+          },
+        });
+        return row;
+      });
       return this.toTargetDto(updated);
     } catch (err) {
       if (isPrismaUnique(err)) throw new BadRequestException("targetKey already exists for dataset");
@@ -191,10 +226,22 @@ export class AdminRlsService {
     }
   }
 
-  async deleteTarget(targetIdRaw: string) {
+  async deleteTarget(targetIdRaw: string, actorSub?: string | null) {
     const targetId = ensureUuid("targetId", targetIdRaw);
+    const actorUserId = await this.resolveActorUserId(actorSub ?? null);
     try {
-      await this.prisma.rls_target.delete({ where: { id: targetId } });
+      await this.prisma.$transaction(async (tx) => {
+        const row = await tx.rls_target.delete({ where: { id: targetId } });
+        await tx.audit_log.create({
+          data: {
+            actor_user_id: actorUserId,
+            action: "RLS_TARGET_DELETED",
+            entity_type: "rls_target",
+            entity_id: row.id,
+            before_data: this.toTargetDto(row),
+          },
+        });
+      });
       return { ok: true };
     } catch (err) {
       if (isPrismaNotFound(err)) throw new NotFoundException("Target not found");
@@ -217,7 +264,7 @@ export class AdminRlsService {
     return { items: rows.map((row) => this.toRuleDto(row)) };
   }
 
-  async createRules(targetIdRaw: string, items: CreateRuleInput[]) {
+  async createRules(targetIdRaw: string, items: CreateRuleInput[], actorSub?: string | null) {
     const targetId = ensureUuid("targetId", targetIdRaw);
     const target = await this.prisma.rls_target.findUnique({ where: { id: targetId } });
     if (!target) throw new NotFoundException("Target not found");
@@ -247,10 +294,13 @@ export class AdminRlsService {
       throw new BadRequestException(`Unknown customerId(s): ${missing.join(", ")}`);
     }
 
+    const actorUserId = await this.resolveActorUserId(actorSub ?? null);
+
     try {
-      const created = await this.prisma.$transaction(
-        normalized.map((rule) =>
-          this.prisma.rls_rule.create({
+      const created = await this.prisma.$transaction(async (tx) => {
+        const rows: rls_rule[] = [];
+        for (const rule of normalized) {
+          const row = await tx.rls_rule.create({
             data: {
               target_id: target.id,
               customer_id: rule.customerId,
@@ -259,9 +309,28 @@ export class AdminRlsService {
               value_int: rule.valueInt,
               value_uuid: rule.valueUuid,
             },
-          }),
-        ),
-      );
+          });
+          rows.push(row);
+        }
+
+        const uniqueCustomerIds = Array.from(new Set(rows.map((r) => r.customer_id)));
+        await tx.audit_log.create({
+          data: {
+            actor_user_id: actorUserId,
+            action: "RLS_RULE_CREATED",
+            entity_type: "rls_rule",
+            entity_id: null,
+            after_data: {
+              targetId: target.id,
+              count: rows.length,
+              ruleIds: rows.map((r) => r.id),
+              customerIds: uniqueCustomerIds,
+            },
+          },
+        });
+
+        return rows;
+      });
       return { created: created.map((row) => this.toRuleDto(row)) };
     } catch (err) {
       if (isPrismaUnique(err)) {
@@ -271,10 +340,22 @@ export class AdminRlsService {
     }
   }
 
-  async deleteRule(ruleIdRaw: string) {
+  async deleteRule(ruleIdRaw: string, actorSub?: string | null) {
     const ruleId = ensureUuid("ruleId", ruleIdRaw);
+    const actorUserId = await this.resolveActorUserId(actorSub ?? null);
     try {
-      await this.prisma.rls_rule.delete({ where: { id: ruleId } });
+      await this.prisma.$transaction(async (tx) => {
+        const row = await tx.rls_rule.delete({ where: { id: ruleId } });
+        await tx.audit_log.create({
+          data: {
+            actor_user_id: actorUserId,
+            action: "RLS_RULE_DELETED",
+            entity_type: "rls_rule",
+            entity_id: row.id,
+            before_data: this.toRuleDto(row),
+          },
+        });
+      });
       return { ok: true };
     } catch (err) {
       if (isPrismaNotFound(err)) throw new NotFoundException("Rule not found");
@@ -282,10 +363,26 @@ export class AdminRlsService {
     }
   }
 
-  async refreshDataset(datasetIdRaw: string) {
+  async refreshDataset(datasetIdRaw: string, actorSub?: string | null) {
     const datasetId = ensureUuid("datasetId", datasetIdRaw);
     const workspaceId = await this.resolveWorkspaceIdForDataset(datasetId);
-    return this.refreshSvc.requestRefresh(workspaceId, datasetId);
+    const actorUserId = await this.resolveActorUserId(actorSub ?? null);
+    const result = await this.refreshSvc.requestRefresh(workspaceId, datasetId);
+    await this.prisma.audit_log.create({
+      data: {
+        actor_user_id: actorUserId,
+        action: "RLS_REFRESH_REQUESTED",
+        entity_type: "rls_dataset",
+        entity_id: datasetId,
+        after_data: {
+          status: result.status,
+          pending: result.pending ?? false,
+          scheduledAt: result.scheduledAt ?? null,
+          scheduledInMs: result.scheduledInMs ?? null,
+        },
+      },
+    });
+    return result;
   }
 
   async listDatasetRefreshes(datasetIdRaw: string) {
@@ -293,6 +390,103 @@ export class AdminRlsService {
     const workspaceId = await this.resolveWorkspaceIdForDataset(datasetId);
     const items = await this.refreshSvc.listRefreshes(workspaceId, datasetId);
     return { items };
+  }
+
+  async getDatasetSnapshot(datasetIdRaw: string, formatRaw?: string, actorSub?: string | null) {
+    const datasetId = ensureUuid("datasetId", datasetIdRaw);
+    const format = (formatRaw ?? "json").trim().toLowerCase();
+    if (format !== "json" && format !== "csv") {
+      throw new BadRequestException("format must be json or csv");
+    }
+
+    const targets = await this.prisma.rls_target.findMany({
+      where: { dataset_id: datasetId },
+      orderBy: { created_at: "asc" },
+    });
+
+    if (!targets.length) {
+      const catalogRow = await this.prisma.bi_reports.findFirst({
+        where: { dataset_id: datasetId },
+        select: { id: true },
+      });
+      if (!catalogRow) throw new NotFoundException("Dataset not found");
+    }
+
+    const targetIds = targets.map((t) => t.id);
+    const rules = targetIds.length
+      ? await this.prisma.rls_rule.findMany({
+          where: { target_id: { in: targetIds } },
+          include: { customers: { select: { code: true, name: true } } },
+          orderBy: { created_at: "asc" },
+        })
+      : [];
+
+    const snapshotTargets: RlsSnapshotTarget[] = targets.map((t) => ({
+      id: t.id,
+      datasetId: t.dataset_id,
+      targetKey: t.target_key,
+      displayName: t.display_name,
+      factTable: t.fact_table,
+      factColumn: t.fact_column,
+      valueType: t.value_type,
+      defaultBehavior: t.default_behavior,
+      status: t.status,
+      createdAt: t.created_at?.toISOString ? t.created_at.toISOString() : String(t.created_at),
+    }));
+
+    const targetById = new Map<string, RlsSnapshotTarget>();
+    snapshotTargets.forEach((t) => targetById.set(t.id, t));
+
+    const snapshotRules: RlsSnapshotRule[] = rules.map((r) => {
+      const target = targetById.get(r.target_id);
+      return {
+        id: r.id,
+        targetId: r.target_id,
+        targetKey: target?.targetKey ?? null,
+        targetDisplayName: target?.displayName ?? null,
+        customerId: r.customer_id,
+        customerCode: r.customers?.code ?? null,
+        customerName: r.customers?.name ?? null,
+        op: r.op,
+        valueText: r.value_text,
+        valueInt: r.value_int,
+        valueUuid: r.value_uuid,
+        createdAt: r.created_at?.toISOString ? r.created_at.toISOString() : String(r.created_at),
+      };
+    });
+
+    const snapshot: RlsSnapshot = {
+      datasetId,
+      generatedAt: new Date().toISOString(),
+      targets: snapshotTargets,
+      rules: snapshotRules,
+    };
+
+    const actorUserId = await this.resolveActorUserId(actorSub ?? null);
+    await this.prisma.audit_log.create({
+      data: {
+        actor_user_id: actorUserId,
+        action: "RLS_SNAPSHOT_EXPORTED",
+        entity_type: "rls_dataset",
+        entity_id: datasetId,
+        after_data: {
+          format,
+          targets: snapshotTargets.length,
+          rules: snapshotRules.length,
+        },
+      },
+    });
+
+    if (format === "csv") {
+      return {
+        content: buildSnapshotCsv(snapshot),
+        filename: `rls_snapshot_${datasetId}.csv`,
+        contentType: "text/csv",
+        generatedAt: snapshot.generatedAt,
+      };
+    }
+
+    return snapshot;
   }
 
   private normalizeRuleItem(item: CreateRuleInput, index: number, valueType: ValueType) {
@@ -331,6 +525,15 @@ export class AdminRlsService {
     }
 
     return { customerId, op, valueText, valueInt, valueUuid };
+  }
+
+  private async resolveActorUserId(actorSub: string | null): Promise<string | null> {
+    if (!actorSub) return null;
+    const actor = await this.prisma.users.findUnique({
+      where: { entra_sub: actorSub },
+      select: { id: true },
+    });
+    return actor?.id ?? null;
   }
 
   private toTargetDto(row: any) {

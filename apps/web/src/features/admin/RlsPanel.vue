@@ -133,6 +133,16 @@
         >
           Guia PBIX
         </button>
+        <button
+          type="button"
+          class="rounded-xl px-3 py-2 text-xs font-semibold"
+          :class="activeTab === 'snapshot'
+            ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900'
+            : 'border border-slate-200 text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:text-slate-200 dark:hover:bg-slate-800'"
+          @click="activeTab = 'snapshot'"
+        >
+          Snapshot
+        </button>
       </div>
 
       <div class="mt-4">
@@ -316,66 +326,23 @@
                 </button>
               </div>
             </div>
-            <div class="mt-4 rounded-xl border border-slate-200 p-3 dark:border-slate-800">
-              <div class="text-xs font-semibold text-slate-900 dark:text-slate-100">Nova regra</div>
-
-              <div class="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-3">
-                <div>
-                  <label class="text-xs font-medium text-slate-700 dark:text-slate-300">Customer</label>
-                  <select
-                    v-model="ruleCustomerId"
-                    class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
-                           dark:border-slate-800 dark:bg-slate-900"
-                  >
-                    <option value="">-- selecione --</option>
-                    <option v-for="c in customers" :key="c.id" :value="c.id">
-                      {{ c.code }} - {{ c.name }}
-                    </option>
-                  </select>
-                </div>
-
-                <div>
-                  <label class="text-xs font-medium text-slate-700 dark:text-slate-300">Operacao</label>
-                  <select
-                    v-model="ruleOp"
-                    class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
-                           dark:border-slate-800 dark:bg-slate-900"
-                  >
-                    <option value="include">include</option>
-                    <option value="exclude">exclude</option>
-                  </select>
-                </div>
+            <div class="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div class="text-[11px] text-slate-500 dark:text-slate-400">
+                Cadastre regras para o target selecionado.
               </div>
+              <button
+                type="button"
+                class="rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800
+                       disabled:opacity-60 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
+                :disabled="!targets.length"
+                @click="openRuleCreate"
+              >
+                + Nova regra
+              </button>
+            </div>
 
-              <div class="mt-3">
-                <label class="text-xs font-medium text-slate-700 dark:text-slate-300">Valores</label>
-                <textarea
-                  v-model="ruleValues"
-                  rows="3"
-                  class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
-                         dark:border-slate-800 dark:bg-slate-900"
-                  :placeholder="ruleValuesPlaceholder"
-                />
-                <div class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
-                  Separe por virgula, ponto e virgula ou quebra de linha.
-                </div>
-              </div>
-
-              <div v-if="rulesError" class="mt-2 text-xs text-rose-600 dark:text-rose-300">
-                {{ rulesError }}
-              </div>
-
-              <div class="mt-3 flex items-center justify-end gap-2">
-                <button
-                  type="button"
-                  class="rounded-xl bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800
-                         disabled:opacity-60 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
-                  :disabled="!canCreateRules || creatingRules"
-                  @click="createRules"
-                >
-                  {{ creatingRules ? "Salvando..." : "Adicionar regras" }}
-                </button>
-              </div>
+            <div v-if="rulesError" class="mt-3 text-xs text-rose-600 dark:text-rose-300">
+              {{ rulesError }}
             </div>
 
             <div
@@ -446,7 +413,7 @@
         </div>
 
         <!-- TAB: GUIDE -->
-        <div v-else>
+        <div v-else-if="activeTab === 'guide'">
           <div
             v-if="!datasetId"
             class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700
@@ -510,6 +477,82 @@
                     <span class="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-900 group-hover:underline dark:text-slate-100">
                       Abrir tutorial -></span>
                   </div>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB: SNAPSHOT -->
+        <div v-else-if="activeTab === 'snapshot'">
+          <div
+            v-if="!datasetId"
+            class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700
+                   dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-200"
+          >
+            Selecione um report com dataset para exportar snapshot.
+          </div>
+
+          <div v-else class="space-y-3">
+            <div class="rounded-xl border border-slate-200 p-3 dark:border-slate-800">
+              <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <div class="text-sm font-semibold text-slate-900 dark:text-slate-100">Snapshot do dataset</div>
+                  <div class="text-xs text-slate-600 dark:text-slate-300">
+                    Exporta targets e regras para auditoria (JSON/CSV).
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs hover:bg-slate-50
+                         disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+                  :disabled="snapshotLoading"
+                  @click="loadSnapshot"
+                >
+                  {{ snapshotLoading ? "Gerando..." : "Gerar snapshot" }}
+                </button>
+              </div>
+
+              <div v-if="snapshotError" class="mt-2 text-xs text-rose-600 dark:text-rose-300">
+                {{ snapshotError }}
+              </div>
+
+              <div v-else-if="snapshot" class="mt-3 grid grid-cols-1 gap-2 text-[11px] text-slate-500 dark:text-slate-400 sm:grid-cols-3">
+                <div>
+                  <span class="font-semibold text-slate-900 dark:text-slate-100">Targets:</span>
+                  {{ snapshotCounts.targets }}
+                </div>
+                <div>
+                  <span class="font-semibold text-slate-900 dark:text-slate-100">Regras:</span>
+                  {{ snapshotCounts.rules }}
+                </div>
+                <div>
+                  <span class="font-semibold text-slate-900 dark:text-slate-100">Gerado:</span>
+                  {{ fmtDate(snapshot.generatedAt) }}
+                </div>
+              </div>
+            </div>
+
+            <div class="rounded-xl border border-slate-200 p-3 dark:border-slate-800">
+              <div class="text-xs font-semibold text-slate-900 dark:text-slate-100">Exportar</div>
+              <div class="mt-2 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  class="rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800
+                         disabled:opacity-60 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
+                  :disabled="snapshotExporting !== ''"
+                  @click="exportSnapshot('json')"
+                >
+                  {{ snapshotExporting === "json" ? "Exportando..." : "Exportar JSON" }}
+                </button>
+                <button
+                  type="button"
+                  class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs hover:bg-slate-50
+                         disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+                  :disabled="snapshotExporting !== ''"
+                  @click="exportSnapshot('csv')"
+                >
+                  {{ snapshotExporting === "csv" ? "Exportando..." : "Exportar CSV" }}
                 </button>
               </div>
             </div>
@@ -638,6 +681,117 @@
               {{ guideStepIndex >= guideSteps.length - 1 ? "Concluir" : "Proximo" }}
             </button>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL create rule -->
+    <div v-if="ruleModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
+      <div class="w-full max-w-xl rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-800 dark:bg-slate-900">
+        <div class="flex items-start justify-between gap-3">
+          <div class="min-w-0">
+            <div class="text-sm font-semibold text-slate-900 dark:text-slate-100">Nova regra</div>
+            <div class="mt-1 text-xs text-slate-600 dark:text-slate-300">
+              Defina include/exclude para um customer no target escolhido.
+            </div>
+          </div>
+
+          <button
+            type="button"
+            class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs hover:bg-slate-50
+                   dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+            @click="closeRuleModal"
+          >
+            Fechar
+          </button>
+        </div>
+
+        <div class="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
+          <div>
+            <label class="text-xs font-medium text-slate-700 dark:text-slate-300">Target</label>
+            <select
+              v-model="ruleForm.targetId"
+              class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
+                     dark:border-slate-800 dark:bg-slate-900"
+            >
+              <option value="">-- selecione --</option>
+              <option v-for="t in targets" :key="t.id" :value="t.id">
+                {{ t.displayName }} ({{ t.targetKey }})
+              </option>
+            </select>
+            <div class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+              value_type: {{ ruleFormTarget?.valueType || "-" }}
+            </div>
+          </div>
+
+          <div>
+            <label class="text-xs font-medium text-slate-700 dark:text-slate-300">Customer</label>
+            <select
+              v-model="ruleForm.customerId"
+              class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
+                     dark:border-slate-800 dark:bg-slate-900"
+            >
+              <option value="">-- selecione --</option>
+              <option v-for="c in customers" :key="c.id" :value="c.id">
+                {{ c.code }} - {{ c.name }}
+              </option>
+            </select>
+          </div>
+        </div>
+
+        <div class="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
+          <div>
+            <label class="text-xs font-medium text-slate-700 dark:text-slate-300">Operacao</label>
+            <select
+              v-model="ruleForm.op"
+              class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
+                     dark:border-slate-800 dark:bg-slate-900"
+            >
+              <option value="include">include</option>
+              <option value="exclude">exclude</option>
+            </select>
+          </div>
+          <div></div>
+        </div>
+
+        <div class="mt-3">
+          <label class="text-xs font-medium text-slate-700 dark:text-slate-300">Valores</label>
+          <textarea
+            v-model="ruleForm.values"
+            rows="4"
+            class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
+                   dark:border-slate-800 dark:bg-slate-900"
+            :placeholder="ruleValuesPlaceholder"
+          />
+          <div class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+            Separe por virgula, ponto e virgula ou quebra de linha.
+          </div>
+        </div>
+
+        <div v-if="ruleModalError" class="mt-2 text-xs text-rose-600 dark:text-rose-300">
+          {{ ruleModalError }}
+        </div>
+
+        <div class="mt-4 flex items-center justify-end gap-2">
+          <button
+            type="button"
+            class="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm hover:bg-slate-50
+                   disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+            :disabled="ruleModalSaving"
+            @click="closeRuleModal"
+          >
+            Cancelar
+          </button>
+
+          <button
+            type="button"
+            class="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800
+                   disabled:opacity-60 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
+            :disabled="ruleModalSaving || !canSaveRule"
+            @click="saveRuleModal"
+          >
+            {{ ruleModalSaving ? "Salvando..." : "Salvar regra" }}
+          </button>
         </div>
       </div>
     </div>
@@ -791,6 +945,7 @@ import {
   type CreateTargetPayload,
   type RlsRule,
   type RlsRuleOp,
+  type RlsSnapshot,
   type RlsTarget,
   type RlsTargetStatus,
   type RlsValueType,
@@ -799,8 +954,11 @@ import {
   createRlsTarget,
   deleteRlsRule,
   deleteRlsTarget,
+  getRlsSnapshot,
+  getRlsSnapshotCsv,
   listRlsRules,
   listRlsTargets,
+  refreshRlsDataset,
   updateRlsTarget,
 } from "@/features/admin/api/rls";
 import { useConfirm } from "@/ui/confirm/useConfirm";
@@ -815,7 +973,7 @@ const props = defineProps<{
 const { confirm } = useConfirm();
 const { push } = useToast();
 
-const activeTab = ref<"targets" | "rules" | "guide">("targets");
+const activeTab = ref<"targets" | "rules" | "guide" | "snapshot">("targets");
 
 // =====================
 // Guide modal
@@ -1136,27 +1294,42 @@ const selectedTargetId = ref<string>("");
 const rules = ref<RlsRule[]>([]);
 const loadingRules = ref(false);
 const rulesError = ref("");
-const creatingRules = ref(false);
 const ruleBusy = useBusyMap();
 
 const rulesFilterCustomerId = ref<string>("");
-const ruleCustomerId = ref<string>("");
-const ruleOp = ref<RlsRuleOp>("include");
-const ruleValues = ref<string>("");
+
+const ruleModalOpen = ref(false);
+const ruleModalSaving = ref(false);
+const ruleModalError = ref("");
+const ruleForm = reactive<{
+  targetId: string;
+  customerId: string;
+  op: RlsRuleOp;
+  values: string;
+}>({
+  targetId: "",
+  customerId: "",
+  op: "include",
+  values: "",
+});
+
+const refreshInFlight = ref(false);
+const refreshQueued = ref(false);
 
 const selectedTarget = computed(() => targets.value.find((t) => t.id === selectedTargetId.value) ?? null);
+const ruleFormTarget = computed(() => targets.value.find((t) => t.id === ruleForm.targetId) ?? null);
 
-const canCreateRules = computed(() => {
+const canSaveRule = computed(() => {
   return (
     !!datasetId.value &&
-    !!selectedTargetId.value &&
-    !!ruleCustomerId.value &&
-    ruleValues.value.trim().length > 0
+    !!ruleForm.targetId &&
+    !!ruleForm.customerId &&
+    ruleForm.values.trim().length > 0
   );
 });
 
 const ruleValuesPlaceholder = computed(() => {
-  const vt = selectedTarget.value?.valueType;
+  const vt = ruleFormTarget.value?.valueType;
   if (vt === "int") return "ex: 10, 11";
   if (vt === "uuid") return "ex: 123e4567-e89b-12d3-a456-426614174000";
   return "ex: ACME, C6";
@@ -1170,6 +1343,44 @@ function splitValues(raw: string): string[] {
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+async function triggerDatasetRefresh(reason: string) {
+  if (!datasetId.value) return;
+  if (refreshInFlight.value) {
+    refreshQueued.value = true;
+    return;
+  }
+  refreshInFlight.value = true;
+
+  try {
+    const res = await refreshRlsDataset(datasetId.value);
+    const detail = res.pending
+      ? "Refresh em andamento, pendente agendado."
+      : res.status === "scheduled"
+        ? "Refresh agendado."
+        : "Refresh solicitado.";
+    push({
+      kind: "success",
+      title: `Refresh RLS (${reason})`,
+      message: detail,
+    });
+  } catch (e: any) {
+    const ne = normalizeApiError(e);
+    push({
+      kind: "error",
+      title: "Falha ao solicitar refresh",
+      message: ne.message,
+      details: ne.details,
+      timeoutMs: 9000,
+    });
+  } finally {
+    refreshInFlight.value = false;
+    if (refreshQueued.value) {
+      refreshQueued.value = false;
+      void triggerDatasetRefresh("alteracao adicional");
+    }
+  }
+}
 
 async function loadRules() {
   if (!selectedTargetId.value) {
@@ -1198,47 +1409,69 @@ async function loadRules() {
   }
 }
 
-async function createRules() {
-  if (!selectedTarget.value || !canCreateRules.value) return;
+function openRuleCreate() {
+  ruleModalError.value = "";
+  ruleForm.targetId = selectedTargetId.value || targets.value[0]?.id || "";
+  ruleForm.customerId = "";
+  ruleForm.op = "include";
+  ruleForm.values = "";
+  ruleModalOpen.value = true;
+}
 
-  rulesError.value = "";
-  creatingRules.value = true;
+function closeRuleModal() {
+  if (ruleModalSaving.value) return;
+  ruleModalOpen.value = false;
+}
+
+async function saveRuleModal() {
+  if (!ruleFormTarget.value || !canSaveRule.value) return;
+
+  ruleModalError.value = "";
+  ruleModalSaving.value = true;
 
   try {
-    const values = splitValues(ruleValues.value);
+    const values = splitValues(ruleForm.values);
     if (!values.length) {
-      rulesError.value = "Informe ao menos um valor.";
+      ruleModalError.value = "Informe ao menos um valor.";
       return;
     }
 
     const items: CreateRulePayload[] = [];
 
     for (const value of values) {
-      if (selectedTarget.value.valueType === "text") {
-        items.push({ customerId: ruleCustomerId.value, op: ruleOp.value, valueText: value });
-      } else if (selectedTarget.value.valueType === "int") {
+      if (ruleFormTarget.value.valueType === "text") {
+        items.push({ customerId: ruleForm.customerId, op: ruleForm.op, valueText: value });
+      } else if (ruleFormTarget.value.valueType === "int") {
         const n = Number(value);
         if (!Number.isFinite(n) || !Number.isInteger(n)) {
-          rulesError.value = `Valor invalido para int: ${value}`;
+          ruleModalError.value = `Valor invalido para int: ${value}`;
           return;
         }
-        items.push({ customerId: ruleCustomerId.value, op: ruleOp.value, valueInt: n });
+        items.push({ customerId: ruleForm.customerId, op: ruleForm.op, valueInt: n });
       } else {
         if (!UUID_RE.test(value)) {
-          rulesError.value = `Valor invalido para uuid: ${value}`;
+          ruleModalError.value = `Valor invalido para uuid: ${value}`;
           return;
         }
-        items.push({ customerId: ruleCustomerId.value, op: ruleOp.value, valueUuid: value });
+        items.push({ customerId: ruleForm.customerId, op: ruleForm.op, valueUuid: value });
       }
     }
 
-    await createRlsRules(selectedTarget.value.id, items);
+    await createRlsRules(ruleFormTarget.value.id, items);
     push({ kind: "success", title: "Regras criadas", message: `${items.length} regra(s)` });
-    ruleValues.value = "";
-    await loadRules();
+    ruleForm.values = "";
+    ruleModalOpen.value = false;
+
+    if (selectedTargetId.value !== ruleForm.targetId) {
+      selectedTargetId.value = ruleForm.targetId;
+    } else {
+      await loadRules();
+    }
+
+    void triggerDatasetRefresh("regras criadas");
   } catch (e: any) {
     const ne = normalizeApiError(e);
-    rulesError.value = ne.message;
+    ruleModalError.value = ne.message;
     push({
       kind: "error",
       title: "Falha ao criar regras",
@@ -1247,7 +1480,7 @@ async function createRules() {
       timeoutMs: 9000,
     });
   } finally {
-    creatingRules.value = false;
+    ruleModalSaving.value = false;
   }
 }
 
@@ -1261,12 +1494,13 @@ async function removeRule(r: RlsRule) {
   });
   if (!ok) return;
 
-  await ruleBusy.run(r.id, async () => {
-    try {
-      await deleteRlsRule(r.id);
-      rules.value = rules.value.filter((x) => x.id !== r.id);
-      push({ kind: "success", title: "Regra removida" });
-    } catch (e: any) {
+    await ruleBusy.run(r.id, async () => {
+      try {
+        await deleteRlsRule(r.id);
+        rules.value = rules.value.filter((x) => x.id !== r.id);
+        push({ kind: "success", title: "Regra removida" });
+        void triggerDatasetRefresh("regra removida");
+      } catch (e: any) {
       const ne = normalizeApiError(e);
       push({
         kind: "error",
@@ -1299,6 +1533,82 @@ function fmtDate(iso: string) {
     return d.toLocaleString();
   } catch {
     return iso;
+  }
+}
+
+// =====================
+// Snapshot
+// =====================
+const snapshot = ref<RlsSnapshot | null>(null);
+const snapshotLoading = ref(false);
+const snapshotError = ref("");
+const snapshotExporting = ref<"" | "json" | "csv">("");
+
+const snapshotCounts = computed(() => ({
+  targets: snapshot.value?.targets.length ?? 0,
+  rules: snapshot.value?.rules.length ?? 0,
+}));
+
+async function loadSnapshot() {
+  if (!datasetId.value) return;
+  snapshotLoading.value = true;
+  snapshotError.value = "";
+
+  try {
+    snapshot.value = await getRlsSnapshot(datasetId.value);
+  } catch (e: any) {
+    const ne = normalizeApiError(e);
+    snapshotError.value = ne.message;
+    push({
+      kind: "error",
+      title: "Falha ao gerar snapshot",
+      message: ne.message,
+      details: ne.details,
+      timeoutMs: 9000,
+    });
+  } finally {
+    snapshotLoading.value = false;
+  }
+}
+
+function downloadText(filename: string, content: string, mimeType: string) {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+async function exportSnapshot(format: "json" | "csv") {
+  if (!datasetId.value || snapshotExporting.value) return;
+  snapshotExporting.value = format;
+
+  try {
+    if (format === "json") {
+      const data = snapshot.value ?? (await getRlsSnapshot(datasetId.value));
+      snapshot.value = data;
+      const content = JSON.stringify(data, null, 2);
+      downloadText(`rls_snapshot_${datasetId.value}.json`, content, "application/json");
+      return;
+    }
+
+    const csv = await getRlsSnapshotCsv(datasetId.value);
+    downloadText(csv.filename, csv.content, csv.contentType || "text/csv");
+  } catch (e: any) {
+    const ne = normalizeApiError(e);
+    push({
+      kind: "error",
+      title: "Falha ao exportar snapshot",
+      message: ne.message,
+      details: ne.details,
+      timeoutMs: 9000,
+    });
+  } finally {
+    snapshotExporting.value = "";
   }
 }
 
@@ -1493,8 +1803,14 @@ watch(customerId, async () => {
   rules.value = [];
   selectedTargetId.value = "";
   rulesFilterCustomerId.value = "";
-  ruleCustomerId.value = "";
-  ruleValues.value = "";
+  ruleForm.targetId = "";
+  ruleForm.customerId = "";
+  ruleForm.op = "include";
+  ruleForm.values = "";
+  ruleModalOpen.value = false;
+  ruleModalError.value = "";
+  snapshot.value = null;
+  snapshotError.value = "";
 
   if (customerId.value) {
     await loadCatalog();
@@ -1506,16 +1822,41 @@ watch(workspaceRefId, () => {
   targets.value = [];
   rules.value = [];
   selectedTargetId.value = "";
+  ruleForm.targetId = "";
+  ruleForm.customerId = "";
+  ruleForm.op = "include";
+  ruleForm.values = "";
+  ruleModalOpen.value = false;
+  ruleModalError.value = "";
+  snapshot.value = null;
+  snapshotError.value = "";
 });
 
 watch(datasetId, async (next) => {
   targets.value = [];
   rules.value = [];
   selectedTargetId.value = "";
+  ruleForm.targetId = "";
+  ruleForm.customerId = "";
+  ruleForm.op = "include";
+  ruleForm.values = "";
+  ruleModalOpen.value = false;
+  ruleModalError.value = "";
+  snapshot.value = null;
+  snapshotError.value = "";
 
   if (next) {
     await loadTargets();
+    if (activeTab.value === "snapshot") {
+      await loadSnapshot();
+    }
   }
+});
+
+watch(activeTab, async (next) => {
+  if (next !== "snapshot") return;
+  if (!datasetId.value || snapshot.value || snapshotLoading.value) return;
+  await loadSnapshot();
 });
 
 watch(targets, () => {

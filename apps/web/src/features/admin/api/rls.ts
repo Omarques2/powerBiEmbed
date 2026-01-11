@@ -29,6 +29,42 @@ export type RlsRule = {
   createdAt: string;
 };
 
+export type RlsSnapshotTarget = {
+  id: string;
+  datasetId: string;
+  targetKey: string;
+  displayName: string;
+  factTable: string;
+  factColumn: string;
+  valueType: RlsValueType;
+  defaultBehavior: RlsDefaultBehavior;
+  status: RlsTargetStatus;
+  createdAt: string;
+};
+
+export type RlsSnapshotRule = {
+  id: string;
+  targetId: string;
+  targetKey: string | null;
+  targetDisplayName: string | null;
+  customerId: string;
+  customerCode: string | null;
+  customerName: string | null;
+  op: RlsRuleOp;
+  valueText: string | null;
+  valueInt: number | null;
+  valueUuid: string | null;
+  createdAt: string;
+};
+
+export type RlsSnapshot = {
+  datasetId: string;
+  generatedAt: string;
+  targets: RlsSnapshotTarget[];
+  rules: RlsSnapshotRule[];
+};
+
+
 export type CreateTargetPayload = {
   targetKey: string;
   displayName: string;
@@ -100,4 +136,16 @@ export async function refreshRlsDataset(datasetId: string) {
 export async function listRlsRefreshes(datasetId: string) {
   const res = await http.get(`/admin/rls/datasets/${encodeURIComponent(datasetId)}/refreshes`);
   return res.data as { items: any[] };
+}
+
+export async function getRlsSnapshot(datasetId: string) {
+  const res = await http.get(`/admin/rls/datasets/${encodeURIComponent(datasetId)}/snapshot`);
+  return res.data as RlsSnapshot;
+}
+
+export async function getRlsSnapshotCsv(datasetId: string) {
+  const res = await http.get(`/admin/rls/datasets/${encodeURIComponent(datasetId)}/snapshot`, {
+    params: { format: "csv" },
+  });
+  return res.data as { content: string; filename: string; contentType: string; generatedAt?: string };
 }
