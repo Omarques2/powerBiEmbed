@@ -1321,7 +1321,8 @@ function buildGuideSteps(t: RlsTarget): GuideStep[] {
         "Preencha Server e Database e clique OK.",
         "Autentique com usuario/senha (tipo Database).",
         "Se for a primeira vez, escolha credencial Database e marque Salvar.",
-        "No Navigator, selecione sec_rls_base e clique Transform Data.",
+        "No Navigator, abra o schema (ex: public) e selecione sec_rls_base.",
+        "Clique Transform Data para abrir o Power Query.",
         "Load direto funciona, mas Transform Data e recomendado.",
       ],
       tips: ["Use Transform Data para ajustar tipos e criar as queries derivadas."],
@@ -1340,6 +1341,7 @@ function buildGuideSteps(t: RlsTarget): GuideStep[] {
         "Defina customer_id como Text (compatibilidade com CUSTOMDATA()).",
         "Se customer_id vier como Guid, altere para Text.",
         "Defina target_key e op como Text.",
+        "Use Transform -> Data Type para ajustar os tipos.",
         valueTypeHint,
         "Se houver normalizacao na Dim, aplique o mesmo na coluna de valor.",
       ],
@@ -1360,6 +1362,7 @@ function buildGuideSteps(t: RlsTarget): GuideStep[] {
         `Renomeie para Sec_${t.targetKey}.`,
         `Filtre target_key = "${t.targetKey}".`,
         `Mantenha apenas customer_id, op e ${valueCol}.`,
+        "Use Choose Columns para remover colunas nao usadas.",
         `Aplique Trim/Clean/Upper em ${valueCol} se fizer o mesmo na Dim.`,
       ],
       tips: [
@@ -1376,7 +1379,7 @@ function buildGuideSteps(t: RlsTarget): GuideStep[] {
         `Renomeie para Dim_${t.targetKey}.`,
         `Mantenha apenas a coluna ${t.factColumn}.`,
         "Normalize valores (Trim + Clean). Uppercase somente se aplicar no Sec_.",
-        "Remova valores em branco se existirem.",
+        "Remova valores em branco (filtro: is not blank).",
         "Remove Duplicates para garantir 1:*.",
         "Renomeie a coluna para Value.",
       ],
@@ -1422,10 +1425,12 @@ function buildGuideSteps(t: RlsTarget): GuideStep[] {
         "Modeling -> Manage roles -> New.",
         "Nome da role: CustomerRLS.",
         `Selecione a tabela Dim_${t.targetKey}.`,
+        `Default behavior do target: ${t.defaultBehavior}.`,
         "Cole o DAX no filtro da tabela.",
       ],
       tips: [
         "CUSTOMDATA() vem do embed token; garanta customer_id como Text.",
+        "Se default for deny, sem include a visibilidade sera negada.",
       ],
       links: [
         { label: "RLS no Power BI", href: "https://learn.microsoft.com/power-bi/enterprise/service-admin-rls" },
@@ -1462,6 +1467,7 @@ function daxForTarget(t: RlsTarget) {
   const sec = `Sec_${t.targetKey}`;
   const dim = `Dim_${t.targetKey}`;
   const valueCol = valueColumnForTarget(t);
+  const defaultAllow = t.defaultBehavior === "deny" ? "FALSE()" : "TRUE()";
   return [
     "VAR customer = CUSTOMDATA()",
     `VAR inc =`,
@@ -1469,7 +1475,8 @@ function daxForTarget(t: RlsTarget) {
     "VAR exc =",
     `    CALCULATETABLE(VALUES(${sec}[${valueCol}]), ${sec}[customer_id] = customer, ${sec}[op] = "exclude")`,
     "VAR hasInc = COUNTROWS(inc) > 0",
-    `VAR isInc = IF(hasInc, ${dim}[Value] IN inc, TRUE())`,
+    `VAR defaultAllow = ${defaultAllow}`,
+    `VAR isInc = IF(hasInc, ${dim}[Value] IN inc, defaultAllow)`,
     `VAR isExc = ${dim}[Value] IN exc`,
     "RETURN isInc && NOT isExc",
   ].join("\n");
