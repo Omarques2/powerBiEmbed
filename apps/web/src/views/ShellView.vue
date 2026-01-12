@@ -18,7 +18,7 @@
           :selected-report="selectedReport"
           :loading-workspaces="loadingWorkspaces"
           :loading-reports="loadingReports"
-          :error="error"
+          :error="listError"
           :load-workspaces="loadWorkspaces"
           :load-reports="loadReports"
           :select-workspace="selectWorkspace"
@@ -53,7 +53,7 @@
           :selected-report="selectedReport"
           :loading-workspaces="loadingWorkspaces"
           :loading-reports="loadingReports"
-          :error="error"
+          :error="listError"
           :load-workspaces="loadWorkspaces"
           :load-reports="loadReports"
           :select-workspace="selectWorkspace"
@@ -210,11 +210,11 @@
               </div>
 
               <div
-                v-if="error && selectedReport"
+                v-if="embedError && selectedReport"
                 class="absolute bottom-3 left-3 right-3 z-20 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 shadow
                        dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-200"
               >
-                {{ error }}
+                {{ embedError }}
               </div>
             </div>
           </div>
@@ -330,7 +330,9 @@ const selectedReport = ref<Report | null>(null);
 const loadingWorkspaces = ref(false);
 const loadingReports = ref(false);
 const loadingEmbed = ref(false);
-const error = ref("");
+const listError = ref("");
+const embedError = ref("");
+const embedErrorLocked = ref(false);
 
 const stageEl = ref<HTMLDivElement | null>(null);
 const containerEl = ref<HTMLDivElement | null>(null);
@@ -399,6 +401,8 @@ function resetEmbed() {
     // ignore reset errors
   }
   embeddedReport = null;
+  embedError.value = "";
+  embedErrorLocked.value = false;
 }
 
 function openExportModal() {
@@ -521,6 +525,57 @@ function triggerDownload(url: string, filename: string) {
   link.remove();
 }
 
+const CAPACITY_ERROR_MESSAGE =
+  "Existe um problema no servidor do Power BI. Tente novamente mais tarde.";
+
+const CAPACITY_ERROR_SIGNATURES = [
+  "capacitylimitexceeded",
+  "capacity operation failed",
+  "compute capacity has exceeded its limits",
+];
+
+function collectPowerBiErrorText(detail: any): string {
+  const parts: string[] = [];
+  const add = (value: unknown) => {
+    if (typeof value === "string" && value.trim()) parts.push(value);
+  };
+
+  if (typeof detail === "string") add(detail);
+  add(detail?.message);
+  add(detail?.detailedMessage);
+  add(detail?.error?.message);
+  add(detail?.errorDetails);
+
+  const errorInfo = detail?.technicalDetails?.errorInfo;
+  if (Array.isArray(errorInfo)) {
+    for (const item of errorInfo) {
+      add(item?.key);
+      add(item?.value);
+    }
+  }
+
+  return parts.join(" ");
+}
+
+function isCapacityError(detail: any): boolean {
+  const text = collectPowerBiErrorText(detail).toLowerCase();
+  return CAPACITY_ERROR_SIGNATURES.some((signature) => text.includes(signature));
+}
+
+function formatPowerBiError(detail: any): { message: string; lock: boolean } {
+  if (isCapacityError(detail)) {
+    return { message: CAPACITY_ERROR_MESSAGE, lock: true };
+  }
+
+  const candidate =
+    detail?.detailedMessage ?? detail?.message ?? detail?.error?.message ?? detail?.errorDetails;
+  if (typeof candidate === "string" && candidate.trim()) {
+    return { message: `Erro do Power BI: ${candidate}`, lock: false };
+  }
+
+  return { message: "Erro do Power BI ao carregar o relatório.", lock: false };
+}
+
 function parseErrorText(text: string | null | undefined) {
   if (!text) return null;
   try {
@@ -612,7 +667,7 @@ async function exportReport() {
   if (!selectedReport.value || !selectedWorkspaceId.value || loadingEmbed.value) return;
   if (printing.value) return;
   printing.value = true;
-  error.value = "";
+  embedError.value = "";
 
   const toastId = push({
     kind: "info",
@@ -699,7 +754,7 @@ async function exportReport() {
   } catch (e: any) {
     if (toastId) remove(toastId);
     const message = await extractErrorMessage(e);
-    error.value = `Falha ao gerar ${exportFormat.value}: ${message}`;
+    embedError.value = `Falha ao gerar ${exportFormat.value}: ${message}`;
     push({
       kind: "error",
       title: "Falha ao gerar arquivo",
@@ -734,7 +789,7 @@ watch(sidebarOpen, (open) => {
 });
 
 async function loadWorkspaces() {
-  error.value = "";
+  listError.value = "";
   loadingWorkspaces.value = true;
   try {
     const res = await http.get("/powerbi/workspaces");
@@ -744,14 +799,14 @@ async function loadWorkspaces() {
       await selectWorkspace(workspaces.value[0]!);
     }
   } catch (e: any) {
-    error.value = `Falha ao listar workspaces: ${e?.response?.data?.message ?? e?.message ?? String(e)}`;
+    listError.value = `Falha ao listar workspaces: ${e?.response?.data?.message ?? e?.message ?? String(e)}`;
   } finally {
     loadingWorkspaces.value = false;
   }
 }
 
 async function loadReports(workspaceId: string) {
-  error.value = "";
+  listError.value = "";
   loadingReports.value = true;
   try {
     const res = await http.get("/powerbi/reports", { params: { workspaceId } });
@@ -762,7 +817,7 @@ async function loadReports(workspaceId: string) {
       resetEmbed();
     }
   } catch (e: any) {
-    error.value = `Falha ao listar reports: ${e?.response?.data?.message ?? e?.message ?? String(e)}`;
+    listError.value = `Falha ao listar reports: ${e?.response?.data?.message ?? e?.message ?? String(e)}`;
   } finally {
     loadingReports.value = false;
   }
@@ -787,7 +842,8 @@ async function selectWorkspace(w: Workspace) {
 }
 
 async function openReport(r: Report) {
-  error.value = "";
+  embedError.value = "";
+  embedErrorLocked.value = false;
   selectedReport.value = r;
   loadingEmbed.value = true;
   reportReady.value = false;
@@ -839,13 +895,17 @@ async function openReport(r: Report) {
     });
 
     report.on("error", (event: any) => {
-      console.error("Power BI error:", event?.detail ?? event);
-      error.value = `Erro do Power BI: ${JSON.stringify(event?.detail ?? event)}`;
+      const detail = event?.detail ?? event;
+      console.error("Power BI error:", detail);
+      if (embedErrorLocked.value) return;
+      const normalized = formatPowerBiError(detail);
+      embedError.value = normalized.message;
+      if (normalized.lock) embedErrorLocked.value = true;
       loadingEmbed.value = false;
       reportReady.value = false;
     });
   } catch (e: any) {
-    error.value = `Falha ao embutir report: ${e?.response?.data?.message ?? e?.message ?? String(e)}`;
+    embedError.value = `Falha ao embutir report: ${e?.response?.data?.message ?? e?.message ?? String(e)}`;
     loadingEmbed.value = false;
     reportReady.value = false;
   }
