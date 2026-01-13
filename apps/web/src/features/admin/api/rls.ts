@@ -1,4 +1,5 @@
 import { http } from "@/api/http";
+import { unwrapData, type ApiEnvelope } from "@/api/envelope";
 
 export type RlsValueType = "text" | "int" | "uuid";
 export type RlsDefaultBehavior = "allow" | "deny";
@@ -87,65 +88,69 @@ export type CreateRulePayload = {
 
 export async function listRlsTargets(datasetId: string) {
   const res = await http.get(`/admin/rls/datasets/${encodeURIComponent(datasetId)}/targets`);
-  return res.data as { items: RlsTarget[] };
+  return unwrapData(res.data as ApiEnvelope<{ items: RlsTarget[] }>);
 }
 
 export async function createRlsTarget(datasetId: string, payload: CreateTargetPayload) {
   const res = await http.post(`/admin/rls/datasets/${encodeURIComponent(datasetId)}/targets`, payload);
-  return res.data as RlsTarget;
+  return unwrapData(res.data as ApiEnvelope<RlsTarget>);
 }
 
 export async function updateRlsTarget(targetId: string, payload: UpdateTargetPayload) {
   const res = await http.patch(`/admin/rls/targets/${encodeURIComponent(targetId)}`, payload);
-  return res.data as RlsTarget;
+  return unwrapData(res.data as ApiEnvelope<RlsTarget>);
 }
 
 export async function deleteRlsTarget(targetId: string) {
   const res = await http.delete(`/admin/rls/targets/${encodeURIComponent(targetId)}`);
-  return res.data as { ok: boolean };
+  return unwrapData(res.data as ApiEnvelope<{ ok: boolean }>);
 }
 
 export async function listRlsRules(targetId: string, customerId?: string) {
   const res = await http.get(`/admin/rls/targets/${encodeURIComponent(targetId)}/rules`, {
     params: { customerId },
   });
-  return res.data as { items: RlsRule[] };
+  return unwrapData(res.data as ApiEnvelope<{ items: RlsRule[] }>);
 }
 
 export async function createRlsRules(targetId: string, items: CreateRulePayload[]) {
   const res = await http.post(`/admin/rls/targets/${encodeURIComponent(targetId)}/rules`, { items });
-  return res.data as { created: RlsRule[] };
+  return unwrapData(res.data as ApiEnvelope<{ created: RlsRule[] }>);
 }
 
 export async function deleteRlsRule(ruleId: string) {
   const res = await http.delete(`/admin/rls/rules/${encodeURIComponent(ruleId)}`);
-  return res.data as { ok: boolean };
+  return unwrapData(res.data as ApiEnvelope<{ ok: boolean }>);
 }
 
 export async function refreshRlsDataset(datasetId: string) {
   const res = await http.post(`/admin/rls/datasets/${encodeURIComponent(datasetId)}/refresh`);
-  return res.data as {
-    status: "queued" | "scheduled" | "running";
-    pending?: boolean;
-    scheduledAt?: string;
-    scheduledInMs?: number;
-    refresh?: unknown;
-  };
+  return unwrapData(
+    res.data as ApiEnvelope<{
+      status: "queued" | "scheduled" | "running";
+      pending?: boolean;
+      scheduledAt?: string;
+      scheduledInMs?: number;
+      refresh?: unknown;
+    }>,
+  );
 }
 
 export async function listRlsRefreshes(datasetId: string) {
   const res = await http.get(`/admin/rls/datasets/${encodeURIComponent(datasetId)}/refreshes`);
-  return res.data as { items: any[] };
+  return unwrapData(res.data as ApiEnvelope<{ items: any[] }>);
 }
 
 export async function getRlsSnapshot(datasetId: string) {
   const res = await http.get(`/admin/rls/datasets/${encodeURIComponent(datasetId)}/snapshot`);
-  return res.data as RlsSnapshot;
+  return unwrapData(res.data as ApiEnvelope<RlsSnapshot>);
 }
 
 export async function getRlsSnapshotCsv(datasetId: string) {
   const res = await http.get(`/admin/rls/datasets/${encodeURIComponent(datasetId)}/snapshot`, {
     params: { format: "csv" },
   });
-  return res.data as { content: string; filename: string; contentType: string; generatedAt?: string };
+  return unwrapData(
+    res.data as ApiEnvelope<{ content: string; filename: string; contentType: string; generatedAt?: string }>,
+  );
 }

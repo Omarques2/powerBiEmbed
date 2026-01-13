@@ -1,5 +1,6 @@
 // apps/web/src/features/admin/api/permissions.ts
 import { http } from "@/api/http";
+import { unwrapData, type ApiEnvelope } from "@/api/envelope";
 import type { MembershipRole } from "./memberships";
 
 export type UserPermissionsResponse = {
@@ -29,7 +30,7 @@ export type UserPermissionsResponse = {
 
 export async function getUserPermissions(userId: string, customerId?: string) {
   const res = await http.get(`/admin/users/${userId}/permissions`, { params: { customerId } });
-  return res.data as UserPermissionsResponse;
+  return unwrapData(res.data as ApiEnvelope<UserPermissionsResponse>);
 }
 
 export async function setWorkspacePermission(
@@ -42,10 +43,10 @@ export async function setWorkspacePermission(
     canView,
     grantReports,
   });
-  return res.data as { ok: boolean; reportsAffected?: number };
+  return unwrapData(res.data as ApiEnvelope<{ ok: boolean; reportsAffected?: number }>);
 }
 
 export async function setReportPermission(userId: string, reportRefId: string, canView: boolean) {
   const res = await http.put(`/admin/users/${userId}/reports/${reportRefId}`, { canView });
-  return res.data as { ok: boolean };
+  return unwrapData(res.data as ApiEnvelope<{ ok: boolean }>);
 }

@@ -3,6 +3,7 @@ import { AuthGuard } from "../auth/auth.guard";
 import { PlatformAdminGuard } from "../auth/platform-admin.guard";
 import { PowerBiService } from "./powerbi.service";
 import { PowerBiCatalogSyncService } from "./powerbi-catalog-sync.service";
+import { AdminPowerBiCatalogQueryDto, AdminPowerBiSyncDto, WorkspaceQueryDto } from "./dto/powerbi.dto";
 
 @Controller("admin/powerbi")
 @UseGuards(AuthGuard, PlatformAdminGuard)
@@ -19,17 +20,13 @@ export class AdminPowerBiController {
   }
 
   @Get("remote/reports")
-  async remoteReports(@Query("workspaceId") workspaceId: string) {
-    return this.pbi.listReports(workspaceId);
+  async remoteReports(@Query() query: WorkspaceQueryDto) {
+    return this.pbi.listReports(query.workspaceId);
   }
 
   // SYNC: grava catálogo no BD para um customer
   @Post("sync")
-  async syncCustomer(@Body() body: {
-    customerId: string;
-    workspaceIds?: string[];          // opcional: filtra
-    deactivateMissing?: boolean;      // opcional: marca como inactive os que sumiram
-  }) {
+  async syncCustomer(@Body() body: AdminPowerBiSyncDto) {
     return this.sync.syncCustomerCatalog({
       customerId: body.customerId,
       workspaceIds: body.workspaceIds,
@@ -38,7 +35,7 @@ export class AdminPowerBiController {
   }
 
   @Get("catalog")
-  async catalog(@Query("customerId") customerId: string) {
-    return this.sync.getCustomerCatalog(customerId);
+  async catalog(@Query() query: AdminPowerBiCatalogQueryDto) {
+    return this.sync.getCustomerCatalog(query.customerId);
   }
 }

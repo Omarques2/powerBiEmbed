@@ -10,14 +10,20 @@ import {
   Patch,
   Delete,
   Query,
+  ParseUUIDPipe,
 } from "@nestjs/common";
 import { AuthGuard } from "../auth/auth.guard";
 import { PlatformAdminGuard } from "../auth/platform-admin.guard";
 import { AdminUsersService } from "./admin-users.service";
 import type { AuthedRequest } from "../auth/authed-request.type";
-import { ParseUUIDPipe } from "@nestjs/common";
-
-type MembershipRole = "owner" | "admin" | "member" | "viewer";
+import {
+  ActivateUserDto,
+  ListActiveUsersQueryDto,
+  PatchMembershipDto,
+  RemoveMembershipQueryDto,
+  TransferMembershipDto,
+  UpsertMembershipDto,
+} from "./dto/admin-users.dto";
 
 @Controller("admin/users")
 @UseGuards(AuthGuard, PlatformAdminGuard)
@@ -32,8 +38,8 @@ export class AdminUsersController {
   @Post(":userId/activate")
   activate(
     @Req() req: AuthedRequest,
-    @Param("userId") userId: string,
-    @Body() body: { customerId: string; role: string; grantCustomerWorkspaces?: boolean },
+    @Param("userId", ParseUUIDPipe) userId: string,
+    @Body() body: ActivateUserDto,
   ) {
     const actorSub = req.user?.sub ? String(req.user.sub) : null;
 
@@ -47,7 +53,7 @@ export class AdminUsersController {
   }
 
   @Post(":userId/disable")
-  disable(@Req() req: AuthedRequest, @Param("userId") userId: string) {
+  disable(@Req() req: AuthedRequest, @Param("userId", ParseUUIDPipe) userId: string) {
     const actorSub = req.user?.sub ? String(req.user.sub) : null;
     return this.svc.disableUser(userId, actorSub);
   }
@@ -58,16 +64,8 @@ export class AdminUsersController {
   @Post(":userId/memberships")
   upsertMembership(
     @Req() req: AuthedRequest,
-    @Param("userId") userId: string,
-    @Body()
-    body: {
-      customerId: string;
-      role: MembershipRole;
-      isActive?: boolean;
-      grantCustomerWorkspaces?: boolean;
-      revokeCustomerPermissions?: boolean;
-      ensureUserActive?: boolean; // se quiser reativar user.status automaticamente
-    },
+    @Param("userId", ParseUUIDPipe) userId: string,
+    @Body() body: UpsertMembershipDto,
   ) {
     const actorSub = req.user?.sub ? String(req.user.sub) : null;
     return this.svc.upsertUserMembership(userId, body, actorSub);
@@ -79,15 +77,9 @@ export class AdminUsersController {
   @Patch(":userId/memberships/:customerId")
   patchMembership(
     @Req() req: AuthedRequest,
-    @Param("userId") userId: string,
-    @Param("customerId") customerId: string,
-    @Body()
-    body: {
-      role?: MembershipRole;
-      isActive?: boolean;
-      grantCustomerWorkspaces?: boolean;
-      revokeCustomerPermissions?: boolean;
-    },
+    @Param("userId", ParseUUIDPipe) userId: string,
+    @Param("customerId", ParseUUIDPipe) customerId: string,
+    @Body() body: PatchMembershipDto,
   ) {
     const actorSub = req.user?.sub ? String(req.user.sub) : null;
     return this.svc.patchUserMembership(userId, customerId, body, actorSub);
@@ -99,12 +91,12 @@ export class AdminUsersController {
   @Delete(":userId/memberships/:customerId")
   removeMembership(
     @Req() req: AuthedRequest,
-    @Param("userId") userId: string,
-    @Param("customerId") customerId: string,
-    @Query("revokeCustomerPermissions") revokeCustomerPermissions?: string,
+    @Param("userId", ParseUUIDPipe) userId: string,
+    @Param("customerId", ParseUUIDPipe) customerId: string,
+    @Query() query: RemoveMembershipQueryDto,
   ) {
     const actorSub = req.user?.sub ? String(req.user.sub) : null;
-    const revoke = revokeCustomerPermissions === "true" || revokeCustomerPermissions === "1";
+    const revoke = query.revokeCustomerPermissions ?? false;
     return this.svc.removeUserMembership(userId, customerId, revoke, actorSub);
   }
 
@@ -114,17 +106,8 @@ export class AdminUsersController {
   @Post(":userId/transfer")
   transferMembership(
     @Req() req: AuthedRequest,
-    @Param("userId") userId: string,
-    @Body()
-    body: {
-      fromCustomerId: string;
-      toCustomerId: string;
-      toRole: MembershipRole;
-      deactivateFrom?: boolean; // default true
-      revokeFromCustomerPermissions?: boolean; // default true
-      grantToCustomerWorkspaces?: boolean; // default false
-      toIsActive?: boolean; // default true
-    },
+    @Param("userId", ParseUUIDPipe) userId: string,
+    @Body() body: TransferMembershipDto,
   ) {
     const actorSub = req.user?.sub ? String(req.user.sub) : null;
     return this.svc.transferUserMembership(userId, body, actorSub);
@@ -132,19 +115,17 @@ export class AdminUsersController {
 
   @Get("active")
   listActive(
-    @Query("q") q?: string,
-    @Query("page") page?: string,
-    @Query("pageSize") pageSize?: string,
+    @Query() query: ListActiveUsersQueryDto,
   ) {
     return this.svc.listActiveUsers({
-      q,
-      page: Number(page ?? 1),
-      pageSize: Number(pageSize ?? 25),
+      q: query.q,
+      page: query.page ?? 1,
+      pageSize: query.pageSize ?? 25,
     });
   }
 
   @Get(":userId")
-  getById(@Param("userId") userId: string) {
+  getById(@Param("userId", ParseUUIDPipe) userId: string) {
     return this.svc.getUserById(userId);
   }
 }

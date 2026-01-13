@@ -1,8 +1,13 @@
-import { Body, Controller, Get, Param, Put, Query, Req, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Param, ParseUUIDPipe, Put, Query, Req, UseGuards } from "@nestjs/common";
 import { AuthGuard } from "../auth/auth.guard";
 import { PlatformAdminGuard } from "../auth/platform-admin.guard";
 import { AdminUsersService } from "./admin-users.service";
 import type { AuthedRequest } from "../auth/authed-request.type";
+import {
+  PermissionsListQueryDto,
+  SetReportPermissionDto,
+  SetWorkspacePermissionDto,
+} from "./dto/admin-permissions.dto";
 
 @Controller("admin")
 @UseGuards(AuthGuard, PlatformAdminGuard)
@@ -11,20 +16,18 @@ export class AdminPermissionsController {
 
   @Get("users/active")
   listActive(
-    @Query("q") q?: string,
-    @Query("page") page?: string,
-    @Query("pageSize") pageSize?: string,
+    @Query() query: PermissionsListQueryDto,
   ) {
     return this.svc.listActiveUsers({
-      q: q?.trim() || undefined,
-      page: page ? Number(page) : 1,
-      pageSize: pageSize ? Number(pageSize) : 25,
+      q: query.q?.trim() || undefined,
+      page: query.page ?? 1,
+      pageSize: query.pageSize ?? 25,
     });
   }
 
   @Get("users/:userId/permissions")
   getPermissions(
-    @Param("userId") userId: string,
+    @Param("userId", ParseUUIDPipe) userId: string,
     @Query("customerId") customerId?: string,
   ) {
     return this.svc.getUserPermissions(userId, customerId?.trim() || null);
@@ -33,15 +36,15 @@ export class AdminPermissionsController {
   @Put("users/:userId/workspaces/:workspaceRefId")
   async setWorkspacePerm(
     @Req() req: AuthedRequest,
-    @Param("userId") userId: string,
-    @Param("workspaceRefId") workspaceRefId: string,
-    @Body() body: { canView: boolean; grantReports?: boolean },
+    @Param("userId", ParseUUIDPipe) userId: string,
+    @Param("workspaceRefId", ParseUUIDPipe) workspaceRefId: string,
+    @Body() body: SetWorkspacePermissionDto,
   ) {
     const actorSub = req.user?.sub ? String(req.user.sub) : null;
     return this.svc.setWorkspacePermission(
       userId,
       workspaceRefId,
-      Boolean(body?.canView),
+      body.canView,
       body?.grantReports ?? true,
       actorSub,
     );
@@ -50,11 +53,11 @@ export class AdminPermissionsController {
   @Put("users/:userId/reports/:reportRefId")
   async setReportPerm(
     @Req() req: AuthedRequest,
-    @Param("userId") userId: string,
-    @Param("reportRefId") reportRefId: string,
-    @Body() body: { canView: boolean },
+    @Param("userId", ParseUUIDPipe) userId: string,
+    @Param("reportRefId", ParseUUIDPipe) reportRefId: string,
+    @Body() body: SetReportPermissionDto,
   ) {
     const actorSub = req.user?.sub ? String(req.user.sub) : null;
-    return this.svc.setReportPermission(userId, reportRefId, Boolean(body?.canView), actorSub);
+    return this.svc.setReportPermission(userId, reportRefId, body.canView, actorSub);
   }
 }

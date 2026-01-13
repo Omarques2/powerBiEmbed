@@ -1,5 +1,6 @@
 // apps/web/src/features/admin/api/search.ts
 import { http } from "@/api/http";
+import { unwrapData, type ApiEnvelope } from "@/api/envelope";
 
 export type AdminSearchDTO = {
   q: string;
@@ -26,5 +27,5 @@ export type AdminSearchDTO = {
 
 export async function globalSearch(q: string, limit = 8) {
   const res = await http.get("/admin/search", { params: { q, limit } });
-  return res.data as AdminSearchDTO;
+  return unwrapData(res.data as ApiEnvelope<AdminSearchDTO>);
 }

@@ -1,5 +1,6 @@
 // apps/web/src/features/admin/api/overview.ts
 import { http } from "@/api/http";
+import { unwrapData, type ApiEnvelope } from "@/api/envelope";
 
 export type AdminOverviewDTO = {
   counts: {
@@ -28,5 +29,5 @@ export type AdminOverviewDTO = {
 
 export async function getAdminOverview() {
   const res = await http.get("/admin/overview");
-  return res.data as AdminOverviewDTO;
+  return unwrapData(res.data as ApiEnvelope<AdminOverviewDTO>);
 }

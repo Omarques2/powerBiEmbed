@@ -1,6 +1,6 @@
 // apps/web/src/features/admin/api/audit.ts
 import { http } from "@/api/http";
-import type { Paged } from "./types";
+import { unwrapPaged, type ApiEnvelope } from "@/api/envelope";
 
 export type AuditRow = {
   id: string;
@@ -27,5 +27,5 @@ export async function listAuditLogs(params: {
   to?: string;
 }) {
   const res = await http.get("/admin/audit", { params });
-  return res.data as Paged<AuditRow>;
+  return unwrapPaged(res.data as ApiEnvelope<AuditRow[]>);
 }

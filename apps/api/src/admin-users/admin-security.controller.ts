@@ -6,6 +6,7 @@ import {
   Delete,
   Get,
   Param,
+  ParseUUIDPipe,
   Post,
   Query,
   Req,
@@ -15,13 +16,7 @@ import { AuthGuard } from "../auth/auth.guard";
 import { PlatformAdminGuard } from "../auth/platform-admin.guard";
 import type { AuthedRequest } from "../auth/authed-request.type";
 import { AdminUsersService } from "./admin-users.service";
-
-type GrantPlatformAdminBody = {
-  appKey?: string; // default PBI_EMBED
-  roleKey?: string; // default platform_admin (mantém futuro aberto)
-  userId?: string;
-  userEmail?: string;
-};
+import { GrantPlatformAdminDto, RevokePlatformAdminQueryDto } from "./dto/admin-security.dto";
 
 @Controller("admin/security")
 @UseGuards(AuthGuard, PlatformAdminGuard)
@@ -34,7 +29,7 @@ export class AdminSecurityController {
   }
 
   @Post("platform-admins")
-  async grant(@Req() req: AuthedRequest, @Body() body: GrantPlatformAdminBody) {
+  async grant(@Req() req: AuthedRequest, @Body() body: GrantPlatformAdminDto) {
     const actorSub = req.user?.sub ? String(req.user.sub) : null;
 
     const appKey = (body.appKey ?? "PBI_EMBED").trim();
@@ -56,15 +51,19 @@ export class AdminSecurityController {
   @Delete("platform-admins/:userId")
   async revoke(
     @Req() req: AuthedRequest,
-    @Param("userId") userId: string,
-    @Query("appKey") appKey?: string,
-    @Query("roleKey") roleKey?: string,
+    @Param("userId", ParseUUIDPipe) userId: string,
+    @Query() query: RevokePlatformAdminQueryDto,
   ) {
     const actorSub = req.user?.sub ? String(req.user.sub) : null;
 
     return this.svc.revokePlatformAdmin(
-      { userId, appKey: (appKey ?? "PBI_EMBED").trim(), roleKey: (roleKey ?? "platform_admin").trim() },
+      {
+        userId,
+        appKey: (query.appKey ?? "PBI_EMBED").trim(),
+        roleKey: (query.roleKey ?? "platform_admin").trim(),
+      },
       actorSub,
     );
   }
 }
+

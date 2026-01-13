@@ -1,5 +1,6 @@
 // apps/web/src/features/admin/api/security.ts
 import { http } from "@/api/http";
+import { unwrapData, type ApiEnvelope } from "@/api/envelope";
 
 export type PlatformAdminRow = {
   userId: string;
@@ -13,7 +14,7 @@ export type PlatformAdminRow = {
 
 export async function listPlatformAdmins(appKey = "PBI_EMBED") {
   const res = await http.get("/admin/security/platform-admins", { params: { appKey } });
-  return res.data as PlatformAdminRow[];
+  return unwrapData(res.data as ApiEnvelope<PlatformAdminRow[]>);
 }
 
 export async function grantPlatformAdmin(input: { appKey?: string; userId?: string; userEmail?: string }) {
@@ -23,12 +24,12 @@ export async function grantPlatformAdmin(input: { appKey?: string; userId?: stri
     userId: input.userId,
     userEmail: input.userEmail,
   });
-  return res.data;
+  return unwrapData(res.data as ApiEnvelope<unknown>);
 }
 
 export async function revokePlatformAdmin(userId: string, appKey = "PBI_EMBED") {
   const res = await http.delete(`/admin/security/platform-admins/${encodeURIComponent(userId)}`, {
     params: { appKey, roleKey: "platform_admin" },
   });
-  return res.data;
+  return unwrapData(res.data as ApiEnvelope<unknown>);
 }

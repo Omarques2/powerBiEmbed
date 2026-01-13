@@ -31,6 +31,14 @@ function pickMessageFromData(data: any): string | undefined {
 
   if (typeof data === "string") return data;
 
+  if (typeof data === "object" && data && typeof (data as any).error === "object") {
+    const err = (data as any).error as { code?: unknown; message?: unknown; details?: unknown };
+    if (err.code === "VALIDATION_ERROR" && Array.isArray(err.details) && err.details.length > 0) {
+      return String(err.details[0]);
+    }
+    if (typeof err.message === "string") return err.message;
+  }
+
   // NestJS frequentemente envia { message, error, statusCode }
   // message pode ser string ou array de strings.
   const msg = (data as any).message;
@@ -63,6 +71,14 @@ export function normalizeApiError(err: unknown): NormalizedApiError {
 
     const data = err.response?.data;
     const msgFromData = pickMessageFromData(data);
+    const envelopeError =
+      data && typeof data === "object" && typeof (data as any).error === "object"
+        ? ((data as any).error as { code?: string; message?: string; details?: unknown })
+        : undefined;
+    const correlationId =
+      data && typeof data === "object" && typeof (data as any).correlationId === "string"
+        ? (data as any).correlationId
+        : undefined;
 
     // Mensagem humana prioriza backend -> status -> axios -> genérico
     const message =
@@ -74,16 +90,26 @@ export function normalizeApiError(err: unknown): NormalizedApiError {
     const details = {
       kind,
       status,
-      code,
+      code: envelopeError?.code ?? code,
       method,
       url,
       // dados do backend são muito úteis; manter, mas sem forçar gigantismo
       response: data,
       // headers podem ter coisas úteis; mas evitamos dump completo por padrão
       responseHeaders: err.response?.headers,
+      correlationId,
+      backendError: envelopeError,
     };
 
-    return { kind, message, status, code, method, url, details };
+    return {
+      kind,
+      message,
+      status,
+      code: envelopeError?.code ?? code,
+      method,
+      url,
+      details,
+    };
   }
 
   // Error nativo

@@ -1,5 +1,6 @@
 // apps/web/src/features/admin/api/powerbi.ts
 import { http } from "@/api/http";
+import { unwrapData, type ApiEnvelope } from "@/api/envelope";
 
 export type RemoteWorkspace = {
   id: string;
@@ -18,12 +19,12 @@ export type RemoteReport = {
 
 export async function listRemoteWorkspaces() {
   const res = await http.get("/admin/powerbi/remote/workspaces");
-  return res.data as RemoteWorkspace[];
+  return unwrapData(res.data as ApiEnvelope<RemoteWorkspace[]>);
 }
 
 export async function listRemoteReports(workspaceId: string) {
   const res = await http.get("/admin/powerbi/remote/reports", { params: { workspaceId } });
-  return res.data as RemoteReport[];
+  return unwrapData(res.data as ApiEnvelope<RemoteReport[]>);
 }
 
 export async function syncPowerBiCatalog(payload: {
@@ -32,14 +33,16 @@ export async function syncPowerBiCatalog(payload: {
   deactivateMissing?: boolean;
 }) {
   const res = await http.post("/admin/powerbi/sync", payload);
-  return res.data as {
-    ok: boolean;
-    customerId: string;
-    workspacesSeenRemote: number;
-    workspacesUpserted: number;
-    reportsUpserted: number;
-    reportsDeactivated: number;
-  };
+  return unwrapData(
+    res.data as ApiEnvelope<{
+      ok: boolean;
+      customerId: string;
+      workspacesSeenRemote: number;
+      workspacesUpserted: number;
+      reportsUpserted: number;
+      reportsDeactivated: number;
+    }>,
+  );
 }
 
 export type CustomerCatalog = {
@@ -63,15 +66,17 @@ export type CustomerCatalog = {
 
 export async function getPowerBiCatalog(customerId: string) {
   const res = await http.get("/admin/powerbi/catalog", { params: { customerId } });
-  return res.data as CustomerCatalog;
+  return unwrapData(res.data as ApiEnvelope<CustomerCatalog>);
 }
 
 export async function unlinkCustomerWorkspace(customerId: string, workspaceRefId: string) {
   const res = await http.post(`/admin/customers/${customerId}/workspaces/${workspaceRefId}/unlink`);
-  return res.data as {
-    ok: boolean;
-    workspace: { workspaceRefId: string; isActive: boolean };
-    reports: { totalFound: number; deactivated: number };
-    permissions: { usersConsidered: number; workspacePermsRevoked: number; reportPermsRevoked: number };
-  };
+  return unwrapData(
+    res.data as ApiEnvelope<{
+      ok: boolean;
+      workspace: { workspaceRefId: string; isActive: boolean };
+      reports: { totalFound: number; deactivated: number };
+      permissions: { usersConsidered: number; workspacePermsRevoked: number; reportPermsRevoked: number };
+    }>,
+  );
 }

@@ -252,6 +252,7 @@ v-if="errPerms" class="mt-3 rounded-xl border border-rose-200 bg-rose-50 p-2 tex
 import { computed, onMounted, reactive, ref } from "vue";
 import { useToast } from "@/ui/toast/useToast";
 import { PermSwitch } from "@/ui/toggles";
+import { normalizeApiError } from "@/ui/ops";
 import UserMembershipEditor from "../UserMembershipEditor.vue";
 
 import {
@@ -431,8 +432,8 @@ async function toggleWorkspace(wsRefId: string) {
       for (const r of ws.reports) r.canView = prevReports[r.reportRefId] ?? r.canView;
     }
 
-    const msg = e?.response?.data?.message ?? e?.message ?? "Falha ao atualizar workspace";
-    push({ kind: "error", title: "Falha ao atualizar workspace", message: msg });
+    const ne = normalizeApiError(e);
+    push({ kind: "error", title: "Falha ao atualizar workspace", message: ne.message });
   } finally {
     wsBusy[wsRefId] = false;
   }
@@ -466,8 +467,8 @@ async function toggleReport(wsRefId: string, reportRefId: string) {
   } catch (e: any) {
     // rollback
     r.canView = prev;
-    const msg = e?.response?.data?.message ?? e?.message ?? "Falha ao atualizar report";
-    push({ kind: "error", title: "Falha ao atualizar report", message: msg });
+    const ne = normalizeApiError(e);
+    push({ kind: "error", title: "Falha ao atualizar report", message: ne.message });
   } finally {
     rBusy[reportRefId] = false;
   }

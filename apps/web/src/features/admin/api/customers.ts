@@ -1,5 +1,6 @@
 // apps/web/src/features/admin/api/customers.ts
 import { http } from "@/api/http";
+import { unwrapData, type ApiEnvelope } from "@/api/envelope";
 
 export type CustomerRow = {
   id: string;
@@ -22,20 +23,27 @@ export type UpdateCustomerPayload = {
 
 export async function listCustomers() {
   const res = await http.get("/admin/customers");
-  return res.data as CustomerRow[];
+  return unwrapData(res.data as ApiEnvelope<CustomerRow[]>);
 }
 
 export async function createCustomer(payload: CreateCustomerPayload) {
   const res = await http.post("/admin/customers", payload);
-  return res.data as CustomerRow;
+  return unwrapData(res.data as ApiEnvelope<CustomerRow>);
 }
 
 export async function updateCustomer(customerId: string, payload: UpdateCustomerPayload) {
   const res = await http.put(`/admin/customers/${customerId}`, payload);
-  return res.data as { ok: boolean; customer: CustomerRow };
+  return unwrapData(res.data as ApiEnvelope<{ ok: boolean; customer: CustomerRow }>);
 }
 
 export async function setCustomerStatus(customerId: string, status: "active" | "inactive") {
   const res = await http.post(`/admin/customers/${customerId}/status`, { status });
-  return res.data as { ok: boolean; status: string; workspacesDeactivated?: number; reportsDeactivated?: number };
+  return unwrapData(
+    res.data as ApiEnvelope<{
+      ok: boolean;
+      status: string;
+      workspacesDeactivated?: number;
+      reportsDeactivated?: number;
+    }>,
+  );
 }

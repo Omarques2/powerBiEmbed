@@ -1,7 +1,7 @@
 // apps/web/src/features/admin/api/users.ts
 import { http } from "@/api/http";
+import { unwrapData, unwrapPaged, type ApiEnvelope } from "@/api/envelope";
 import type { MembershipRole } from "./memberships";
-import type { Paged } from "./types";
 
 export type PendingUserRow = {
   id: string;
@@ -29,30 +29,30 @@ export type ActivatePayload = {
 
 export async function adminMe() {
   const res = await http.get("/admin/me");
-  return res.data as { ok: boolean };
+  return unwrapData(res.data as ApiEnvelope<{ ok: boolean }>);
 }
 
 export async function listPendingUsers() {
   const res = await http.get("/admin/users/pending");
-  return res.data as PendingUserRow[];
+  return unwrapData(res.data as ApiEnvelope<PendingUserRow[]>);
 }
 
 export async function listActiveUsers(q = "", page = 1, pageSize = 25) {
   const res = await http.get("/admin/users/active", { params: { q, page, pageSize } });
-  return res.data as Paged<ActiveUserRow>;
+  return unwrapPaged(res.data as ApiEnvelope<ActiveUserRow[]>);
 }
 
 export async function getUserById(userId: string) {
   const res = await http.get(`/admin/users/${encodeURIComponent(userId)}`);
-  return res.data as ActiveUserRow;
+  return unwrapData(res.data as ApiEnvelope<ActiveUserRow>);
 }
 
 export async function activateUser(userId: string, payload: ActivatePayload) {
   const res = await http.post(`/admin/users/${userId}/activate`, payload);
-  return res.data as { ok: boolean };
+  return unwrapData(res.data as ApiEnvelope<{ ok: boolean }>);
 }
 
 export async function disableUser(userId: string) {
   const res = await http.post(`/admin/users/${userId}/disable`);
-  return res.data as { ok: boolean };
+  return unwrapData(res.data as ApiEnvelope<{ ok: boolean }>);
 }

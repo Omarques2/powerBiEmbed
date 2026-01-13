@@ -19,6 +19,7 @@ import { UsersService } from "../users/users.service";
 import { BiAuthzService } from "../bi-authz/bi-authz.service";
 import type { AuthedRequest } from "../auth/authed-request.type";
 import { ActiveUserGuard } from "../auth/active-user.guard";
+import { EmbedConfigQueryDto, ExportReportDto, WorkspaceQueryDto } from "./dto/powerbi.dto";
 
 @Controller("powerbi")
 export class PowerBiController {
@@ -37,23 +38,22 @@ export class PowerBiController {
 
   @UseGuards(AuthGuard, ActiveUserGuard)
   @Get("reports")
-  async getReports(@Req() req: AuthedRequest, @Query("workspaceId") workspaceId: string) {
+  async getReports(@Req() req: AuthedRequest, @Query() query: WorkspaceQueryDto) {
     const user = await this.usersService.upsertFromClaims(req.user ?? {});
-    return this.biAuthz.listAllowedReports(user.id, workspaceId);
+    return this.biAuthz.listAllowedReports(user.id, query.workspaceId);
   }
 
   @UseGuards(AuthGuard, ActiveUserGuard)
   @Get("embed-config")
   async getEmbedConfig(
     @Req() req: AuthedRequest,
-    @Query("workspaceId") workspaceId: string,
-    @Query("reportId") reportId: string,
+    @Query() query: EmbedConfigQueryDto,
   ) {
     const user = await this.usersService.upsertFromClaims(req.user ?? {});
-    await this.biAuthz.assertCanViewReport(user.id, workspaceId, reportId);
-    const customerId = await this.biAuthz.getWorkspaceCustomerId(user.id, workspaceId);
+    await this.biAuthz.assertCanViewReport(user.id, query.workspaceId, query.reportId);
+    const customerId = await this.biAuthz.getWorkspaceCustomerId(user.id, query.workspaceId);
     const username = user.email ?? user.id;
-    return this.svc.getEmbedConfig(workspaceId, reportId, {
+    return this.svc.getEmbedConfig(query.workspaceId, query.reportId, {
       username,
       roles: ["CustomerRLS"],
       customData: customerId,
@@ -66,16 +66,7 @@ export class PowerBiController {
   async exportReportPdf(
     @Req() req: AuthedRequest,
     @Body()
-    body: {
-      workspaceId?: string;
-      reportId?: string;
-      bookmarkState?: string;
-      format?: string;
-      pageName?: string;
-      skipStamp?: boolean;
-      relaxedPdfCheck?: boolean;
-      forceIdentity?: boolean;
-    },
+    body: ExportReportDto,
     @Res({ passthrough: true }) res: Response,
   ) {
     const workspaceId = body?.workspaceId;

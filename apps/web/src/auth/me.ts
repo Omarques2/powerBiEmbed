@@ -1,5 +1,6 @@
 // apps/web/src/auth/me.ts
 import { http } from "@/api/http";
+import { unwrapData, type ApiEnvelope } from "@/api/envelope";
 
 export type MeResponse = {
   email: string | null;
@@ -42,7 +43,7 @@ export async function getMeCached(force = false): Promise<MeResponse | null> {
   const inflight = (async () => {
     try {
       const res = await http.get("/users/me");
-      const me = res.data as MeResponse;
+      const me = unwrapData(res.data as ApiEnvelope<MeResponse>);
       cache = { value: me, fetchedAt: Date.now() };
       return me;
     } catch {

@@ -295,6 +295,7 @@ import { useToast } from "@/ui/toast/useToast";
 import PillToggle from "@/ui/toggles/PillToggle.vue";
 
 import { http } from "@/api/http";
+import { unwrapData, type ApiEnvelope } from "@/api/envelope";
 import { logout } from "../auth/auth";
 import HamburgerIcon from "../components/icons/HamburgerIcon.vue";
 import SidebarContent from "../components/SidebarContent.vue";
@@ -303,6 +304,13 @@ import IconRefresh from "../components/icons/IconRefresh.vue";
 
 type Workspace = { id?: string; workspaceId?: string; name?: string };
 type Report = { id: string; name?: string; workspaceId?: string };
+type EmbedConfigResponse = {
+  reportId: string;
+  workspaceId: string;
+  embedUrl: string;
+  embedToken: string;
+  expiresOn?: string;
+};
 type MeResponse = {
   email: string | null;
   displayName: string | null;
@@ -793,13 +801,14 @@ async function loadWorkspaces() {
   loadingWorkspaces.value = true;
   try {
     const res = await http.get("/powerbi/workspaces");
-    workspaces.value = res.data;
+    workspaces.value = unwrapData(res.data as ApiEnvelope<Workspace[]>);
 
     if (workspaces.value.length > 0 && !selectedWorkspaceId.value) {
       await selectWorkspace(workspaces.value[0]!);
     }
   } catch (e: any) {
-    listError.value = `Falha ao listar workspaces: ${e?.response?.data?.message ?? e?.message ?? String(e)}`;
+    const message = await extractErrorMessage(e);
+    listError.value = `Falha ao listar workspaces: ${message}`;
   } finally {
     loadingWorkspaces.value = false;
   }
@@ -810,14 +819,15 @@ async function loadReports(workspaceId: string) {
   loadingReports.value = true;
   try {
     const res = await http.get("/powerbi/reports", { params: { workspaceId } });
-    reports.value = res.data;
+    reports.value = unwrapData(res.data as ApiEnvelope<Report[]>);
 
     if (selectedReport.value && !reports.value.find((r) => r.id === selectedReport.value!.id)) {
       selectedReport.value = null;
       resetEmbed();
     }
   } catch (e: any) {
-    listError.value = `Falha ao listar reports: ${e?.response?.data?.message ?? e?.message ?? String(e)}`;
+    const message = await extractErrorMessage(e);
+    listError.value = `Falha ao listar reports: ${message}`;
   } finally {
     loadingReports.value = false;
   }
@@ -858,7 +868,7 @@ async function openReport(r: Report) {
       params: { workspaceId, reportId: r.id },
     });
 
-    const cfg = cfgRes.data;
+    const cfg = unwrapData(cfgRes.data as ApiEnvelope<EmbedConfigResponse>);
 
     const embedConfig: pbi.IEmbedConfiguration = {
       type: "report",
@@ -905,7 +915,8 @@ async function openReport(r: Report) {
       reportReady.value = false;
     });
   } catch (e: any) {
-    embedError.value = `Falha ao embutir report: ${e?.response?.data?.message ?? e?.message ?? String(e)}`;
+    const message = await extractErrorMessage(e);
+    embedError.value = `Falha ao embutir report: ${message}`;
     loadingEmbed.value = false;
     reportReady.value = false;
   }
@@ -923,7 +934,7 @@ async function onLogout() {
 async function loadMe() {
   try {
     const res = await http.get("/users/me");
-    me.value = res.data;
+    me.value = unwrapData(res.data as ApiEnvelope<MeResponse>);
   } catch {
     me.value = null;
   }

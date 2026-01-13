@@ -2,6 +2,7 @@ import { Controller, Get, Query, UseGuards } from "@nestjs/common";
 import { AuthGuard } from "../auth/auth.guard";
 import { PlatformAdminGuard } from "../auth/platform-admin.guard";
 import { AdminUsersService } from "./admin-users.service";
+import { AuditQueryDto } from "./dto/admin-audit.dto";
 
 @Controller("admin/audit")
 @UseGuards(AuthGuard, PlatformAdminGuard)
@@ -10,24 +11,17 @@ export class AdminAuditController {
 
   @Get()
   list(
-    @Query("page") page?: string,
-    @Query("pageSize") pageSize?: string,
-    @Query("action") action?: string,
-    @Query("entityType") entityType?: string,
-    @Query("entityId") entityId?: string,
-    @Query("actorUserId") actorUserId?: string,
-    @Query("from") from?: string,
-    @Query("to") to?: string,
+    @Query() query: AuditQueryDto,
   ) {
     return this.svc.listAuditLogs({
-      page: page ? Number(page) : 1,
-      pageSize: pageSize ? Number(pageSize) : 50,
-      action: action?.trim() || undefined,
-      entityType: entityType?.trim() || undefined,
-      entityId: entityId?.trim() || undefined,
-      actorUserId: actorUserId?.trim() || undefined,
-      from: from?.trim() || undefined,
-      to: to?.trim() || undefined,
+      page: query.page ?? 1,
+      pageSize: query.pageSize ?? 50,
+      action: query.action?.trim() || undefined,
+      entityType: query.entityType?.trim() || undefined,
+      entityId: query.entityId?.trim() || undefined,
+      actorUserId: query.actorUserId?.trim() || undefined,
+      from: query.from?.trim() || undefined,
+      to: query.to?.trim() || undefined,
     });
   }
 }

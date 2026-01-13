@@ -44,6 +44,7 @@
 import { onBeforeUnmount, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { http } from "@/api/http";
+import { unwrapData, type ApiEnvelope } from "@/api/envelope";
 import { logout } from "../auth/auth";
 
 type MeResponse = {
@@ -62,7 +63,7 @@ let timer: number | null = null;
 async function fetchMe(): Promise<MeResponse | null> {
   try {
     const res = await http.get("/users/me");
-    return res.data as MeResponse;
+    return unwrapData(res.data as ApiEnvelope<MeResponse>);
   } catch (e: any) {
     const status = e?.response?.status;
 
