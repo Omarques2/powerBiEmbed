@@ -36,13 +36,13 @@ async function createApp(overrides: {
     .useValue({});
 
   if (overrides.authGuard) {
-    moduleBuilder.overrideProvider(AuthGuard).useValue(overrides.authGuard);
+    moduleBuilder.overrideGuard(AuthGuard).useValue(overrides.authGuard);
   }
   if (overrides.platformAdminGuard) {
-    moduleBuilder.overrideProvider(PlatformAdminGuard).useValue(overrides.platformAdminGuard);
+    moduleBuilder.overrideGuard(PlatformAdminGuard).useValue(overrides.platformAdminGuard);
   }
   if (overrides.activeUserGuard) {
-    moduleBuilder.overrideProvider(ActiveUserGuard).useValue(overrides.activeUserGuard);
+    moduleBuilder.overrideGuard(ActiveUserGuard).useValue(overrides.activeUserGuard);
   }
 
   const moduleRef = await moduleBuilder.compile();

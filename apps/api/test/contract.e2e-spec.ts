@@ -13,8 +13,8 @@ import { HttpExceptionFilter } from "../src/common/http/http-exception.filter";
 
 const allowGuard = { canActivate: () => true };
 
-const userId = "00000000-0000-0000-0000-000000000002";
-const customerId = "00000000-0000-0000-0000-000000000003";
+const userId = "11111111-1111-4111-8111-111111111111";
+const customerId = "22222222-2222-4222-8222-222222222222";
 
 function applyGlobals(app: INestApplication) {
   app.use(attachCorrelationId);
@@ -33,9 +33,9 @@ async function createApp(adminUsers: Partial<AdminUsersService>) {
   const moduleBuilder = Test.createTestingModule({ imports: [AppModule] })
     .overrideProvider(PrismaService)
     .useValue({})
-    .overrideProvider(AuthGuard)
+    .overrideGuard(AuthGuard)
     .useValue(allowGuard)
-    .overrideProvider(PlatformAdminGuard)
+    .overrideGuard(PlatformAdminGuard)
     .useValue(allowGuard)
     .overrideProvider(AdminUsersService)
     .useValue(adminUsers);

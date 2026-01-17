@@ -5,6 +5,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { AdminUsersModule } from './admin-users/admin-users.module';
 import { AdminRlsModule } from './admin-rls/admin-rls.module';
 import { validateEnv } from "./config/config.schema";
+import { HealthModule } from "./health/health.module";
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { validateEnv } from "./config/config.schema";
     PowerbiModule,
     AdminUsersModule,
     AdminRlsModule,
+    HealthModule,
   ],
 })
 export class AppModule {}
