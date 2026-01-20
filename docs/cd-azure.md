@@ -145,6 +145,11 @@ Em `Settings -> Secrets and variables -> Actions`:
 - `PROD_API_BASE_URL` (ex: https://<prod-url>)
 - `AZURE_STATIC_WEB_APPS_API_TOKEN`
 - `VITE_API_BASE_URL` (URL do backend para o build do web)
+- `VITE_ENTRA_SPA_CLIENT_ID`
+- `VITE_ENTRA_AUTHORITY`
+- `VITE_ENTRA_REDIRECT_URI`
+- `VITE_ENTRA_POST_LOGOUT_REDIRECT_URI`
+- `VITE_ENTRA_API_SCOPE`
 
 ## 8.1) Node para o build do web
 O build do front usa Vite 7 (Node 20+). Garanta `NODE_VERSION=20.19.0` no job `web`.
