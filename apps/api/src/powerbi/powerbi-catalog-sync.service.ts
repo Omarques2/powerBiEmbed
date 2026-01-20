@@ -1,6 +1,11 @@
-import { BadRequestException, Injectable, InternalServerErrorException, NotFoundException } from "@nestjs/common";
-import { PrismaService } from "../prisma/prisma.service";
-import { PowerBiService } from "./powerbi.service";
+import {
+  BadRequestException,
+  Injectable,
+  InternalServerErrorException,
+  NotFoundException,
+} from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
+import { PowerBiService } from './powerbi.service';
 
 @Injectable()
 export class PowerBiCatalogSyncService {
@@ -14,38 +19,53 @@ export class PowerBiCatalogSyncService {
     workspaceIds?: string[];
     deactivateMissing: boolean;
   }) {
-    const customerId = (input.customerId ?? "").trim();
-    if (!customerId) throw new BadRequestException("customerId is required");
+    const customerId = (input.customerId ?? '').trim();
+    if (!customerId) throw new BadRequestException('customerId is required');
 
     const customer = await this.prisma.customer.findUnique({
       where: { id: customerId },
       select: { id: true, status: true },
     });
-    if (!customer) throw new NotFoundException("Customer not found");
-    if (customer.status !== "active") throw new BadRequestException("Customer is not active");
+    if (!customer) throw new NotFoundException('Customer not found');
+    if (customer.status !== 'active')
+      throw new BadRequestException('Customer is not active');
 
     // 1) Puxa workspaces do Power BI (remoto)
     let remoteWorkspaces: Array<{ id: string; name: string | null }> = [];
     try {
       const ws = await this.pbi.listWorkspaces();
-      remoteWorkspaces = ws.map((w: any) => ({ id: String(w.id), name: w.name ?? null }));
-    } catch (e: any) {
-      throw new InternalServerErrorException(`Failed to list workspaces from Power BI: ${e?.message ?? String(e)}`);
+      remoteWorkspaces = ws.map((w) => ({
+        id: String(w.id),
+        name: w.name ?? null,
+      }));
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : String(e);
+      throw new InternalServerErrorException(
+        `Failed to list workspaces from Power BI: ${message}`,
+      );
     }
 
     // filtro opcional
     if (input.workspaceIds?.length) {
       const allow = new Set(input.workspaceIds.map(String));
-      remoteWorkspaces = remoteWorkspaces.filter(w => allow.has(w.id));
+      remoteWorkspaces = remoteWorkspaces.filter((w) => allow.has(w.id));
     }
 
     // 2) Upsert workspaces no BD (para esse customer)
-    const upsertedWorkspaceRefIds: Array<{ workspaceId: string; workspaceRefId: string }> = [];
+    const upsertedWorkspaceRefIds: Array<{
+      workspaceId: string;
+      workspaceRefId: string;
+    }> = [];
 
     await this.prisma.$transaction(async (tx) => {
       for (const w of remoteWorkspaces) {
         const row = await tx.biWorkspace.upsert({
-          where: { customerId_workspaceId: { customerId: customerId, workspaceId: w.id } },
+          where: {
+            customerId_workspaceId: {
+              customerId: customerId,
+              workspaceId: w.id,
+            },
+          },
           create: {
             customerId: customerId,
             workspaceId: w.id,
@@ -59,14 +79,20 @@ export class PowerBiCatalogSyncService {
           select: { id: true, workspaceId: true },
         });
 
-        upsertedWorkspaceRefIds.push({ workspaceId: row.workspaceId, workspaceRefId: row.id });
+        upsertedWorkspaceRefIds.push({
+          workspaceId: row.workspaceId,
+          workspaceRefId: row.id,
+        });
       }
 
       // Opcional: desativar workspaces que sumiram (somente se NÃO estiver usando filtro)
       if (input.deactivateMissing && !input.workspaceIds?.length) {
-        const remoteSet = new Set(remoteWorkspaces.map(w => w.id));
+        const remoteSet = new Set(remoteWorkspaces.map((w) => w.id));
         await tx.biWorkspace.updateMany({
-          where: { customerId: customerId, workspaceId: { notIn: Array.from(remoteSet) } },
+          where: {
+            customerId: customerId,
+            workspaceId: { notIn: Array.from(remoteSet) },
+          },
           data: { isActive: false },
         });
       }
@@ -77,25 +103,35 @@ export class PowerBiCatalogSyncService {
     let reportsDeactivated = 0;
 
     for (const ws of upsertedWorkspaceRefIds) {
-      let remoteReports: Array<{ id: string; name: string | null; datasetId: string | null }> = [];
+      let remoteReports: Array<{
+        id: string;
+        name: string | null;
+        datasetId: string | null;
+      }> = [];
 
       try {
         const rr = await this.pbi.listReports(ws.workspaceId);
-        remoteReports = rr.map((r: any) => ({
+        remoteReports = rr.map((r) => ({
           id: String(r.id),
           name: r.name ?? null,
           datasetId: r.datasetId ?? null,
         }));
-      } catch (e: any) {
+      } catch (e: unknown) {
+        const message = e instanceof Error ? e.message : String(e);
         throw new InternalServerErrorException(
-          `Failed to list reports for workspace ${ws.workspaceId}: ${e?.message ?? String(e)}`
+          `Failed to list reports for workspace ${ws.workspaceId}: ${message}`,
         );
       }
 
       await this.prisma.$transaction(async (tx) => {
         for (const r of remoteReports) {
           await tx.biReport.upsert({
-            where: { workspaceRefId_reportId: { workspaceRefId: ws.workspaceRefId, reportId: r.id } },
+            where: {
+              workspaceRefId_reportId: {
+                workspaceRefId: ws.workspaceRefId,
+                reportId: r.id,
+              },
+            },
             create: {
               workspaceRefId: ws.workspaceRefId,
               reportId: r.id,
@@ -113,9 +149,12 @@ export class PowerBiCatalogSyncService {
         }
 
         if (input.deactivateMissing) {
-          const remoteSet = new Set(remoteReports.map(r => r.id));
+          const remoteSet = new Set(remoteReports.map((r) => r.id));
           const res = await tx.biReport.updateMany({
-            where: { workspaceRefId: ws.workspaceRefId, reportId: { notIn: Array.from(remoteSet) } },
+            where: {
+              workspaceRefId: ws.workspaceRefId,
+              reportId: { notIn: Array.from(remoteSet) },
+            },
             data: { isActive: false },
           });
           reportsDeactivated += res.count;
@@ -134,18 +173,18 @@ export class PowerBiCatalogSyncService {
   }
 
   async getCustomerCatalog(customerIdRaw: string) {
-    const customerId = (customerIdRaw ?? "").trim();
-    if (!customerId) throw new BadRequestException("customerId is required");
+    const customerId = (customerIdRaw ?? '').trim();
+    if (!customerId) throw new BadRequestException('customerId is required');
 
     const customer = await this.prisma.customer.findUnique({
       where: { id: customerId },
       select: { id: true, status: true, code: true, name: true },
     });
-    if (!customer) throw new NotFoundException("Customer not found");
+    if (!customer) throw new NotFoundException('Customer not found');
 
     const workspaces = await this.prisma.biWorkspace.findMany({
       where: { customerId: customerId },
-      orderBy: [{ isActive: "desc" }, { createdAt: "asc" }],
+      orderBy: [{ isActive: 'desc' }, { createdAt: 'asc' }],
       select: {
         id: true,
         workspaceId: true,
@@ -153,7 +192,7 @@ export class PowerBiCatalogSyncService {
         isActive: true,
         createdAt: true,
         reports: {
-          orderBy: [{ isActive: "desc" }, { createdAt: "asc" }],
+          orderBy: [{ isActive: 'desc' }, { createdAt: 'asc' }],
           select: {
             id: true,
             reportId: true,

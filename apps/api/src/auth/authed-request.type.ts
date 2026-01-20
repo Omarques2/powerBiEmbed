@@ -1,5 +1,6 @@
-import type { Request } from "express";
+import type { Request } from 'express';
+import type { Claims } from './claims.type';
 
 export type AuthedRequest = Request & {
-  user?: any; // depois você tipa com JwtPayload se quiser
+  user?: Claims;
 };

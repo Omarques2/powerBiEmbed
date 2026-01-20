@@ -102,7 +102,11 @@ export class BiAuthzService {
     return wsPerm.workspace.customerId;
   }
 
-  async assertCanViewReport(userId: string, workspaceId: string, reportId: string) {
+  async assertCanViewReport(
+    userId: string,
+    workspaceId: string,
+    reportId: string,
+  ) {
     const ok = await this.prisma.biReportPermission.findFirst({
       where: {
         userId: userId,

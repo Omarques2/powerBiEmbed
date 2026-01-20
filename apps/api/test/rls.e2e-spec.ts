@@ -1,14 +1,14 @@
-import { INestApplication } from "@nestjs/common";
-import { Test, TestingModule } from "@nestjs/testing";
-import request from "supertest";
-import { randomUUID } from "crypto";
-import { AppModule } from "../src/app.module";
-import { PrismaService } from "../src/prisma/prisma.service";
-import { AuthGuard } from "../src/auth/auth.guard";
-import { PlatformAdminGuard } from "../src/auth/platform-admin.guard";
-import { applyGlobals } from "./helpers/e2e-utils";
+import { INestApplication } from '@nestjs/common';
+import { Test, TestingModule } from '@nestjs/testing';
+import request from 'supertest';
+import { randomUUID } from 'crypto';
+import { AppModule } from '../src/app.module';
+import { PrismaService } from '../src/prisma/prisma.service';
+import { AuthGuard } from '../src/auth/auth.guard';
+import { PlatformAdminGuard } from '../src/auth/platform-admin.guard';
+import { applyGlobals } from './helpers/e2e-utils';
 
-describe("Admin RLS (e2e)", () => {
+describe('Admin RLS (e2e)', () => {
   jest.setTimeout(30000);
   let app: INestApplication;
   let prisma: PrismaService;
@@ -38,7 +38,7 @@ describe("Admin RLS (e2e)", () => {
     prisma = app.get(PrismaService);
 
     const customer = await prisma.customer.create({
-      data: { code: customerCode, name: "RLS Test Customer", status: "active" },
+      data: { code: customerCode, name: 'RLS Test Customer', status: 'active' },
       select: { id: true },
     });
     customerId = customer.id;
@@ -60,17 +60,17 @@ describe("Admin RLS (e2e)", () => {
     }
   });
 
-  it("creates target", async () => {
+  it('creates target', async () => {
     const res = await request(app.getHttpServer())
       .post(`/admin/rls/datasets/${datasetId}/targets`)
       .send({
         targetKey,
-        displayName: "Instituicao Financeira",
-        factTable: "Fact",
-        factColumn: "Col",
-        valueType: "text",
-        defaultBehavior: "allow",
-        status: "active",
+        displayName: 'Instituicao Financeira',
+        factTable: 'Fact',
+        factColumn: 'Col',
+        valueType: 'text',
+        defaultBehavior: 'allow',
+        status: 'active',
       })
       .expect(201);
 
@@ -78,48 +78,44 @@ describe("Admin RLS (e2e)", () => {
     targetId = res.body.data.id;
   });
 
-  it("rejects duplicate targetKey", async () => {
+  it('rejects duplicate targetKey', async () => {
     await request(app.getHttpServer())
       .post(`/admin/rls/datasets/${datasetId}/targets`)
       .send({
         targetKey,
-        displayName: "Instituicao Financeira",
-        factTable: "Fact",
-        factColumn: "Col",
-        valueType: "text",
+        displayName: 'Instituicao Financeira',
+        factTable: 'Fact',
+        factColumn: 'Col',
+        valueType: 'text',
       })
       .expect(400);
   });
 
-  it("rejects invalid rule payload with multiple values", async () => {
+  it('rejects invalid rule payload with multiple values', async () => {
+    await request(app.getHttpServer())
+      .post(`/admin/rls/targets/${targetId}/rules`)
+      .send({
+        items: [{ customerId, op: 'include', valueText: 'Audax', valueInt: 3 }],
+      })
+      .expect(400);
+  });
+
+  it('rejects unknown customerId', async () => {
     await request(app.getHttpServer())
       .post(`/admin/rls/targets/${targetId}/rules`)
       .send({
         items: [
-          { customerId, op: "include", valueText: "Audax", valueInt: 3 },
+          { customerId: randomUUID(), op: 'include', valueText: 'Audax' },
         ],
       })
       .expect(400);
   });
 
-  it("rejects unknown customerId", async () => {
-    await request(app.getHttpServer())
-      .post(`/admin/rls/targets/${targetId}/rules`)
-      .send({
-        items: [
-          { customerId: randomUUID(), op: "include", valueText: "Audax" },
-        ],
-      })
-      .expect(400);
-  });
-
-  it("creates rule and rejects duplicate rule", async () => {
+  it('creates rule and rejects duplicate rule', async () => {
     const first = await request(app.getHttpServer())
       .post(`/admin/rls/targets/${targetId}/rules`)
       .send({
-        items: [
-          { customerId, op: "include", valueText: "Audax" },
-        ],
+        items: [{ customerId, op: 'include', valueText: 'Audax' }],
       })
       .expect(201);
 
@@ -128,21 +124,19 @@ describe("Admin RLS (e2e)", () => {
     await request(app.getHttpServer())
       .post(`/admin/rls/targets/${targetId}/rules`)
       .send({
-        items: [
-          { customerId, op: "include", valueText: "Audax" },
-        ],
+        items: [{ customerId, op: 'include', valueText: 'Audax' }],
       })
       .expect(400);
   });
 
-  it("rejects invalid customerId on listRules", async () => {
+  it('rejects invalid customerId on listRules', async () => {
     await request(app.getHttpServer())
       .get(`/admin/rls/targets/${targetId}/rules`)
-      .query({ customerId: "not-uuid" })
+      .query({ customerId: 'not-uuid' })
       .expect(400);
   });
 
-  it("deletes rule", async () => {
+  it('deletes rule', async () => {
     if (!createdRuleId) return;
     await request(app.getHttpServer())
       .delete(`/admin/rls/rules/${createdRuleId}`)

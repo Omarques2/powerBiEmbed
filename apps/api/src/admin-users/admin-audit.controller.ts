@@ -1,18 +1,16 @@
-import { Controller, Get, Query, UseGuards } from "@nestjs/common";
-import { AuthGuard } from "../auth/auth.guard";
-import { PlatformAdminGuard } from "../auth/platform-admin.guard";
-import { AdminUsersService } from "./admin-users.service";
-import { AuditQueryDto } from "./dto/admin-audit.dto";
+import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { AuthGuard } from '../auth/auth.guard';
+import { PlatformAdminGuard } from '../auth/platform-admin.guard';
+import { AdminUsersService } from './admin-users.service';
+import { AuditQueryDto } from './dto/admin-audit.dto';
 
-@Controller("admin/audit")
+@Controller('admin/audit')
 @UseGuards(AuthGuard, PlatformAdminGuard)
 export class AdminAuditController {
   constructor(private readonly svc: AdminUsersService) {}
 
   @Get()
-  list(
-    @Query() query: AuditQueryDto,
-  ) {
+  list(@Query() query: AuditQueryDto) {
     return this.svc.listAuditLogs({
       page: query.page ?? 1,
       pageSize: query.pageSize ?? 50,

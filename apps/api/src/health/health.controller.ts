@@ -1,24 +1,24 @@
-import { Controller, Get, ServiceUnavailableException } from "@nestjs/common";
-import { PrismaService } from "../prisma/prisma.service";
+import { Controller, Get, ServiceUnavailableException } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
 
 @Controller()
 export class HealthController {
   constructor(private readonly prisma: PrismaService) {}
 
-  @Get("health")
+  @Get('health')
   health() {
-    return { status: "ok" };
+    return { status: 'ok' };
   }
 
-  @Get("ready")
+  @Get('ready')
   async ready() {
     try {
       await this.prisma.$queryRaw`SELECT 1`;
-      return { status: "ok" };
+      return { status: 'ok' };
     } catch {
       throw new ServiceUnavailableException({
-        code: "DB_NOT_READY",
-        message: "Database not ready",
+        code: 'DB_NOT_READY',
+        message: 'Database not ready',
       });
     }
   }

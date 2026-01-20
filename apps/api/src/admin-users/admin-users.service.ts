@@ -1,20 +1,28 @@
-import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
-import { PrismaService } from "../prisma/prisma.service";
-import type { Prisma } from "@prisma/client";
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
+import { Prisma } from '@prisma/client';
+import type { MembershipRole } from '@prisma/client';
 
-const ALLOWED_ROLES = new Set(["owner", "admin", "member", "viewer"]);
-const ALLOWED_CUSTOMER_STATUS = new Set(["active", "inactive"]);
-type MembershipRole = "owner" | "admin" | "member" | "viewer";
-
-function asBool(v: any, def = false) {
+const ALLOWED_ROLES = new Set<MembershipRole>([
+  'owner',
+  'admin',
+  'member',
+  'viewer',
+]);
+const ALLOWED_CUSTOMER_STATUS = new Set(['active', 'inactive']);
+function asBool(v: unknown, def = false): boolean {
   if (v === true || v === false) return v;
-  if (v === "true" || v === "1" || v === 1) return true;
-  if (v === "false" || v === "0" || v === 0) return false;
+  if (v === 'true' || v === '1' || v === 1) return true;
+  if (v === 'false' || v === '0' || v === 0) return false;
   return def;
 }
 
 function normalizeCustomerCode(code: string): string {
-  const v = (code ?? "").trim().toUpperCase();
+  const v = (code ?? '').trim().toUpperCase();
   return v;
 }
 
@@ -29,19 +37,31 @@ function validateCustomerCode(code: string) {
 }
 
 function normalizeCustomerName(name: string): string {
-  return (name ?? "").trim();
+  return (name ?? '').trim();
 }
 
 function validateCustomerName(name: string) {
-  if (name.length < 2) throw new BadRequestException("Customer name is too short (min 2).");
-  if (name.length > 120) throw new BadRequestException("Customer name is too long (max 120).");
+  if (name.length < 2)
+    throw new BadRequestException('Customer name is too short (min 2).');
+  if (name.length > 120)
+    throw new BadRequestException('Customer name is too long (max 120).');
+}
+
+function isUniqueConstraintError(
+  err: unknown,
+): err is Prisma.PrismaClientKnownRequestError {
+  return (
+    err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002'
+  );
 }
 
 /**
  * Hardening: valida UUID v4/v5 (aceita v1-5), evitando cast inválido em colunas @db.Uuid.
  */
 function isUuid(v: string): boolean {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    v,
+  );
 }
 
 @Injectable()
@@ -50,8 +70,8 @@ export class AdminUsersService {
 
   async listPending() {
     return this.prisma.user.findMany({
-      where: { status: "pending" },
-      orderBy: { createdAt: "desc" },
+      where: { status: 'pending' },
+      orderBy: { createdAt: 'desc' },
       select: {
         id: true,
         email: true,
@@ -63,7 +83,9 @@ export class AdminUsersService {
     });
   }
 
-  private async resolveActorUserId(actorSub: string | null): Promise<string | null> {
+  private async resolveActorUserId(
+    actorSub: string | null,
+  ): Promise<string | null> {
     if (!actorSub) return null;
     const actor = await this.prisma.user.findUnique({
       where: { entraSub: actorSub },
@@ -79,40 +101,59 @@ export class AdminUsersService {
     grantCustomerWorkspaces = true,
     actorSub: string | null = null,
   ) {
-    if (!ALLOWED_ROLES.has(role)) {
+    if (!ALLOWED_ROLES.has(role as MembershipRole)) {
       throw new BadRequestException(`Invalid role: ${role}`);
     }
+    const membershipRole = role as MembershipRole;
 
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: { id: true, status: true, email: true, displayName: true },
     });
-    if (!user) throw new NotFoundException("User not found");
+    if (!user) throw new NotFoundException('User not found');
 
     const customer = await this.prisma.customer.findUnique({
       where: { id: customerId },
       select: { id: true, status: true, code: true, name: true },
     });
-    if (!customer) throw new NotFoundException("Customer not found");
-    if (customer.status !== "active") throw new BadRequestException("Customer is not active");
+    if (!customer) throw new NotFoundException('Customer not found');
+    if (customer.status !== 'active')
+      throw new BadRequestException('Customer is not active');
 
     const actorUserId = await this.resolveActorUserId(actorSub);
 
     return this.prisma.$transaction(async (tx) => {
       const before = {
-        user: { id: userId, status: user.status, email: user.email ?? null, displayName: user.displayName ?? null },
-        customer: { id: customerId, code: customer.code, name: customer.name, status: customer.status },
+        user: {
+          id: userId,
+          status: user.status,
+          email: user.email ?? null,
+          displayName: user.displayName ?? null,
+        },
+        customer: {
+          id: customerId,
+          code: customer.code,
+          name: customer.name,
+          status: customer.status,
+        },
       };
 
       await tx.user.update({
         where: { id: userId },
-        data: { status: "active" },
+        data: { status: 'active' },
       });
 
       await tx.userCustomerMembership.upsert({
-        where: { userId_customerId: { userId: userId, customerId: customerId } },
-        create: { userId: userId, customerId: customerId, role: role as any, isActive: true },
-        update: { role: role as any, isActive: true },
+        where: {
+          userId_customerId: { userId: userId, customerId: customerId },
+        },
+        create: {
+          userId: userId,
+          customerId: customerId,
+          role: membershipRole,
+          isActive: true,
+        },
+        update: { role: membershipRole, isActive: true },
       });
 
       let wsGranted = 0;
@@ -121,7 +162,11 @@ export class AdminUsersService {
       if (grantCustomerWorkspaces) {
         // 1) Workspaces ativos do customer
         const workspaces = await tx.biWorkspace.findMany({
-          where: { customerId: customerId, isActive: true, customer: { status: "active" } },
+          where: {
+            customerId: customerId,
+            isActive: true,
+            customer: { status: 'active' },
+          },
           select: { id: true },
         });
 
@@ -142,7 +187,7 @@ export class AdminUsersService {
             where: {
               workspaceRefId: { in: workspaces.map((w) => w.id) },
               isActive: true,
-              workspace: { isActive: true, customer: { status: "active" } },
+              workspace: { isActive: true, customer: { status: 'active' } },
             },
             select: { id: true },
           });
@@ -163,17 +208,20 @@ export class AdminUsersService {
       }
 
       const after = {
-        user: { id: userId, status: "active" },
+        user: { id: userId, status: 'active' },
         membership: { customerId, role, isActive: true },
-        grants: { workspacePermissionsGranted: wsGranted, reportPermissionsGranted: rpGranted },
+        grants: {
+          workspacePermissionsGranted: wsGranted,
+          reportPermissionsGranted: rpGranted,
+        },
       };
 
       // Auditoria: ativação
       await tx.auditLog.create({
         data: {
           actorUserId: actorUserId,
-          action: "USER_ACTIVATED",
-          entityType: "users",
+          action: 'USER_ACTIVATED',
+          entityType: 'users',
           entityId: userId,
           beforeData: before,
           afterData: after,
@@ -185,8 +233,8 @@ export class AdminUsersService {
         await tx.auditLog.create({
           data: {
             actorUserId: actorUserId,
-            action: "WORKSPACE_PERMS_GRANTED",
-            entityType: "users",
+            action: 'WORKSPACE_PERMS_GRANTED',
+            entityType: 'users',
             entityId: userId,
             afterData: { customerId, count: wsGranted },
           },
@@ -196,8 +244,8 @@ export class AdminUsersService {
         await tx.auditLog.create({
           data: {
             actorUserId: actorUserId,
-            action: "REPORT_PERMS_GRANTED",
-            entityType: "users",
+            action: 'REPORT_PERMS_GRANTED',
+            entityType: 'users',
             entityId: userId,
             afterData: { customerId, count: rpGranted },
           },
@@ -221,7 +269,7 @@ export class AdminUsersService {
       },
     });
 
-    if (!u) throw new NotFoundException("User not found");
+    if (!u) throw new NotFoundException('User not found');
 
     // Retorno alinhado ao padrão do seu frontend (snake_case)
     return {
@@ -239,14 +287,19 @@ export class AdminUsersService {
       where: { id: userId },
       select: { id: true, status: true, email: true },
     });
-    if (!user) throw new NotFoundException("User not found");
+    if (!user) throw new NotFoundException('User not found');
 
     const actorUserId = await this.resolveActorUserId(actorSub);
 
     return this.prisma.$transaction(async (tx) => {
-      const before = { user: { id: userId, status: user.status, email: user.email ?? null } };
+      const before = {
+        user: { id: userId, status: user.status, email: user.email ?? null },
+      };
 
-      await tx.user.update({ where: { id: userId }, data: { status: "disabled" } });
+      await tx.user.update({
+        where: { id: userId },
+        data: { status: 'disabled' },
+      });
 
       await tx.userCustomerMembership.updateMany({
         where: { userId: userId },
@@ -263,13 +316,13 @@ export class AdminUsersService {
         data: { canView: false },
       });
 
-      const after = { user: { id: userId, status: "disabled" } };
+      const after = { user: { id: userId, status: 'disabled' } };
 
       await tx.auditLog.create({
         data: {
           actorUserId: actorUserId,
-          action: "USER_DISABLED",
-          entityType: "users",
+          action: 'USER_DISABLED',
+          entityType: 'users',
           entityId: userId,
           beforeData: before,
           afterData: after,
@@ -285,22 +338,31 @@ export class AdminUsersService {
       where: { id: userId },
       select: { id: true, status: true, email: true, displayName: true },
     });
-    if (!user) throw new NotFoundException("User not found");
+    if (!user) throw new NotFoundException('User not found');
 
     const customer = await this.prisma.customer.findUnique({
       where: { id: customerId },
       select: { id: true, status: true, code: true, name: true },
     });
-    if (!customer) throw new NotFoundException("Customer not found");
-    if (customer.status !== "active") throw new BadRequestException("Customer is not active");
+    if (!customer) throw new NotFoundException('Customer not found');
+    if (customer.status !== 'active')
+      throw new BadRequestException('Customer is not active');
 
     return { user, customer };
   }
 
-  private async grantCustomerCatalogAccessTx(tx: Prisma.TransactionClient, userId: string, customerId: string) {
+  private async grantCustomerCatalogAccessTx(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    customerId: string,
+  ) {
     // 1) Workspaces ativos do customer
     const workspaces = await tx.biWorkspace.findMany({
-      where: { customerId: customerId, isActive: true, customer: { status: "active" } },
+      where: {
+        customerId: customerId,
+        isActive: true,
+        customer: { status: 'active' },
+      },
       select: { id: true },
     });
 
@@ -322,7 +384,7 @@ export class AdminUsersService {
         where: {
           workspaceRefId: { in: workspaces.map((w) => w.id) },
           isActive: true,
-          workspace: { isActive: true, customer: { status: "active" } },
+          workspace: { isActive: true, customer: { status: 'active' } },
         },
         select: { id: true },
       });
@@ -343,7 +405,11 @@ export class AdminUsersService {
     return { wsGranted, rpGranted };
   }
 
-  private async revokeCustomerCatalogAccessTx(tx: Prisma.TransactionClient, userId: string, customerId: string) {
+  private async revokeCustomerCatalogAccessTx(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    customerId: string,
+  ) {
     // Descobre workspaces do customer e revoga apenas os que pertencem ao customer
     const workspaces = await tx.biWorkspace.findMany({
       where: { customerId: customerId },
@@ -394,34 +460,56 @@ export class AdminUsersService {
     },
     actorSub: string | null,
   ) {
-    const customerId = (input.customerId ?? "").trim();
-    const role = (input.role ?? "").trim() as MembershipRole;
+    const customerId = (input.customerId ?? '').trim();
+    const role = (input.role ?? '').trim() as MembershipRole;
 
-    if (!customerId) throw new BadRequestException("customerId is required");
-    if (!ALLOWED_ROLES.has(role)) throw new BadRequestException(`Invalid role: ${role}`);
+    if (!customerId) throw new BadRequestException('customerId is required');
+    if (!ALLOWED_ROLES.has(role))
+      throw new BadRequestException(`Invalid role: ${role}`);
 
     const isActive = asBool(input.isActive, true);
-    const grantCustomerWorkspaces = asBool(input.grantCustomerWorkspaces, false);
-    const revokeCustomerPermissions = asBool(input.revokeCustomerPermissions, false);
+    const grantCustomerWorkspaces = asBool(
+      input.grantCustomerWorkspaces,
+      false,
+    );
+    const revokeCustomerPermissions = asBool(
+      input.revokeCustomerPermissions,
+      false,
+    );
     const ensureUserActive = asBool(input.ensureUserActive, false);
 
-    const { user, customer } = await this.assertUserAndCustomer(userId, customerId);
+    const { user, customer } = await this.assertUserAndCustomer(
+      userId,
+      customerId,
+    );
     const actorUserId = await this.resolveActorUserId(actorSub);
 
     return this.prisma.$transaction(async (tx) => {
       const beforeMembership = await tx.userCustomerMembership.findUnique({
-        where: { userId_customerId: { userId: userId, customerId: customerId } },
+        where: {
+          userId_customerId: { userId: userId, customerId: customerId },
+        },
         select: { id: true, role: true, isActive: true, createdAt: true }, // <-- inclui id
       });
 
-      if (ensureUserActive && user.status !== "active") {
-        await tx.user.update({ where: { id: userId }, data: { status: "active" } });
+      if (ensureUserActive && user.status !== 'active') {
+        await tx.user.update({
+          where: { id: userId },
+          data: { status: 'active' },
+        });
       }
 
       const membership = await tx.userCustomerMembership.upsert({
-        where: { userId_customerId: { userId: userId, customerId: customerId } },
-        create: { userId: userId, customerId: customerId, role: role as any, isActive: isActive },
-        update: { role: role as any, isActive: isActive },
+        where: {
+          userId_customerId: { userId: userId, customerId: customerId },
+        },
+        create: {
+          userId: userId,
+          customerId: customerId,
+          role: role,
+          isActive: isActive,
+        },
+        update: { role: role, isActive: isActive },
         select: { id: true, customerId: true, role: true, isActive: true }, // <-- inclui id
       });
 
@@ -430,27 +518,44 @@ export class AdminUsersService {
 
       // regra recomendada: se está desativando, revoga permissões do customer
       if (!isActive && revokeCustomerPermissions) {
-        revoked = await this.revokeCustomerCatalogAccessTx(tx, userId, customerId);
+        revoked = await this.revokeCustomerCatalogAccessTx(
+          tx,
+          userId,
+          customerId,
+        );
       }
 
       // se está ativando e pediu grant, aplica grant
       if (isActive && grantCustomerWorkspaces) {
-        granted = await this.grantCustomerCatalogAccessTx(tx, userId, customerId);
+        granted = await this.grantCustomerCatalogAccessTx(
+          tx,
+          userId,
+          customerId,
+        );
       }
 
       await tx.auditLog.create({
         data: {
           actorUserId: actorUserId,
-          action: "USER_MEMBERSHIP_UPSERTED",
-          entityType: "user_customer_memberships",
+          action: 'USER_MEMBERSHIP_UPSERTED',
+          entityType: 'user_customer_memberships',
           entityId: membership.id, // <-- FIX: UUID válido (id da membership)
           beforeData: {
             user: { id: userId, email: user.email ?? null },
-            customer: { id: customerId, code: customer.code, name: customer.name },
+            customer: {
+              id: customerId,
+              code: customer.code,
+              name: customer.name,
+            },
             membership: beforeMembership ?? null,
           },
           afterData: {
-            membership: { id: membership.id, customerId, role: membership.role, isActive: membership.isActive },
+            membership: {
+              id: membership.id,
+              customerId,
+              role: membership.role,
+              isActive: membership.isActive,
+            },
             key: { userId, customerId }, // humano/debug (não indexado)
             granted,
             revoked,
@@ -460,7 +565,11 @@ export class AdminUsersService {
 
       return {
         ok: true,
-        membership: { customerId, role: membership.role, isActive: membership.isActive },
+        membership: {
+          customerId,
+          role: membership.role,
+          isActive: membership.isActive,
+        },
         granted,
         revoked,
       };
@@ -481,32 +590,49 @@ export class AdminUsersService {
     },
     actorSub: string | null,
   ) {
-    const customerId = (customerIdRaw ?? "").trim();
-    if (!customerId) throw new BadRequestException("customerId is required");
+    const customerId = (customerIdRaw ?? '').trim();
+    if (!customerId) throw new BadRequestException('customerId is required');
 
-    const role = input.role ? (String(input.role).trim() as MembershipRole) : null;
-    if (role && !ALLOWED_ROLES.has(role)) throw new BadRequestException(`Invalid role: ${role}`);
+    const role = input.role
+      ? (String(input.role).trim() as MembershipRole)
+      : null;
+    if (role && !ALLOWED_ROLES.has(role))
+      throw new BadRequestException(`Invalid role: ${role}`);
 
-    const isActive = input.isActive === undefined ? undefined : asBool(input.isActive);
-    const grantCustomerWorkspaces = asBool(input.grantCustomerWorkspaces, false);
-    const revokeCustomerPermissions = asBool(input.revokeCustomerPermissions, false);
+    const isActive =
+      input.isActive === undefined ? undefined : asBool(input.isActive);
+    const grantCustomerWorkspaces = asBool(
+      input.grantCustomerWorkspaces,
+      false,
+    );
+    const revokeCustomerPermissions = asBool(
+      input.revokeCustomerPermissions,
+      false,
+    );
 
-    const { user, customer } = await this.assertUserAndCustomer(userId, customerId);
+    const { user, customer } = await this.assertUserAndCustomer(
+      userId,
+      customerId,
+    );
     const actorUserId = await this.resolveActorUserId(actorSub);
 
     return this.prisma.$transaction(async (tx) => {
       const before = await tx.userCustomerMembership.findUnique({
-        where: { userId_customerId: { userId: userId, customerId: customerId } },
+        where: {
+          userId_customerId: { userId: userId, customerId: customerId },
+        },
         select: { id: true, role: true, isActive: true, createdAt: true }, // <-- inclui id
       });
-      if (!before) throw new NotFoundException("Membership not found");
+      if (!before) throw new NotFoundException('Membership not found');
 
-      const nextRole = role ?? (before.role as any);
+      const nextRole = role ?? before.role;
       const nextIsActive = isActive === undefined ? before.isActive : isActive;
 
       const updated = await tx.userCustomerMembership.update({
-        where: { userId_customerId: { userId: userId, customerId: customerId } },
-        data: { role: nextRole as any, isActive: nextIsActive },
+        where: {
+          userId_customerId: { userId: userId, customerId: customerId },
+        },
+        data: { role: nextRole, isActive: nextIsActive },
         select: { id: true, customerId: true, role: true, isActive: true }, // <-- inclui id
       });
 
@@ -514,25 +640,42 @@ export class AdminUsersService {
       let revoked = { wsRevoked: 0, rpRevoked: 0 };
 
       if (!nextIsActive && revokeCustomerPermissions) {
-        revoked = await this.revokeCustomerCatalogAccessTx(tx, userId, customerId);
+        revoked = await this.revokeCustomerCatalogAccessTx(
+          tx,
+          userId,
+          customerId,
+        );
       }
       if (nextIsActive && grantCustomerWorkspaces) {
-        granted = await this.grantCustomerCatalogAccessTx(tx, userId, customerId);
+        granted = await this.grantCustomerCatalogAccessTx(
+          tx,
+          userId,
+          customerId,
+        );
       }
 
       await tx.auditLog.create({
         data: {
           actorUserId: actorUserId,
-          action: "USER_MEMBERSHIP_UPDATED",
-          entityType: "user_customer_memberships",
+          action: 'USER_MEMBERSHIP_UPDATED',
+          entityType: 'user_customer_memberships',
           entityId: updated.id, // <-- FIX: UUID válido (id da membership)
           beforeData: {
             user: { id: userId, email: user.email ?? null },
-            customer: { id: customerId, code: customer.code, name: customer.name },
+            customer: {
+              id: customerId,
+              code: customer.code,
+              name: customer.name,
+            },
             membership: before,
           },
           afterData: {
-            membership: { id: updated.id, customerId, role: updated.role, isActive: updated.isActive },
+            membership: {
+              id: updated.id,
+              customerId,
+              role: updated.role,
+              isActive: updated.isActive,
+            },
             key: { userId, customerId }, // humano/debug
             granted,
             revoked,
@@ -542,7 +685,11 @@ export class AdminUsersService {
 
       return {
         ok: true,
-        membership: { customerId, role: updated.role, isActive: updated.isActive },
+        membership: {
+          customerId,
+          role: updated.role,
+          isActive: updated.isActive,
+        },
         granted,
         revoked,
       };
@@ -558,21 +705,28 @@ export class AdminUsersService {
     revokeCustomerPermissions: boolean,
     actorSub: string | null,
   ) {
-    const customerId = (customerIdRaw ?? "").trim();
-    if (!customerId) throw new BadRequestException("customerId is required");
+    const customerId = (customerIdRaw ?? '').trim();
+    if (!customerId) throw new BadRequestException('customerId is required');
 
-    const { user, customer } = await this.assertUserAndCustomer(userId, customerId);
+    const { user, customer } = await this.assertUserAndCustomer(
+      userId,
+      customerId,
+    );
     const actorUserId = await this.resolveActorUserId(actorSub);
 
     return this.prisma.$transaction(async (tx) => {
       const before = await tx.userCustomerMembership.findUnique({
-        where: { userId_customerId: { userId: userId, customerId: customerId } },
+        where: {
+          userId_customerId: { userId: userId, customerId: customerId },
+        },
         select: { id: true, role: true, isActive: true, createdAt: true }, // <-- inclui id
       });
-      if (!before) throw new NotFoundException("Membership not found");
+      if (!before) throw new NotFoundException('Membership not found');
 
       await tx.userCustomerMembership.delete({
-        where: { userId_customerId: { userId: userId, customerId: customerId } },
+        where: {
+          userId_customerId: { userId: userId, customerId: customerId },
+        },
       });
 
       const revoked = revokeCustomerPermissions
@@ -582,12 +736,16 @@ export class AdminUsersService {
       await tx.auditLog.create({
         data: {
           actorUserId: actorUserId,
-          action: "USER_MEMBERSHIP_REMOVED",
-          entityType: "user_customer_memberships",
+          action: 'USER_MEMBERSHIP_REMOVED',
+          entityType: 'user_customer_memberships',
           entityId: before.id, // <-- FIX: UUID válido (id da membership removida)
           beforeData: {
             user: { id: userId, email: user.email ?? null },
-            customer: { id: customerId, code: customer.code, name: customer.name },
+            customer: {
+              id: customerId,
+              code: customer.code,
+              name: customer.name,
+            },
             membership: before,
           },
           afterData: {
@@ -617,39 +775,58 @@ export class AdminUsersService {
     },
     actorSub: string | null,
   ) {
-    const fromCustomerId = (input.fromCustomerId ?? "").trim();
-    const toCustomerId = (input.toCustomerId ?? "").trim();
-    const toRole = (input.toRole ?? "").trim() as MembershipRole;
+    const fromCustomerId = (input.fromCustomerId ?? '').trim();
+    const toCustomerId = (input.toCustomerId ?? '').trim();
+    const toRole = (input.toRole ?? '').trim() as MembershipRole;
 
-    if (!fromCustomerId) throw new BadRequestException("fromCustomerId is required");
-    if (!toCustomerId) throw new BadRequestException("toCustomerId is required");
+    if (!fromCustomerId)
+      throw new BadRequestException('fromCustomerId is required');
+    if (!toCustomerId)
+      throw new BadRequestException('toCustomerId is required');
     if (fromCustomerId === toCustomerId) {
-      throw new BadRequestException("fromCustomerId and toCustomerId must be different");
+      throw new BadRequestException(
+        'fromCustomerId and toCustomerId must be different',
+      );
     }
-    if (!ALLOWED_ROLES.has(toRole)) throw new BadRequestException(`Invalid role: ${toRole}`);
+    if (!ALLOWED_ROLES.has(toRole))
+      throw new BadRequestException(`Invalid role: ${toRole}`);
 
     const deactivateFrom = asBool(input.deactivateFrom, true);
-    const revokeFromCustomerPermissions = asBool(input.revokeFromCustomerPermissions, true);
-    const grantToCustomerWorkspaces = asBool(input.grantToCustomerWorkspaces, false);
+    const revokeFromCustomerPermissions = asBool(
+      input.revokeFromCustomerPermissions,
+      true,
+    );
+    const grantToCustomerWorkspaces = asBool(
+      input.grantToCustomerWorkspaces,
+      false,
+    );
     const toIsActive = asBool(input.toIsActive, true);
 
     // valida usuário + customers
-    const { user: usr } = await this.assertUserAndCustomer(userId, fromCustomerId);
+    const { user: usr } = await this.assertUserAndCustomer(
+      userId,
+      fromCustomerId,
+    );
     await this.assertUserAndCustomer(userId, toCustomerId);
 
     const actorUserId = await this.resolveActorUserId(actorSub);
 
     return this.prisma.$transaction(async (tx) => {
       const fromBefore = await tx.userCustomerMembership.findUnique({
-        where: { userId_customerId: { userId: userId, customerId: fromCustomerId } },
+        where: {
+          userId_customerId: { userId: userId, customerId: fromCustomerId },
+        },
         select: { id: true, role: true, isActive: true, createdAt: true }, // <-- inclui id
       });
-      if (!fromBefore) throw new NotFoundException("Source membership not found");
+      if (!fromBefore)
+        throw new NotFoundException('Source membership not found');
 
       // 1) desativa origem
       if (deactivateFrom) {
         await tx.userCustomerMembership.update({
-          where: { userId_customerId: { userId: userId, customerId: fromCustomerId } },
+          where: {
+            userId_customerId: { userId: userId, customerId: fromCustomerId },
+          },
           data: { isActive: false },
         });
       }
@@ -660,9 +837,16 @@ export class AdminUsersService {
 
       // 2) cria/ativa destino
       const toMembership = await tx.userCustomerMembership.upsert({
-        where: { userId_customerId: { userId: userId, customerId: toCustomerId } },
-        create: { userId: userId, customerId: toCustomerId, role: toRole as any, isActive: toIsActive },
-        update: { role: toRole as any, isActive: toIsActive },
+        where: {
+          userId_customerId: { userId: userId, customerId: toCustomerId },
+        },
+        create: {
+          userId: userId,
+          customerId: toCustomerId,
+          role: toRole,
+          isActive: toIsActive,
+        },
+        update: { role: toRole, isActive: toIsActive },
         select: { id: true, customerId: true, role: true, isActive: true }, // <-- inclui id
       });
 
@@ -674,15 +858,20 @@ export class AdminUsersService {
       await tx.auditLog.create({
         data: {
           actorUserId: actorUserId,
-          action: "USER_MEMBERSHIP_TRANSFERRED",
-          entityType: "user_customer_memberships",
+          action: 'USER_MEMBERSHIP_TRANSFERRED',
+          entityType: 'user_customer_memberships',
           entityId: toMembership.id, // <-- FIX: UUID válido (id do membership destino)
           beforeData: {
             user: { id: userId, email: usr.email ?? null },
             from: { customerId: fromCustomerId, membership: fromBefore },
           },
           afterData: {
-            to: { id: toMembership.id, customerId: toCustomerId, role: toMembership.role, isActive: toMembership.isActive },
+            to: {
+              id: toMembership.id,
+              customerId: toCustomerId,
+              role: toMembership.role,
+              isActive: toMembership.isActive,
+            },
             key: { userId, fromCustomerId, toCustomerId }, // humano/debug
             revokedFrom: revoked,
             grantedTo: granted,
@@ -693,7 +882,11 @@ export class AdminUsersService {
 
       return {
         ok: true,
-        toMembership: { customerId: toCustomerId, role: toMembership.role, isActive: toMembership.isActive },
+        toMembership: {
+          customerId: toCustomerId,
+          role: toMembership.role,
+          isActive: toMembership.isActive,
+        },
         revokedFrom: revoked,
         grantedTo: granted,
       };
@@ -702,8 +895,14 @@ export class AdminUsersService {
 
   async listCustomers() {
     const rows = await this.prisma.customer.findMany({
-      orderBy: [{ status: "asc" }, { name: "asc" }],
-      select: { id: true, code: true, name: true, status: true, createdAt: true },
+      orderBy: [{ status: 'asc' }, { name: 'asc' }],
+      select: {
+        id: true,
+        code: true,
+        name: true,
+        status: true,
+        createdAt: true,
+      },
     });
 
     return rows.map((c) => ({
@@ -715,10 +914,13 @@ export class AdminUsersService {
     }));
   }
 
-  async createCustomer(input: { code: string; name: string; status?: "active" | "inactive" }, actorSub: string | null) {
+  async createCustomer(
+    input: { code: string; name: string; status?: 'active' | 'inactive' },
+    actorSub: string | null,
+  ) {
     const code = normalizeCustomerCode(input.code);
     const name = normalizeCustomerName(input.name);
-    const status = (input.status ?? "active").trim();
+    const status = (input.status ?? 'active').trim();
 
     validateCustomerCode(code);
     validateCustomerName(name);
@@ -733,16 +935,27 @@ export class AdminUsersService {
       const created = await this.prisma.$transaction(async (tx) => {
         const row = await tx.customer.create({
           data: { code, name, status },
-          select: { id: true, code: true, name: true, status: true, createdAt: true },
+          select: {
+            id: true,
+            code: true,
+            name: true,
+            status: true,
+            createdAt: true,
+          },
         });
 
         await tx.auditLog.create({
           data: {
             actorUserId: actorUserId,
-            action: "CUSTOMER_CREATED",
-            entityType: "customers",
+            action: 'CUSTOMER_CREATED',
+            entityType: 'customers',
             entityId: row.id,
-            afterData: { id: row.id, code: row.code, name: row.name, status: row.status },
+            afterData: {
+              id: row.id,
+              code: row.code,
+              name: row.name,
+              status: row.status,
+            },
           },
         });
 
@@ -756,38 +969,41 @@ export class AdminUsersService {
         status: created.status,
         createdAt: created.createdAt,
       };
-    } catch (e: any) {
-      // Prisma unique constraint
-      if (e?.code === "P2002") {
-        throw new BadRequestException("Customer code already exists.");
+    } catch (err: unknown) {
+      if (isUniqueConstraintError(err)) {
+        throw new BadRequestException('Customer code already exists.');
       }
-      throw e;
+      throw err;
     }
   }
 
-  async updateCustomer(customerId: string, input: { code?: string; name?: string }, actorSub: string | null) {
+  async updateCustomer(
+    customerId: string,
+    input: { code?: string; name?: string },
+    actorSub: string | null,
+  ) {
     const customer = await this.prisma.customer.findUnique({
       where: { id: customerId },
       select: { id: true, code: true, name: true, status: true },
     });
-    if (!customer) throw new NotFoundException("Customer not found");
+    if (!customer) throw new NotFoundException('Customer not found');
 
     const next: { code?: string; name?: string } = {};
 
-    if (typeof input.code === "string") {
+    if (typeof input.code === 'string') {
       const code = normalizeCustomerCode(input.code);
       validateCustomerCode(code);
       next.code = code;
     }
 
-    if (typeof input.name === "string") {
+    if (typeof input.name === 'string') {
       const name = normalizeCustomerName(input.name);
       validateCustomerName(name);
       next.name = name;
     }
 
     if (!Object.keys(next).length) {
-      throw new BadRequestException("Nothing to update.");
+      throw new BadRequestException('Nothing to update.');
     }
 
     const actorUserId = await this.resolveActorUserId(actorSub);
@@ -797,17 +1013,33 @@ export class AdminUsersService {
         const row = await tx.customer.update({
           where: { id: customerId },
           data: next,
-          select: { id: true, code: true, name: true, status: true, createdAt: true },
+          select: {
+            id: true,
+            code: true,
+            name: true,
+            status: true,
+            createdAt: true,
+          },
         });
 
         await tx.auditLog.create({
           data: {
             actorUserId: actorUserId,
-            action: "CUSTOMER_UPDATED",
-            entityType: "customers",
+            action: 'CUSTOMER_UPDATED',
+            entityType: 'customers',
             entityId: customerId,
-            beforeData: { id: customer.id, code: customer.code, name: customer.name, status: customer.status },
-            afterData: { id: row.id, code: row.code, name: row.name, status: row.status },
+            beforeData: {
+              id: customer.id,
+              code: customer.code,
+              name: customer.name,
+              status: customer.status,
+            },
+            afterData: {
+              id: row.id,
+              code: row.code,
+              name: row.name,
+              status: row.status,
+            },
           },
         });
 
@@ -824,16 +1056,20 @@ export class AdminUsersService {
           createdAt: updated.createdAt,
         },
       };
-    } catch (e: any) {
-      if (e?.code === "P2002") {
-        throw new BadRequestException("Customer code already exists.");
+    } catch (err: unknown) {
+      if (isUniqueConstraintError(err)) {
+        throw new BadRequestException('Customer code already exists.');
       }
-      throw e;
+      throw err;
     }
   }
 
-  async setCustomerStatus(customerId: string, statusRaw: "active" | "inactive", actorSub: string | null) {
-    const status = (statusRaw ?? "").trim();
+  async setCustomerStatus(
+    customerId: string,
+    statusRaw: 'active' | 'inactive',
+    actorSub: string | null,
+  ) {
+    const status = (statusRaw ?? '').trim();
     if (!ALLOWED_CUSTOMER_STATUS.has(status)) {
       throw new BadRequestException(`Invalid status: ${status}`);
     }
@@ -842,7 +1078,7 @@ export class AdminUsersService {
       where: { id: customerId },
       select: { id: true, code: true, name: true, status: true },
     });
-    if (!customer) throw new NotFoundException("Customer not found");
+    if (!customer) throw new NotFoundException('Customer not found');
 
     const actorUserId = await this.resolveActorUserId(actorSub);
 
@@ -857,7 +1093,7 @@ export class AdminUsersService {
       let workspacesDeactivated = 0;
       let reportsDeactivated = 0;
 
-      if (status === "inactive") {
+      if (status === 'inactive') {
         const wsRes = await tx.biWorkspace.updateMany({
           where: { customerId: customerId, isActive: true },
           data: { isActive: false },
@@ -872,7 +1108,10 @@ export class AdminUsersService {
 
         if (wsRefs.length) {
           const rpRes = await tx.biReport.updateMany({
-            where: { workspaceRefId: { in: wsRefs.map((w) => w.id) }, isActive: true },
+            where: {
+              workspaceRefId: { in: wsRefs.map((w) => w.id) },
+              isActive: true,
+            },
             data: { isActive: false },
           });
           reportsDeactivated = rpRes.count;
@@ -882,19 +1121,32 @@ export class AdminUsersService {
       await tx.auditLog.create({
         data: {
           actorUserId: actorUserId,
-          action: "CUSTOMER_STATUS_CHANGED",
-          entityType: "customers",
+          action: 'CUSTOMER_STATUS_CHANGED',
+          entityType: 'customers',
           entityId: customerId,
           beforeData: { status: customer.status },
-          afterData: { status: updated.status, workspacesDeactivated, reportsDeactivated },
+          afterData: {
+            status: updated.status,
+            workspacesDeactivated,
+            reportsDeactivated,
+          },
         },
       });
 
-      return { ok: true, status: updated.status, workspacesDeactivated, reportsDeactivated };
+      return {
+        ok: true,
+        status: updated.status,
+        workspacesDeactivated,
+        reportsDeactivated,
+      };
     });
   }
 
-  async unlinkWorkspaceFromCustomer(customerId: string, workspaceRefId: string, actorSub: string | null) {
+  async unlinkWorkspaceFromCustomer(
+    customerId: string,
+    workspaceRefId: string,
+    actorSub: string | null,
+  ) {
     const actorUserId = await this.resolveActorUserId(actorSub);
 
     return this.prisma.$transaction(async (tx) => {
@@ -909,8 +1161,11 @@ export class AdminUsersService {
           customer: { select: { id: true, status: true } },
         },
       });
-      if (!ws) throw new NotFoundException("Workspace not found");
-      if (ws.customerId !== customerId) throw new BadRequestException("Workspace does not belong to this customer");
+      if (!ws) throw new NotFoundException('Workspace not found');
+      if (ws.customerId !== customerId)
+        throw new BadRequestException(
+          'Workspace does not belong to this customer',
+        );
 
       const before = {
         workspace: {
@@ -945,7 +1200,7 @@ export class AdminUsersService {
         where: {
           customerId: customerId,
           isActive: true,
-          customer: { status: "active" },
+          customer: { status: 'active' },
         },
         select: { userId: true },
       });
@@ -990,8 +1245,8 @@ export class AdminUsersService {
       await tx.auditLog.create({
         data: {
           actorUserId: actorUserId,
-          action: "CUSTOMER_WORKSPACE_UNLINKED",
-          entityType: "bi_workspaces",
+          action: 'CUSTOMER_WORKSPACE_UNLINKED',
+          entityType: 'bi_workspaces',
           entityId: workspaceRefId,
           beforeData: before,
           afterData: after,
@@ -1019,32 +1274,34 @@ export class AdminUsersService {
     const pageSizeRaw = Number.isFinite(input.pageSize) ? input.pageSize : 50;
     const pageSize = Math.max(1, Math.min(200, pageSizeRaw));
 
-    const where: any = {};
-    if (input.action) where.action = input.action;
-    if (input.entityType) where.entityType = input.entityType;
-
-    // HARDENING: entityId é @db.Uuid. Evita cast inválido no Prisma/Postgres.
+    let entityId: string | undefined;
     if (input.entityId) {
       const v = String(input.entityId).trim();
       if (!isUuid(v)) {
-        throw new BadRequestException("entityId must be a UUID");
+        throw new BadRequestException('entityId must be a UUID');
       }
-      where.entityId = v;
+      entityId = v;
     }
 
-    if (input.actorUserId) where.actorUserId = input.actorUserId;
+    const where: Prisma.AuditLogWhereInput = {
+      ...(input.action ? { action: input.action } : {}),
+      ...(input.entityType ? { entityType: input.entityType } : {}),
+      ...(input.actorUserId ? { actorUserId: input.actorUserId } : {}),
+      ...(entityId ? { entityId } : {}),
+    };
 
     if (input.from || input.to) {
-      where.createdAt = {};
-      if (input.from) where.createdAt.gte = new Date(input.from);
-      if (input.to) where.createdAt.lte = new Date(input.to);
+      where.createdAt = {
+        ...(input.from ? { gte: new Date(input.from) } : {}),
+        ...(input.to ? { lte: new Date(input.to) } : {}),
+      };
     }
 
     const [total, rows] = await this.prisma.$transaction([
       this.prisma.auditLog.count({ where }),
       this.prisma.auditLog.findMany({
         where,
-        orderBy: { createdAt: "desc" },
+        orderBy: { createdAt: 'desc' },
         skip: (page - 1) * pageSize,
         take: pageSize,
         include: {
@@ -1064,7 +1321,13 @@ export class AdminUsersService {
         entityType: r.entityType,
         entityId: r.entityId,
         actorUserId: r.actorUserId,
-        actor: r.actor ? { id: r.actor.id, email: r.actor.email, displayName: r.actor.displayName } : null,
+        actor: r.actor
+          ? {
+              id: r.actor.id,
+              email: r.actor.email,
+              displayName: r.actor.displayName,
+            }
+          : null,
         ip: r.ip,
         userAgent: r.userAgent,
         before: r.beforeData,
@@ -1078,15 +1341,18 @@ export class AdminUsersService {
   // =========================
   async listActiveUsers(input: { q?: string; page: number; pageSize: number }) {
     const page = Number.isFinite(input.page) && input.page > 0 ? input.page : 1;
-    const pageSize = Math.max(1, Math.min(100, Number.isFinite(input.pageSize) ? input.pageSize : 25));
+    const pageSize = Math.max(
+      1,
+      Math.min(100, Number.isFinite(input.pageSize) ? input.pageSize : 25),
+    );
     const q = input.q?.trim();
 
-    const where: any = { status: "active" };
+    const where: Prisma.UserWhereInput = { status: 'active' };
 
     if (q) {
       where.OR = [
         { email: { contains: q } }, // citext ajuda no case-insensitive
-        { displayName: { contains: q, mode: "insensitive" } },
+        { displayName: { contains: q, mode: 'insensitive' } },
       ];
     }
 
@@ -1094,7 +1360,7 @@ export class AdminUsersService {
       this.prisma.user.count({ where }),
       this.prisma.user.findMany({
         where,
-        orderBy: [{ lastLoginAt: "desc" }, { createdAt: "desc" }],
+        orderBy: [{ lastLoginAt: 'desc' }, { createdAt: 'desc' }],
         skip: (page - 1) * pageSize,
         take: pageSize,
         select: {
@@ -1119,12 +1385,16 @@ export class AdminUsersService {
       where: { id: userId },
       select: { id: true, email: true, displayName: true, status: true },
     });
-    if (!user) throw new NotFoundException("User not found");
+    if (!user) throw new NotFoundException('User not found');
 
     const memberships = await this.prisma.userCustomerMembership.findMany({
-      where: { userId: userId, customer: { status: "active" } },
-      include: { customer: { select: { id: true, code: true, name: true, status: true } } },
-      orderBy: { createdAt: "asc" },
+      where: { userId: userId, customer: { status: 'active' } },
+      include: {
+        customer: {
+          select: { id: true, code: true, name: true, status: true },
+        },
+      },
+      orderBy: { createdAt: 'asc' },
     });
 
     const activeMemberships = memberships.filter((m) => m.isActive);
@@ -1132,11 +1402,18 @@ export class AdminUsersService {
     const effectiveCustomerId =
       customerId && memberships.some((m) => m.customerId === customerId)
         ? customerId
-        : activeMemberships[0]?.customerId ?? memberships[0]?.customerId ?? null;
+        : (activeMemberships[0]?.customerId ??
+          memberships[0]?.customerId ??
+          null);
 
     if (!effectiveCustomerId) {
       return {
-        user: { id: user.id, email: user.email, displayName: user.displayName, status: user.status },
+        user: {
+          id: user.id,
+          email: user.email,
+          displayName: user.displayName,
+          status: user.status,
+        },
         memberships: memberships.map((m) => ({
           customerId: m.customerId,
           role: m.role,
@@ -1152,11 +1429,15 @@ export class AdminUsersService {
       where: { id: effectiveCustomerId },
       select: { id: true, code: true, name: true, status: true },
     });
-    if (!customer) throw new NotFoundException("Customer not found");
+    if (!customer) throw new NotFoundException('Customer not found');
 
     const workspaces = await this.prisma.biWorkspace.findMany({
-      where: { customerId: effectiveCustomerId, isActive: true, customer: { status: "active" } },
-      orderBy: { createdAt: "asc" },
+      where: {
+        customerId: effectiveCustomerId,
+        isActive: true,
+        customer: { status: 'active' },
+      },
+      orderBy: { createdAt: 'asc' },
       select: { id: true, workspaceId: true, workspaceName: true },
     });
 
@@ -1172,10 +1453,16 @@ export class AdminUsersService {
       where: {
         workspaceRefId: { in: workspaces.map((w) => w.id) },
         isActive: true,
-        workspace: { isActive: true, customer: { status: "active" } },
+        workspace: { isActive: true, customer: { status: 'active' } },
       },
-      orderBy: { createdAt: "asc" },
-      select: { id: true, workspaceRefId: true, reportId: true, reportName: true, datasetId: true },
+      orderBy: { createdAt: 'asc' },
+      select: {
+        id: true,
+        workspaceRefId: true,
+        reportId: true,
+        reportName: true,
+        datasetId: true,
+      },
     });
 
     const rpPerms = await this.prisma.biReportPermission.findMany({
@@ -1186,11 +1473,18 @@ export class AdminUsersService {
       select: { reportRefId: true, canView: true },
     });
 
-    const wsPermMap = new Map(wsPerms.map((p) => [p.workspaceRefId, p.canView]));
+    const wsPermMap = new Map(
+      wsPerms.map((p) => [p.workspaceRefId, p.canView]),
+    );
     const rpPermMap = new Map(rpPerms.map((p) => [p.reportRefId, p.canView]));
 
     return {
-      user: { id: user.id, email: user.email, displayName: user.displayName, status: user.status },
+      user: {
+        id: user.id,
+        email: user.email,
+        displayName: user.displayName,
+        status: user.status,
+      },
       customer,
       customerId: effectiveCustomerId,
       memberships: memberships.map((m) => ({
@@ -1231,25 +1525,45 @@ export class AdminUsersService {
       where: { id: userId },
       select: { id: true, status: true },
     });
-    if (!user) throw new NotFoundException("User not found");
+    if (!user) throw new NotFoundException('User not found');
 
     const ws = await this.prisma.biWorkspace.findUnique({
       where: { id: workspaceRefId },
-      select: { id: true, customerId: true, isActive: true, workspaceId: true, workspaceName: true },
+      select: {
+        id: true,
+        customerId: true,
+        isActive: true,
+        workspaceId: true,
+        workspaceName: true,
+      },
     });
-    if (!ws) throw new NotFoundException("Workspace not found");
+    if (!ws) throw new NotFoundException('Workspace not found');
 
     const actorUserId = await this.resolveActorUserId(actorSub);
 
     return this.prisma.$transaction(async (tx) => {
       const beforePerm = await tx.biWorkspacePermission.findUnique({
-        where: { userId_workspaceRefId: { userId: userId, workspaceRefId: workspaceRefId } },
+        where: {
+          userId_workspaceRefId: {
+            userId: userId,
+            workspaceRefId: workspaceRefId,
+          },
+        },
         select: { id: true, canView: true },
       });
 
       const up = await tx.biWorkspacePermission.upsert({
-        where: { userId_workspaceRefId: { userId: userId, workspaceRefId: workspaceRefId } },
-        create: { userId: userId, workspaceRefId: workspaceRefId, canView: canView },
+        where: {
+          userId_workspaceRefId: {
+            userId: userId,
+            workspaceRefId: workspaceRefId,
+          },
+        },
+        create: {
+          userId: userId,
+          workspaceRefId: workspaceRefId,
+          canView: canView,
+        },
         update: { canView: canView },
         select: { id: true, canView: true },
       });
@@ -1264,7 +1578,10 @@ export class AdminUsersService {
         });
         if (repIds.length) {
           const r = await tx.biReportPermission.updateMany({
-            where: { userId: userId, reportRefId: { in: repIds.map((x) => x.id) } },
+            where: {
+              userId: userId,
+              reportRefId: { in: repIds.map((x) => x.id) },
+            },
             data: { canView: false },
           });
           reportsAffected = r.count;
@@ -1278,13 +1595,20 @@ export class AdminUsersService {
         if (reps.length) {
           // cria novos
           const created = await tx.biReportPermission.createMany({
-            data: reps.map((r) => ({ userId: userId, reportRefId: r.id, canView: true })),
+            data: reps.map((r) => ({
+              userId: userId,
+              reportRefId: r.id,
+              canView: true,
+            })),
             skipDuplicates: true,
           });
 
           // garante que existentes fiquem true
           const updated = await tx.biReportPermission.updateMany({
-            where: { userId: userId, reportRefId: { in: reps.map((r) => r.id) } },
+            where: {
+              userId: userId,
+              reportRefId: { in: reps.map((r) => r.id) },
+            },
             data: { canView: true },
           });
 
@@ -1295,8 +1619,8 @@ export class AdminUsersService {
       await tx.auditLog.create({
         data: {
           actorUserId: actorUserId,
-          action: "WORKSPACE_PERM_UPDATED",
-          entityType: "bi_workspaces",
+          action: 'WORKSPACE_PERM_UPDATED',
+          entityType: 'bi_workspaces',
           entityId: workspaceRefId,
           beforeData: {
             userId,
@@ -1320,26 +1644,38 @@ export class AdminUsersService {
   // =========================
   // SET report permission (com auditoria)
   // =========================
-  async setReportPermission(userId: string, reportRefId: string, canView: boolean, actorSub: string | null) {
-    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
-    if (!user) throw new NotFoundException("User not found");
+  async setReportPermission(
+    userId: string,
+    reportRefId: string,
+    canView: boolean,
+    actorSub: string | null,
+  ) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true },
+    });
+    if (!user) throw new NotFoundException('User not found');
 
     const rep = await this.prisma.biReport.findUnique({
       where: { id: reportRefId },
       select: { id: true, isActive: true, workspaceRefId: true },
     });
-    if (!rep) throw new NotFoundException("Report not found");
+    if (!rep) throw new NotFoundException('Report not found');
 
     const actorUserId = await this.resolveActorUserId(actorSub);
 
     return this.prisma.$transaction(async (tx) => {
       const beforePerm = await tx.biReportPermission.findUnique({
-        where: { userId_reportRefId: { userId: userId, reportRefId: reportRefId } },
+        where: {
+          userId_reportRefId: { userId: userId, reportRefId: reportRefId },
+        },
         select: { id: true, canView: true },
       });
 
       await tx.biReportPermission.upsert({
-        where: { userId_reportRefId: { userId: userId, reportRefId: reportRefId } },
+        where: {
+          userId_reportRefId: { userId: userId, reportRefId: reportRefId },
+        },
         create: { userId: userId, reportRefId: reportRefId, canView: canView },
         update: { canView: canView },
       });
@@ -1347,10 +1683,14 @@ export class AdminUsersService {
       await tx.auditLog.create({
         data: {
           actorUserId: actorUserId,
-          action: "REPORT_PERM_UPDATED",
-          entityType: "bi_reports",
+          action: 'REPORT_PERM_UPDATED',
+          entityType: 'bi_reports',
           entityId: reportRefId,
-          beforeData: { userId, reportRefId, canView: beforePerm?.canView ?? null },
+          beforeData: {
+            userId,
+            reportRefId,
+            canView: beforePerm?.canView ?? null,
+          },
           afterData: { userId, reportRefId, canView },
         },
       });
@@ -1364,8 +1704,8 @@ export class AdminUsersService {
   // =============================
 
   async listPlatformAdmins(input: { appKey: string; roleKey?: string }) {
-    const appKey = (input.appKey ?? "PBI_EMBED").trim();
-    const roleKey = (input.roleKey ?? "platform_admin").trim();
+    const appKey = (input.appKey ?? 'PBI_EMBED').trim();
+    const roleKey = (input.roleKey ?? 'platform_admin').trim();
 
     const rows = await this.prisma.userAppRole.findMany({
       where: {
@@ -1375,11 +1715,13 @@ export class AdminUsersService {
       },
       select: {
         createdAt: true,
-        user: { select: { id: true, email: true, displayName: true, status: true } },
+        user: {
+          select: { id: true, email: true, displayName: true, status: true },
+        },
         application: { select: { appKey: true } },
         appRole: { select: { roleKey: true } },
       },
-      orderBy: { createdAt: "asc" },
+      orderBy: { createdAt: 'asc' },
     });
 
     return rows.map((r) => ({
@@ -1405,14 +1747,21 @@ export class AdminUsersService {
     });
 
     const role = await tx.appRole.upsert({
-      where: { applicationId_roleKey: { applicationId: app.id, roleKey: input.roleKey } },
+      where: {
+        applicationId_roleKey: {
+          applicationId: app.id,
+          roleKey: input.roleKey,
+        },
+      },
       create: {
         applicationId: app.id,
         roleKey: input.roleKey,
-        name: input.roleKey === "platform_admin" ? "Platform Admin" : input.roleKey,
+        name:
+          input.roleKey === 'platform_admin' ? 'Platform Admin' : input.roleKey,
       },
       update: {
-        name: input.roleKey === "platform_admin" ? "Platform Admin" : input.roleKey,
+        name:
+          input.roleKey === 'platform_admin' ? 'Platform Admin' : input.roleKey,
       },
       select: { id: true, roleKey: true },
     });
@@ -1434,32 +1783,44 @@ export class AdminUsersService {
   }
 
   async grantPlatformAdmin(
-    input: { appKey: string; roleKey: string; userId: string | null; userEmail: string | null },
+    input: {
+      appKey: string;
+      roleKey: string;
+      userId: string | null;
+      userEmail: string | null;
+    },
     actorSub: string | null,
   ) {
-    const appKey = (input.appKey ?? "PBI_EMBED").trim();
-    const roleKey = (input.roleKey ?? "platform_admin").trim();
+    const appKey = (input.appKey ?? 'PBI_EMBED').trim();
+    const roleKey = (input.roleKey ?? 'platform_admin').trim();
 
     const actorUserId = await this.resolveActorUserId(actorSub);
 
     // Resolve user alvo
-    const targetUser =
-      input.userId
-        ? await this.prisma.user.findUnique({
-            where: { id: input.userId },
-            select: { id: true, email: true, status: true },
-          })
-        : await this.prisma.user.findFirst({
-            where: { email: { equals: String(input.userEmail), mode: "insensitive" } as any },
-            select: { id: true, email: true, status: true },
-          });
+    const targetUser = input.userId
+      ? await this.prisma.user.findUnique({
+          where: { id: input.userId },
+          select: { id: true, email: true, status: true },
+        })
+      : await this.prisma.user.findFirst({
+          where: {
+            email: {
+              equals: String(input.userEmail),
+              mode: 'insensitive',
+            },
+          },
+          select: { id: true, email: true, status: true },
+        });
 
     if (!targetUser) {
-      throw new NotFoundException("User not found");
+      throw new NotFoundException('User not found');
     }
 
     return this.prisma.$transaction(async (tx) => {
-      const { app, role } = await this.ensureAppAndRoleTx(tx, { appKey, roleKey });
+      const { app, role } = await this.ensureAppAndRoleTx(tx, {
+        appKey,
+        roleKey,
+      });
 
       // Idempotência: se já existe, no-op
       const existing = await tx.userAppRole.findFirst({
@@ -1486,8 +1847,8 @@ export class AdminUsersService {
       await tx.auditLog.create({
         data: {
           actorUserId: actorUserId,
-          action: "PLATFORM_ADMIN_GRANTED",
-          entityType: "users",
+          action: 'PLATFORM_ADMIN_GRANTED',
+          entityType: 'users',
           entityId: targetUser.id,
           beforeData: existing
             ? { alreadyHadRole: true, appKey, roleKey }
@@ -1515,8 +1876,8 @@ export class AdminUsersService {
     actorSub: string | null,
   ) {
     const userId = input.userId.trim();
-    const appKey = (input.appKey ?? "PBI_EMBED").trim();
-    const roleKey = (input.roleKey ?? "platform_admin").trim();
+    const appKey = (input.appKey ?? 'PBI_EMBED').trim();
+    const roleKey = (input.roleKey ?? 'platform_admin').trim();
 
     const actorUserId = await this.resolveActorUserId(actorSub);
 
@@ -1524,11 +1885,14 @@ export class AdminUsersService {
       where: { id: userId },
       select: { id: true, email: true },
     });
-    if (!user) throw new NotFoundException("User not found");
+    if (!user) throw new NotFoundException('User not found');
 
     return this.prisma.$transaction(async (tx) => {
       // Descobre app/role (cria se não existir)
-      const { app, role } = await this.ensureAppAndRoleTx(tx, { appKey, roleKey });
+      const { app, role } = await this.ensureAppAndRoleTx(tx, {
+        appKey,
+        roleKey,
+      });
 
       const existing = await tx.userAppRole.findFirst({
         where: {
@@ -1545,8 +1909,8 @@ export class AdminUsersService {
         await tx.auditLog.create({
           data: {
             actorUserId: actorUserId,
-            action: "PLATFORM_ADMIN_REVOKED",
-            entityType: "users",
+            action: 'PLATFORM_ADMIN_REVOKED',
+            entityType: 'users',
             entityId: userId,
             beforeData: { hadRole: false, appKey, roleKey },
             afterData: { ok: true, noOp: true },
@@ -1557,9 +1921,15 @@ export class AdminUsersService {
       }
 
       // Break-glass: impedir remover o último admin do app/role
-      const totalAdmins = await this.countPlatformAdminsTx(tx, { appKey, roleKey });
+      const totalAdmins = await this.countPlatformAdminsTx(tx, {
+        appKey,
+        roleKey,
+      });
       if (totalAdmins <= 1) {
-        throw new BadRequestException({ code: "LAST_PLATFORM_ADMIN", message: "Cannot revoke the last platform admin." });
+        throw new BadRequestException({
+          code: 'LAST_PLATFORM_ADMIN',
+          message: 'Cannot revoke the last platform admin.',
+        });
       }
 
       await tx.userAppRole.delete({ where: { id: existing.id } });
@@ -1567,8 +1937,8 @@ export class AdminUsersService {
       await tx.auditLog.create({
         data: {
           actorUserId: actorUserId,
-          action: "PLATFORM_ADMIN_REVOKED",
-          entityType: "users",
+          action: 'PLATFORM_ADMIN_REVOKED',
+          entityType: 'users',
           entityId: userId,
           beforeData: {
             hadRole: true,
@@ -1596,13 +1966,13 @@ export class AdminUsersService {
     // “Critical actions” deve refletir o que você considera operacional/risco.
     // Ajuste essa lista conforme seus actions atuais.
     const criticalActions = [
-      "PLATFORM_ADMIN_GRANTED",
-      "PLATFORM_ADMIN_REVOKED",
-      "PLATFORM_ADMIN_BOOTSTRAPPED",
-      "USER_DISABLED",
-      "CUSTOMER_STATUS_CHANGED",
-      "PBI_CATALOG_SYNC_OK",
-      "PBI_CATALOG_SYNC_FAILED",
+      'PLATFORM_ADMIN_GRANTED',
+      'PLATFORM_ADMIN_REVOKED',
+      'PLATFORM_ADMIN_BOOTSTRAPPED',
+      'USER_DISABLED',
+      'CUSTOMER_STATUS_CHANGED',
+      'PBI_CATALOG_SYNC_OK',
+      'PBI_CATALOG_SYNC_FAILED',
     ];
 
     const [
@@ -1615,16 +1985,16 @@ export class AdminUsersService {
       lastSyncOk,
       lastSyncFail,
     ] = await this.prisma.$transaction([
-      this.prisma.user.count({ where: { status: "pending" } }),
-      this.prisma.customer.count({ where: { status: "inactive" } }),
+      this.prisma.user.count({ where: { status: 'pending' } }),
+      this.prisma.customer.count({ where: { status: 'inactive' } }),
 
       // conta platform admins para o app PBI_EMBED (role global customerId = null)
       this.prisma.userAppRole.count({
         where: {
           customerId: null,
-          application: { appKey: "PBI_EMBED" },
-          appRole: { roleKey: "platform_admin" },
-          user: { status: "active" },
+          application: { appKey: 'PBI_EMBED' },
+          appRole: { roleKey: 'platform_admin' },
+          user: { status: 'active' },
         },
       }),
 
@@ -1633,7 +2003,7 @@ export class AdminUsersService {
 
       this.prisma.auditLog.findMany({
         where: { action: { in: criticalActions } },
-        orderBy: { createdAt: "desc" },
+        orderBy: { createdAt: 'desc' },
         take: 10,
         select: {
           id: true,
@@ -1649,30 +2019,36 @@ export class AdminUsersService {
       }),
 
       this.prisma.auditLog.findFirst({
-        where: { action: "PBI_CATALOG_SYNC_OK" },
-        orderBy: { createdAt: "desc" },
+        where: { action: 'PBI_CATALOG_SYNC_OK' },
+        orderBy: { createdAt: 'desc' },
         select: { createdAt: true },
       }),
 
       this.prisma.auditLog.findFirst({
-        where: { action: "PBI_CATALOG_SYNC_FAILED" },
-        orderBy: { createdAt: "desc" },
+        where: { action: 'PBI_CATALOG_SYNC_FAILED' },
+        orderBy: { createdAt: 'desc' },
         select: { createdAt: true },
       }),
     ]);
 
-    const okAt = lastSyncOk?.createdAt ? new Date(lastSyncOk.createdAt).getTime() : null;
-    const failAt = lastSyncFail?.createdAt ? new Date(lastSyncFail.createdAt).getTime() : null;
+    const okAt = lastSyncOk?.createdAt
+      ? new Date(lastSyncOk.createdAt).getTime()
+      : null;
+    const failAt = lastSyncFail?.createdAt
+      ? new Date(lastSyncFail.createdAt).getTime()
+      : null;
 
     const lastSyncAt =
-      okAt || failAt ? new Date(Math.max(okAt ?? 0, failAt ?? 0)).toISOString() : null;
+      okAt || failAt
+        ? new Date(Math.max(okAt ?? 0, failAt ?? 0)).toISOString()
+        : null;
 
     const lastSyncStatus =
       okAt || failAt
         ? okAt !== null && okAt >= (failAt ?? 0)
-          ? "ok"
-          : "fail"
-        : "unknown";
+          ? 'ok'
+          : 'fail'
+        : 'unknown';
 
     return {
       counts: {
@@ -1711,72 +2087,75 @@ export class AdminUsersService {
 
     // Heurísticas para id: Power BI GUIDs são comuns
     const looksLikeGuid =
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(q);
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+        q,
+      );
 
-    const [users, customers, workspaces, reports] = await this.prisma.$transaction([
-      this.prisma.user.findMany({
-        where: {
-          OR: [
-            { email: { contains: q, mode: "insensitive" } },
-            { displayName: { contains: q, mode: "insensitive" } },
-            ...(looksLikeGuid ? [{ id: q }] : []),
-          ],
-        },
-        orderBy: { createdAt: "desc" },
-        take: limit,
-        select: { id: true, email: true, displayName: true, status: true },
-      }),
+    const [users, customers, workspaces, reports] =
+      await this.prisma.$transaction([
+        this.prisma.user.findMany({
+          where: {
+            OR: [
+              { email: { contains: q, mode: 'insensitive' } },
+              { displayName: { contains: q, mode: 'insensitive' } },
+              ...(looksLikeGuid ? [{ id: q }] : []),
+            ],
+          },
+          orderBy: { createdAt: 'desc' },
+          take: limit,
+          select: { id: true, email: true, displayName: true, status: true },
+        }),
 
-      this.prisma.customer.findMany({
-        where: {
-          OR: [
-            { code: { contains: q, mode: "insensitive" } },
-            { name: { contains: q, mode: "insensitive" } },
-            ...(looksLikeGuid ? [{ id: q }] : []),
-          ],
-        },
-        orderBy: [{ status: "asc" }, { code: "asc" }],
-        take: limit,
-        select: { id: true, code: true, name: true, status: true },
-      }),
+        this.prisma.customer.findMany({
+          where: {
+            OR: [
+              { code: { contains: q, mode: 'insensitive' } },
+              { name: { contains: q, mode: 'insensitive' } },
+              ...(looksLikeGuid ? [{ id: q }] : []),
+            ],
+          },
+          orderBy: [{ status: 'asc' }, { code: 'asc' }],
+          take: limit,
+          select: { id: true, code: true, name: true, status: true },
+        }),
 
-      this.prisma.biWorkspace.findMany({
-        where: {
-          OR: [
-            { workspaceName: { contains: q, mode: "insensitive" } },
-            ...(looksLikeGuid ? [{ workspaceId: q }] : []),
-          ],
-        },
-        take: limit,
-        orderBy: { createdAt: "desc" },
-        select: {
-          id: true,
-          workspaceId: true,
-          workspaceName: true,
-          customerId: true,
-          isActive: true,
-        },
-      }),
+        this.prisma.biWorkspace.findMany({
+          where: {
+            OR: [
+              { workspaceName: { contains: q, mode: 'insensitive' } },
+              ...(looksLikeGuid ? [{ workspaceId: q }] : []),
+            ],
+          },
+          take: limit,
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            workspaceId: true,
+            workspaceName: true,
+            customerId: true,
+            isActive: true,
+          },
+        }),
 
-      this.prisma.biReport.findMany({
-        where: {
-          OR: [
-            { reportName: { contains: q, mode: "insensitive" } },
-            ...(looksLikeGuid ? [{ reportId: q }, { datasetId: q }] : []),
-          ],
-        },
-        take: limit,
-        orderBy: { createdAt: "desc" },
-        select: {
-          id: true,
-          reportId: true,
-          reportName: true,
-          datasetId: true,
-          workspaceRefId: true,
-          isActive: true,
-        },
-      }),
-    ]);
+        this.prisma.biReport.findMany({
+          where: {
+            OR: [
+              { reportName: { contains: q, mode: 'insensitive' } },
+              ...(looksLikeGuid ? [{ reportId: q }, { datasetId: q }] : []),
+            ],
+          },
+          take: limit,
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            reportId: true,
+            reportName: true,
+            datasetId: true,
+            workspaceRefId: true,
+            isActive: true,
+          },
+        }),
+      ]);
 
     return {
       q,
@@ -1811,5 +2190,4 @@ export class AdminUsersService {
       },
     };
   }
-
 }

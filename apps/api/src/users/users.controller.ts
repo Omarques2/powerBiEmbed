@@ -1,17 +1,17 @@
-import { Controller, Get, Req, UseGuards } from "@nestjs/common";
-import { AuthGuard } from "../auth/auth.guard";
-import type { AuthedRequest } from "../auth/authed-request.type";
-import { UsersService } from "./users.service";
+import { Controller, Get, Req, UseGuards } from '@nestjs/common';
+import { AuthGuard } from '../auth/auth.guard';
+import type { AuthedRequest } from '../auth/authed-request.type';
+import { UsersService } from './users.service';
 
-@Controller("users")
+@Controller('users')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @UseGuards(AuthGuard)
-  @Get("me")
+  @Get('me')
   async me(@Req() req: AuthedRequest) {
     const claims = req.user;
-    if (!claims) return { status: "pending" };
+    if (!claims) return { status: 'pending' };
 
     const user = await this.usersService.upsertFromClaims(claims);
 
@@ -23,18 +23,18 @@ export class UsersController {
 
     // Status efetivo (se disabled, bloqueia sempre)
     const effectiveStatus =
-      user.status === "disabled"
-        ? "disabled"
-        : user.status === "active" && (hasCustomer || isPlatformAdmin)
-          ? "active"
-          : "pending";
+      user.status === 'disabled'
+        ? 'disabled'
+        : user.status === 'active' && (hasCustomer || isPlatformAdmin)
+          ? 'active'
+          : 'pending';
 
     return {
       email: user.email ?? null,
       displayName: user.displayName ?? null,
       status: effectiveStatus,
       rawStatus: user.status, // útil para debug
-      memberships: memberships.map(m => ({
+      memberships: memberships.map((m) => ({
         customerId: m.customerId,
         role: m.role,
         isActive: m.isActive,

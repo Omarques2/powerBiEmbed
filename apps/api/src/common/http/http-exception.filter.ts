@@ -4,10 +4,10 @@ import {
   ExceptionFilter,
   HttpException,
   HttpStatus,
-} from "@nestjs/common";
-import type { Request, Response } from "express";
-import { Prisma } from "@prisma/client";
-import { getCorrelationId } from "./request-context";
+} from '@nestjs/common';
+import type { Request, Response } from 'express';
+import { Prisma } from '@prisma/client';
+import { getCorrelationId } from './request-context';
 
 type ErrorPayload = {
   code: string;
@@ -16,29 +16,24 @@ type ErrorPayload = {
 };
 
 function statusToCode(status: number): string {
-  switch (status) {
-    case HttpStatus.BAD_REQUEST:
-      return "BAD_REQUEST";
-    case HttpStatus.UNAUTHORIZED:
-      return "UNAUTHORIZED";
-    case HttpStatus.FORBIDDEN:
-      return "FORBIDDEN";
-    case HttpStatus.NOT_FOUND:
-      return "NOT_FOUND";
-    case HttpStatus.CONFLICT:
-      return "CONFLICT";
-    case HttpStatus.TOO_MANY_REQUESTS:
-      return "RATE_LIMIT";
-    default:
-      return "INTERNAL_ERROR";
-  }
+  const map: Partial<Record<number, string>> = {
+    [HttpStatus.BAD_REQUEST]: 'BAD_REQUEST',
+    [HttpStatus.UNAUTHORIZED]: 'UNAUTHORIZED',
+    [HttpStatus.FORBIDDEN]: 'FORBIDDEN',
+    [HttpStatus.NOT_FOUND]: 'NOT_FOUND',
+    [HttpStatus.CONFLICT]: 'CONFLICT',
+    [HttpStatus.TOO_MANY_REQUESTS]: 'RATE_LIMIT',
+  };
+  return map[status] ?? 'INTERNAL_ERROR';
 }
 
-function isValidationErrorResponse(response: unknown): response is { message: string[] } {
+function isValidationErrorResponse(
+  response: unknown,
+): response is { message: string[] } {
   return Boolean(
     response &&
-      typeof response === "object" &&
-      Array.isArray((response as { message?: unknown }).message),
+    typeof response === 'object' &&
+    Array.isArray((response as { message?: unknown }).message),
   );
 }
 
@@ -52,28 +47,28 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
     let payload: ErrorPayload = {
-      code: "INTERNAL_ERROR",
-      message: "Internal server error",
+      code: 'INTERNAL_ERROR',
+      message: 'Internal server error',
     };
 
     if (exception instanceof Prisma.PrismaClientKnownRequestError) {
-      if (exception.code === "P2002") {
+      if (exception.code === 'P2002') {
         status = HttpStatus.CONFLICT;
         payload = {
-          code: "UNIQUE_CONSTRAINT",
-          message: "Unique constraint violation",
+          code: 'UNIQUE_CONSTRAINT',
+          message: 'Unique constraint violation',
           details: exception.meta,
         };
-      } else if (exception.code === "P2025") {
+      } else if (exception.code === 'P2025') {
         status = HttpStatus.NOT_FOUND;
         payload = {
-          code: "NOT_FOUND",
-          message: "Record not found",
+          code: 'NOT_FOUND',
+          message: 'Record not found',
         };
       } else {
         status = HttpStatus.BAD_REQUEST;
         payload = {
-          code: "PRISMA_ERROR",
+          code: 'PRISMA_ERROR',
           message: exception.message,
           details: exception.meta,
         };
@@ -82,39 +77,48 @@ export class HttpExceptionFilter implements ExceptionFilter {
       status = exception.getStatus();
       const responseBody = exception.getResponse();
 
-      if (typeof responseBody === "string") {
+      if (typeof responseBody === 'string') {
         payload = {
           code: statusToCode(status),
           message: responseBody,
         };
       } else if (isValidationErrorResponse(responseBody)) {
         payload = {
-          code: "VALIDATION_ERROR",
-          message: "Validation failed",
+          code: 'VALIDATION_ERROR',
+          message: 'Validation failed',
           details: responseBody.message,
         };
-      } else if (responseBody && typeof responseBody === "object") {
-        const body = responseBody as { code?: string; message?: string; error?: string; details?: unknown };
+      } else if (responseBody && typeof responseBody === 'object') {
+        const body = responseBody as {
+          code?: string;
+          message?: string;
+          error?: string;
+          details?: unknown;
+        };
         payload = {
           code: body.code ?? statusToCode(status),
-          message: body.message ?? body.error ?? "Request failed",
+          message: body.message ?? body.error ?? 'Request failed',
           details: body.details,
         };
       } else {
         payload = {
           code: statusToCode(status),
-          message: "Request failed",
+          message: 'Request failed',
         };
       }
     } else if (exception instanceof Error) {
       payload = {
-        code: "INTERNAL_ERROR",
-        message: "Internal server error",
+        code: 'INTERNAL_ERROR',
+        message: 'Internal server error',
       };
     }
 
-    const isDev = (process.env.NODE_ENV ?? "development") === "development";
-    if (isDev && status >= 500 && exception instanceof Error) {
+    const isDev = (process.env.NODE_ENV ?? 'development') === 'development';
+    if (
+      isDev &&
+      status >= HttpStatus.INTERNAL_SERVER_ERROR &&
+      exception instanceof Error
+    ) {
       payload.details = { stack: exception.stack };
     }
 

@@ -1,6 +1,13 @@
-import { IsArray, IsBoolean, IsOptional, IsString, IsUUID, Matches } from "class-validator";
-import { Transform } from "class-transformer";
-import { toBoolean } from "../../common/dto/transformers";
+import {
+  IsArray,
+  IsBoolean,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Matches,
+} from 'class-validator';
+import { Transform } from 'class-transformer';
+import { toBoolean } from '../../common/dto/transformers';
 
 export class WorkspaceQueryDto {
   @IsUUID()

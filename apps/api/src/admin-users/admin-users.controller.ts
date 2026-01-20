@@ -11,11 +11,11 @@ import {
   Delete,
   Query,
   ParseUUIDPipe,
-} from "@nestjs/common";
-import { AuthGuard } from "../auth/auth.guard";
-import { PlatformAdminGuard } from "../auth/platform-admin.guard";
-import { AdminUsersService } from "./admin-users.service";
-import type { AuthedRequest } from "../auth/authed-request.type";
+} from '@nestjs/common';
+import { AuthGuard } from '../auth/auth.guard';
+import { PlatformAdminGuard } from '../auth/platform-admin.guard';
+import { AdminUsersService } from './admin-users.service';
+import type { AuthedRequest } from '../auth/authed-request.type';
 import {
   ActivateUserDto,
   ListActiveUsersQueryDto,
@@ -23,22 +23,22 @@ import {
   RemoveMembershipQueryDto,
   TransferMembershipDto,
   UpsertMembershipDto,
-} from "./dto/admin-users.dto";
+} from './dto/admin-users.dto';
 
-@Controller("admin/users")
+@Controller('admin/users')
 @UseGuards(AuthGuard, PlatformAdminGuard)
 export class AdminUsersController {
   constructor(private readonly svc: AdminUsersService) {}
 
-  @Get("pending")
+  @Get('pending')
   listPending() {
     return this.svc.listPending();
   }
 
-  @Post(":userId/activate")
+  @Post(':userId/activate')
   activate(
     @Req() req: AuthedRequest,
-    @Param("userId", ParseUUIDPipe) userId: string,
+    @Param('userId', ParseUUIDPipe) userId: string,
     @Body() body: ActivateUserDto,
   ) {
     const actorSub = req.user?.sub ? String(req.user.sub) : null;
@@ -52,8 +52,11 @@ export class AdminUsersController {
     );
   }
 
-  @Post(":userId/disable")
-  disable(@Req() req: AuthedRequest, @Param("userId", ParseUUIDPipe) userId: string) {
+  @Post(':userId/disable')
+  disable(
+    @Req() req: AuthedRequest,
+    @Param('userId', ParseUUIDPipe) userId: string,
+  ) {
     const actorSub = req.user?.sub ? String(req.user.sub) : null;
     return this.svc.disableUser(userId, actorSub);
   }
@@ -61,10 +64,10 @@ export class AdminUsersController {
   // -----------------------------
   // NOVO: criar/upsert membership
   // -----------------------------
-  @Post(":userId/memberships")
+  @Post(':userId/memberships')
   upsertMembership(
     @Req() req: AuthedRequest,
-    @Param("userId", ParseUUIDPipe) userId: string,
+    @Param('userId', ParseUUIDPipe) userId: string,
     @Body() body: UpsertMembershipDto,
   ) {
     const actorSub = req.user?.sub ? String(req.user.sub) : null;
@@ -74,11 +77,11 @@ export class AdminUsersController {
   // -----------------------------
   // NOVO: editar membership
   // -----------------------------
-  @Patch(":userId/memberships/:customerId")
+  @Patch(':userId/memberships/:customerId')
   patchMembership(
     @Req() req: AuthedRequest,
-    @Param("userId", ParseUUIDPipe) userId: string,
-    @Param("customerId", ParseUUIDPipe) customerId: string,
+    @Param('userId', ParseUUIDPipe) userId: string,
+    @Param('customerId', ParseUUIDPipe) customerId: string,
     @Body() body: PatchMembershipDto,
   ) {
     const actorSub = req.user?.sub ? String(req.user.sub) : null;
@@ -88,11 +91,11 @@ export class AdminUsersController {
   // -----------------------------
   // NOVO: remover membership
   // -----------------------------
-  @Delete(":userId/memberships/:customerId")
+  @Delete(':userId/memberships/:customerId')
   removeMembership(
     @Req() req: AuthedRequest,
-    @Param("userId", ParseUUIDPipe) userId: string,
-    @Param("customerId", ParseUUIDPipe) customerId: string,
+    @Param('userId', ParseUUIDPipe) userId: string,
+    @Param('customerId', ParseUUIDPipe) customerId: string,
     @Query() query: RemoveMembershipQueryDto,
   ) {
     const actorSub = req.user?.sub ? String(req.user.sub) : null;
@@ -103,20 +106,18 @@ export class AdminUsersController {
   // -----------------------------
   // NOVO: transferir customer
   // -----------------------------
-  @Post(":userId/transfer")
+  @Post(':userId/transfer')
   transferMembership(
     @Req() req: AuthedRequest,
-    @Param("userId", ParseUUIDPipe) userId: string,
+    @Param('userId', ParseUUIDPipe) userId: string,
     @Body() body: TransferMembershipDto,
   ) {
     const actorSub = req.user?.sub ? String(req.user.sub) : null;
     return this.svc.transferUserMembership(userId, body, actorSub);
   }
 
-  @Get("active")
-  listActive(
-    @Query() query: ListActiveUsersQueryDto,
-  ) {
+  @Get('active')
+  listActive(@Query() query: ListActiveUsersQueryDto) {
     return this.svc.listActiveUsers({
       q: query.q,
       page: query.page ?? 1,
@@ -124,8 +125,8 @@ export class AdminUsersController {
     });
   }
 
-  @Get(":userId")
-  getById(@Param("userId", ParseUUIDPipe) userId: string) {
+  @Get(':userId')
+  getById(@Param('userId', ParseUUIDPipe) userId: string) {
     return this.svc.getUserById(userId);
   }
 }

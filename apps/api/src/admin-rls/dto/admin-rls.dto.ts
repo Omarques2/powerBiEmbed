@@ -7,13 +7,14 @@ import {
   IsString,
   IsUUID,
   ValidateNested,
-} from "class-validator";
-import { Transform, Type } from "class-transformer";
+} from 'class-validator';
+import { Transform, Type } from 'class-transformer';
+import type { TransformFnParams } from 'class-transformer';
 
-const VALUE_TYPES = ["text", "int", "uuid"] as const;
-const DEFAULT_BEHAVIORS = ["allow", "deny"] as const;
-const TARGET_STATUSES = ["draft", "active"] as const;
-const RULE_OPS = ["include", "exclude"] as const;
+const VALUE_TYPES = ['text', 'int', 'uuid'] as const;
+const DEFAULT_BEHAVIORS = ['allow', 'deny'] as const;
+const TARGET_STATUSES = ['draft', 'active'] as const;
+const RULE_OPS = ['include', 'exclude'] as const;
 
 export class CreateTargetDto {
   @IsString()
@@ -82,8 +83,14 @@ export class CreateRuleDto {
   valueText?: string | null;
 
   @IsOptional()
-  @Transform(({ value }) =>
-    value === undefined || value === null || value === "" ? value : Number(value),
+  @Transform(
+    ({ value }: TransformFnParams): number | string | null | undefined => {
+      if (value === undefined || value === null || value === '') {
+        return value as null | undefined;
+      }
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : String(value);
+    },
   )
   @IsInt()
   valueInt?: number | string | null;

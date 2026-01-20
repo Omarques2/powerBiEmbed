@@ -1,6 +1,6 @@
-import { Injectable, Logger } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
-import { PowerBiService } from "../powerbi/powerbi.service";
+import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { PowerBiService } from '../powerbi/powerbi.service';
 
 type RefreshState = {
   running: boolean;
@@ -11,11 +11,11 @@ type RefreshState = {
 };
 
 type RefreshResult = {
-  status: "queued" | "scheduled" | "running";
+  status: 'queued' | 'scheduled' | 'running';
   pending?: boolean;
   scheduledAt?: string;
   scheduledInMs?: number;
-  refresh?: any;
+  refresh?: unknown;
 };
 
 @Injectable()
@@ -28,23 +28,28 @@ export class RlsRefreshService {
     private readonly pbi: PowerBiService,
     private readonly config: ConfigService,
   ) {
-    const raw = Number(this.config.get<string>("RLS_REFRESH_WINDOW_MS") ?? "90000");
+    const raw = Number(
+      this.config.get<string>('RLS_REFRESH_WINDOW_MS') ?? '90000',
+    );
     this.windowMs = Number.isFinite(raw) && raw > 0 ? raw : 90_000;
   }
 
-  async requestRefresh(workspaceId: string, datasetId: string): Promise<RefreshResult> {
+  async requestRefresh(
+    workspaceId: string,
+    datasetId: string,
+  ): Promise<RefreshResult> {
     const key = this.key(workspaceId, datasetId);
     const state = this.getState(key);
     const now = Date.now();
 
     if (state.running) {
       state.pending = true;
-      return { status: "running", pending: true };
+      return { status: 'running', pending: true };
     }
 
     if (state.timer && state.scheduledAt) {
       return {
-        status: "scheduled",
+        status: 'scheduled',
         scheduledAt: new Date(state.scheduledAt).toISOString(),
         scheduledInMs: Math.max(state.scheduledAt - now, 0),
       };
@@ -55,8 +60,10 @@ export class RlsRefreshService {
       const delay = this.windowMs - elapsed;
       this.schedule(key, workspaceId, datasetId, delay);
       return {
-        status: "scheduled",
-        scheduledAt: state.scheduledAt ? new Date(state.scheduledAt).toISOString() : undefined,
+        status: 'scheduled',
+        scheduledAt: state.scheduledAt
+          ? new Date(state.scheduledAt).toISOString()
+          : undefined,
         scheduledInMs: delay,
       };
     }
@@ -80,7 +87,12 @@ export class RlsRefreshService {
     return state;
   }
 
-  private schedule(key: string, workspaceId: string, datasetId: string, delay: number) {
+  private schedule(
+    key: string,
+    workspaceId: string,
+    datasetId: string,
+    delay: number,
+  ) {
     const state = this.getState(key);
     if (state.timer) return;
 
@@ -88,22 +100,30 @@ export class RlsRefreshService {
     state.timer = setTimeout(() => {
       state.timer = undefined;
       state.scheduledAt = undefined;
-      this.runRefresh(key, workspaceId, datasetId).catch((err) => {
-        this.logger.error(`Refresh failed for ${key}: ${err?.message ?? err}`);
+      this.runRefresh(key, workspaceId, datasetId).catch((err: unknown) => {
+        const message = err instanceof Error ? err.message : String(err);
+        this.logger.error(`Refresh failed for ${key}: ${message}`);
       });
     }, delay);
 
     state.timer.unref?.();
   }
 
-  private async runRefresh(key: string, workspaceId: string, datasetId: string): Promise<RefreshResult> {
+  private async runRefresh(
+    key: string,
+    workspaceId: string,
+    datasetId: string,
+  ): Promise<RefreshResult> {
     const state = this.getState(key);
     state.running = true;
     state.lastRequestedAt = Date.now();
 
     try {
-      const refresh = await this.pbi.refreshDatasetInGroup(workspaceId, datasetId);
-      return { status: "queued", refresh };
+      const refresh = await this.pbi.refreshDatasetInGroup(
+        workspaceId,
+        datasetId,
+      );
+      return { status: 'queued', refresh };
     } finally {
       state.running = false;
       if (state.pending) {

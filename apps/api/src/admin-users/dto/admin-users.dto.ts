@@ -1,8 +1,17 @@
-import { IsBoolean, IsIn, IsInt, IsOptional, IsString, IsUUID, Max, Min } from "class-validator";
-import { Transform, Type } from "class-transformer";
-import { toBoolean } from "../../common/dto/transformers";
+import {
+  IsBoolean,
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Max,
+  Min,
+} from 'class-validator';
+import { Transform, Type } from 'class-transformer';
+import { toBoolean } from '../../common/dto/transformers';
 
-const MEMBERSHIP_ROLES = ["owner", "admin", "member", "viewer"] as const;
+const MEMBERSHIP_ROLES = ['owner', 'admin', 'member', 'viewer'] as const;
 
 export class ActivateUserDto {
   @IsUUID()

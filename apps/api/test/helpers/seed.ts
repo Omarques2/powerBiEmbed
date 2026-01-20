@@ -1,5 +1,5 @@
-import { randomUUID } from "crypto";
-import { PrismaService } from "../../src/prisma/prisma.service";
+import { randomUUID } from 'crypto';
+import { PrismaService } from '../../src/prisma/prisma.service';
 
 export type SeedData = {
   runId: string;
@@ -48,15 +48,15 @@ export async function seedTestData(prisma: PrismaService): Promise<SeedData> {
   const reportId = randomUUID();
 
   const app = await prisma.application.create({
-    data: { appKey: "PBI_EMBED", name: "Power BI Embed" },
+    data: { appKey: 'PBI_EMBED', name: 'Power BI Embed' },
     select: { id: true, appKey: true },
   });
 
   const role = await prisma.appRole.create({
     data: {
       applicationId: app.id,
-      roleKey: "platform_admin",
-      name: "Platform Admin",
+      roleKey: 'platform_admin',
+      name: 'Platform Admin',
     },
     select: { id: true, roleKey: true },
   });
@@ -67,7 +67,7 @@ export async function seedTestData(prisma: PrismaService): Promise<SeedData> {
       entraOid: randomUUID(),
       email: `admin-${runId}@example.com`,
       displayName: `Admin ${runId}`,
-      status: "active",
+      status: 'active',
       lastLoginAt: new Date(),
     },
     select: { id: true, entraSub: true, email: true },
@@ -88,7 +88,7 @@ export async function seedTestData(prisma: PrismaService): Promise<SeedData> {
       entraOid: randomUUID(),
       email: `user-${runId}@example.com`,
       displayName: `User ${runId}`,
-      status: "active",
+      status: 'active',
       lastLoginAt: new Date(),
     },
     select: { id: true, entraSub: true, email: true },
@@ -100,7 +100,7 @@ export async function seedTestData(prisma: PrismaService): Promise<SeedData> {
       entraOid: randomUUID(),
       email: `pending-${runId}@example.com`,
       displayName: `Pending ${runId}`,
-      status: "pending",
+      status: 'pending',
     },
     select: { id: true, entraSub: true, email: true },
   });
@@ -111,18 +111,26 @@ export async function seedTestData(prisma: PrismaService): Promise<SeedData> {
       entraOid: randomUUID(),
       email: `disable-${runId}@example.com`,
       displayName: `Disable ${runId}`,
-      status: "active",
+      status: 'active',
     },
     select: { id: true, entraSub: true, email: true },
   });
 
   const customerA = await prisma.customer.create({
-    data: { code: `TEST_A_${runId}`, name: `Customer A ${runId}`, status: "active" },
+    data: {
+      code: `TEST_A_${runId}`,
+      name: `Customer A ${runId}`,
+      status: 'active',
+    },
     select: { id: true, code: true },
   });
 
   const customerB = await prisma.customer.create({
-    data: { code: `TEST_B_${runId}`, name: `Customer B ${runId}`, status: "active" },
+    data: {
+      code: `TEST_B_${runId}`,
+      name: `Customer B ${runId}`,
+      status: 'active',
+    },
     select: { id: true, code: true },
   });
 
@@ -130,7 +138,7 @@ export async function seedTestData(prisma: PrismaService): Promise<SeedData> {
     data: {
       userId: activeUser.id,
       customerId: customerA.id,
-      role: "admin",
+      role: 'admin',
       isActive: true,
     },
   });
@@ -139,7 +147,7 @@ export async function seedTestData(prisma: PrismaService): Promise<SeedData> {
     data: {
       userId: disableUser.id,
       customerId: customerA.id,
-      role: "viewer",
+      role: 'viewer',
       isActive: true,
     },
   });
@@ -187,11 +195,11 @@ export async function seedTestData(prisma: PrismaService): Promise<SeedData> {
       datasetId,
       targetKey,
       displayName: `Target ${runId}`,
-      factTable: "Fact",
-      factColumn: "Column",
-      valueType: "text",
-      defaultBehavior: "allow",
-      status: "active",
+      factTable: 'Fact',
+      factColumn: 'Column',
+      valueType: 'text',
+      defaultBehavior: 'allow',
+      status: 'active',
     },
     select: { id: true, targetKey: true },
   });
@@ -200,8 +208,8 @@ export async function seedTestData(prisma: PrismaService): Promise<SeedData> {
     data: {
       targetId: rlsTarget.id,
       customerId: customerA.id,
-      op: "include",
-      valueText: "example",
+      op: 'include',
+      valueText: 'example',
     },
     select: { id: true },
   });

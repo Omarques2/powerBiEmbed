@@ -1,6 +1,11 @@
-import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from "@nestjs/common";
-import { PrismaService } from "../prisma/prisma.service";
-import type { AuthedRequest } from "./authed-request.type";
+import {
+  CanActivate,
+  ExecutionContext,
+  ForbiddenException,
+  Injectable,
+} from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
+import type { AuthedRequest } from './authed-request.type';
 
 @Injectable()
 export class ActiveUserGuard implements CanActivate {
@@ -10,7 +15,10 @@ export class ActiveUserGuard implements CanActivate {
     const req = ctx.switchToHttp().getRequest<AuthedRequest>();
     const claims = req.user;
     if (!claims?.sub) {
-      throw new ForbiddenException({ code: "NO_SUBJECT", message: "Missing subject claim" });
+      throw new ForbiddenException({
+        code: 'NO_SUBJECT',
+        message: 'Missing subject claim',
+      });
     }
 
     const entraSub = String(claims.sub);
@@ -25,31 +33,37 @@ export class ActiveUserGuard implements CanActivate {
       await this.prisma.user.create({
         data: {
           entraSub: entraSub,
-          status: "pending",
+          status: 'pending',
           lastLoginAt: new Date(),
         },
       });
 
       throw new ForbiddenException({
-        code: "PENDING_APPROVAL",
-        message: "User created as pending; waiting approval",
+        code: 'PENDING_APPROVAL',
+        message: 'User created as pending; waiting approval',
       });
     }
 
-    if (user.status === "disabled") {
-      throw new ForbiddenException({ code: "USER_DISABLED", message: "User disabled" });
+    if (user.status === 'disabled') {
+      throw new ForbiddenException({
+        code: 'USER_DISABLED',
+        message: 'User disabled',
+      });
     }
 
-    if (user.status !== "active") {
-      throw new ForbiddenException({ code: "PENDING_APPROVAL", message: "User pending approval" });
+    if (user.status !== 'active') {
+      throw new ForbiddenException({
+        code: 'PENDING_APPROVAL',
+        message: 'User pending approval',
+      });
     }
 
     const isPlatformAdmin = await this.prisma.userAppRole.findFirst({
       where: {
         userId: user.id,
         customerId: null,
-        application: { appKey: "PBI_EMBED" },
-        appRole: { roleKey: "platform_admin" },
+        application: { appKey: 'PBI_EMBED' },
+        appRole: { roleKey: 'platform_admin' },
       },
       select: { id: true },
     });
@@ -60,14 +74,18 @@ export class ActiveUserGuard implements CanActivate {
 
     // Exigir pelo menos 1 customer ativo (opcional mas altamente recomendado)
     const hasMembership = await this.prisma.userCustomerMembership.findFirst({
-      where: { userId: user.id, isActive: true, customer: { status: "active" } },
+      where: {
+        userId: user.id,
+        isActive: true,
+        customer: { status: 'active' },
+      },
       select: { id: true },
     });
 
     if (!hasMembership) {
       throw new ForbiddenException({
-        code: "PENDING_CUSTOMER_LINK",
-        message: "User has no active customer membership",
+        code: 'PENDING_CUSTOMER_LINK',
+        message: 'User has no active customer membership',
       });
     }
 

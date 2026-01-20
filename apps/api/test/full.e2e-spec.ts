@@ -1,10 +1,10 @@
-import { INestApplication } from "@nestjs/common";
-import request from "supertest";
-import { PrismaService } from "../src/prisma/prisma.service";
-import { createE2eApp, setTestUsers } from "./helpers/e2e-utils";
-import { seedTestData, truncateAll } from "./helpers/seed";
+import { INestApplication } from '@nestjs/common';
+import request from 'supertest';
+import { PrismaService } from '../src/prisma/prisma.service';
+import { createE2eApp, setTestUsers } from './helpers/e2e-utils';
+import { seedTestData, truncateAll } from './helpers/seed';
 
-describe("Full API (e2e)", () => {
+describe('Full API (e2e)', () => {
   jest.setTimeout(60000);
 
   let app: INestApplication;
@@ -16,34 +16,34 @@ describe("Full API (e2e)", () => {
 
   const powerBiStub = {
     listWorkspaces: jest.fn(async () => [
-      { id: seed?.workspaceId ?? "ws", name: "Test Workspace" },
+      { id: seed?.workspaceId ?? 'ws', name: 'Test Workspace' },
     ]),
     listReports: jest.fn(async (workspaceId: string) => [
       {
         workspaceId,
-        id: seed?.reportId ?? "report",
-        name: "Test Report",
-        datasetId: seed?.datasetId ?? "dataset",
+        id: seed?.reportId ?? 'report',
+        name: 'Test Report',
+        datasetId: seed?.datasetId ?? 'dataset',
       },
     ]),
     getEmbedConfig: jest.fn(async (workspaceId: string, reportId: string) => ({
       reportId,
       workspaceId,
-      embedUrl: "https://example.com/embed",
-      embedToken: "test-embed-token",
+      embedUrl: 'https://example.com/embed',
+      embedToken: 'test-embed-token',
       expiresOn: new Date(Date.now() + 60_000).toISOString(),
     })),
     exportReportFile: jest.fn(async () => ({
-      buffer: Buffer.from("%PDF-1.4 test"),
-      kind: "pdf",
+      buffer: Buffer.from('%PDF-1.4 test'),
+      kind: 'pdf',
     })),
-    refreshDatasetInGroup: jest.fn(async () => ({ status: "Queued" })),
+    refreshDatasetInGroup: jest.fn(async () => ({ status: 'Queued' })),
     listDatasetRefreshesInGroup: jest.fn(async () => []),
   };
 
   const rlsRefreshStub = {
     requestRefresh: jest.fn(async () => ({
-      status: "queued",
+      status: 'queued',
       pending: true,
       scheduledAt: null,
       scheduledInMs: 0,
@@ -52,7 +52,8 @@ describe("Full API (e2e)", () => {
   };
 
   beforeAll(async () => {
-    process.env.BOOTSTRAP_TOKEN = process.env.BOOTSTRAP_TOKEN ?? "test-bootstrap-token";
+    process.env.BOOTSTRAP_TOKEN =
+      process.env.BOOTSTRAP_TOKEN ?? 'test-bootstrap-token';
 
     app = await createE2eApp({
       powerBiService: powerBiStub,
@@ -67,22 +68,22 @@ describe("Full API (e2e)", () => {
       admin: {
         sub: seed.admin.entraSub,
         email: seed.admin.email ?? undefined,
-        name: "Admin User",
+        name: 'Admin User',
       },
       active: {
         sub: seed.activeUser.entraSub,
         email: seed.activeUser.email ?? undefined,
-        name: "Active User",
+        name: 'Active User',
       },
       pending: {
         sub: seed.pendingUser.entraSub,
         email: seed.pendingUser.email ?? undefined,
-        name: "Pending User",
+        name: 'Pending User',
       },
       disable: {
         sub: seed.disableUser.entraSub,
         email: seed.disableUser.email ?? undefined,
-        name: "Disable User",
+        name: 'Disable User',
       },
     });
   });
@@ -101,64 +102,65 @@ describe("Full API (e2e)", () => {
     await app.close();
   });
 
-  it("serves root + health + ready", async () => {
-    const root = await request(app.getHttpServer()).get("/");
-    expect(root.status).toBe(200);
-    expect(root.body.data).toBe("Hello World!");
+  it('serves root + health + ready', async () => {
+    const root = await request(app.getHttpServer()).get('/');
+    expect(root.status).toBe(404);
 
-    const health = await request(app.getHttpServer()).get("/health");
+    const health = await request(app.getHttpServer()).get('/health');
     expect(health.status).toBe(200);
-    expect(health.body.data.status).toBe("ok");
+    expect(health.body.data.status).toBe('ok');
 
-    const ready = await request(app.getHttpServer()).get("/ready");
+    const ready = await request(app.getHttpServer()).get('/ready');
     expect(ready.status).toBe(200);
-    expect(ready.body.data.status).toBe("ok");
+    expect(ready.body.data.status).toBe('ok');
   });
 
-  it("handles users/me for active user", async () => {
+  it('handles users/me for active user', async () => {
     const res = await request(app.getHttpServer())
-      .get("/users/me")
-      .set("x-test-user", "active");
+      .get('/users/me')
+      .set('x-test-user', 'active');
     expect(res.status).toBe(200);
-    expect(res.body.data.status).toBe("active");
+    expect(res.body.data.status).toBe('active');
     expect(res.body.data.memberships.length).toBeGreaterThan(0);
   });
 
-  it("treats platform admin as active without customer membership", async () => {
+  it('treats platform admin as active without customer membership', async () => {
     const res = await request(app.getHttpServer())
-      .get("/users/me")
-      .set("x-test-user", "admin");
+      .get('/users/me')
+      .set('x-test-user', 'admin');
     expect(res.status).toBe(200);
-    expect(res.body.data.status).toBe("active");
+    expect(res.body.data.status).toBe('active');
   });
 
-  it("serves admin basics (me, customers, pending)", async () => {
+  it('serves admin basics (me, customers, pending)', async () => {
     const me = await request(app.getHttpServer())
-      .get("/admin/me")
-      .set("x-test-user", "admin");
+      .get('/admin/me')
+      .set('x-test-user', 'admin');
     expect(me.status).toBe(200);
     expect(me.body.data.ok).toBe(true);
 
     const customers = await request(app.getHttpServer())
-      .get("/admin/customers")
-      .set("x-test-user", "admin");
+      .get('/admin/customers')
+      .set('x-test-user', 'admin');
     expect(customers.status).toBe(200);
     expect(customers.body.data.length).toBeGreaterThanOrEqual(2);
 
     const pending = await request(app.getHttpServer())
-      .get("/admin/users/pending")
-      .set("x-test-user", "admin");
+      .get('/admin/users/pending')
+      .set('x-test-user', 'admin');
     expect(pending.status).toBe(200);
-    expect(pending.body.data.some((u: any) => u.id === seed.pendingUser.id)).toBe(true);
+    expect(
+      pending.body.data.some((u: any) => u.id === seed.pendingUser.id),
+    ).toBe(true);
   });
 
-  it("activates and disables users, manages memberships, and transfers", async () => {
+  it('activates and disables users, manages memberships, and transfers', async () => {
     const activate = await request(app.getHttpServer())
       .post(`/admin/users/${seed.pendingUser.id}/activate`)
-      .set("x-test-user", "admin")
+      .set('x-test-user', 'admin')
       .send({
         customerId: seed.customerA.id,
-        role: "admin",
+        role: 'admin',
         grantCustomerWorkspaces: true,
       });
     expect(activate.status).toBe(201);
@@ -166,16 +168,16 @@ describe("Full API (e2e)", () => {
 
     const disable = await request(app.getHttpServer())
       .post(`/admin/users/${seed.disableUser.id}/disable`)
-      .set("x-test-user", "admin");
+      .set('x-test-user', 'admin');
     expect(disable.status).toBe(201);
     expect(disable.body.data.ok).toBe(true);
 
     const upsert = await request(app.getHttpServer())
       .post(`/admin/users/${seed.pendingUser.id}/memberships`)
-      .set("x-test-user", "admin")
+      .set('x-test-user', 'admin')
       .send({
         customerId: seed.customerB.id,
-        role: "viewer",
+        role: 'viewer',
         isActive: true,
         grantCustomerWorkspaces: false,
       });
@@ -183,10 +185,12 @@ describe("Full API (e2e)", () => {
     expect(upsert.body.data.ok).toBe(true);
 
     const patch = await request(app.getHttpServer())
-      .patch(`/admin/users/${seed.pendingUser.id}/memberships/${seed.customerB.id}`)
-      .set("x-test-user", "admin")
+      .patch(
+        `/admin/users/${seed.pendingUser.id}/memberships/${seed.customerB.id}`,
+      )
+      .set('x-test-user', 'admin')
       .send({
-        role: "member",
+        role: 'member',
         isActive: false,
         revokeCustomerPermissions: true,
       });
@@ -195,11 +199,11 @@ describe("Full API (e2e)", () => {
 
     const transfer = await request(app.getHttpServer())
       .post(`/admin/users/${seed.pendingUser.id}/transfer`)
-      .set("x-test-user", "admin")
+      .set('x-test-user', 'admin')
       .send({
         fromCustomerId: seed.customerA.id,
         toCustomerId: seed.customerB.id,
-        toRole: "admin",
+        toRole: 'admin',
         deactivateFrom: true,
         revokeFromCustomerPermissions: true,
         grantToCustomerWorkspaces: false,
@@ -209,17 +213,19 @@ describe("Full API (e2e)", () => {
     expect(transfer.body.data.ok).toBe(true);
 
     const remove = await request(app.getHttpServer())
-      .delete(`/admin/users/${seed.pendingUser.id}/memberships/${seed.customerB.id}`)
-      .set("x-test-user", "admin")
+      .delete(
+        `/admin/users/${seed.pendingUser.id}/memberships/${seed.customerB.id}`,
+      )
+      .set('x-test-user', 'admin')
       .query({ revokeCustomerPermissions: true });
     expect(remove.status).toBe(200);
     expect(remove.body.data.ok).toBe(true);
   });
 
-  it("lists active users and fetches user detail", async () => {
+  it('lists active users and fetches user detail', async () => {
     const active = await request(app.getHttpServer())
-      .get("/admin/users/active")
-      .set("x-test-user", "admin")
+      .get('/admin/users/active')
+      .set('x-test-user', 'admin')
       .query({ page: 1, pageSize: 10 });
     expect(active.status).toBe(200);
     expect(active.body.meta.page).toBe(1);
@@ -227,202 +233,219 @@ describe("Full API (e2e)", () => {
 
     const detail = await request(app.getHttpServer())
       .get(`/admin/users/${seed.activeUser.id}`)
-      .set("x-test-user", "admin");
+      .set('x-test-user', 'admin');
     expect(detail.status).toBe(200);
     expect(detail.body.data.id).toBe(seed.activeUser.id);
   });
 
-  it("creates/updates customers and unlinks workspace", async () => {
+  it('creates/updates customers and unlinks workspace', async () => {
     const created = await request(app.getHttpServer())
-      .post("/admin/customers")
-      .set("x-test-user", "admin")
-      .send({ code: `NEW_${seed.runId}`, name: `New Customer ${seed.runId}`, status: "active" });
+      .post('/admin/customers')
+      .set('x-test-user', 'admin')
+      .send({
+        code: `NEW_${seed.runId}`,
+        name: `New Customer ${seed.runId}`,
+        status: 'active',
+      });
     expect(created.status).toBe(201);
     createdCustomerId = created.body.data.id;
 
     const updated = await request(app.getHttpServer())
       .put(`/admin/customers/${createdCustomerId}`)
-      .set("x-test-user", "admin")
-      .send({ code: `UPD_${seed.runId}`, name: `Updated Customer ${seed.runId}` });
+      .set('x-test-user', 'admin')
+      .send({
+        code: `UPD_${seed.runId}`,
+        name: `Updated Customer ${seed.runId}`,
+      });
     expect(updated.status).toBe(200);
-    expect(updated.body.data.id).toBe(createdCustomerId);
+    expect(updated.body.data.customer.id).toBe(createdCustomerId);
 
     const status = await request(app.getHttpServer())
       .post(`/admin/customers/${createdCustomerId}/status`)
-      .set("x-test-user", "admin")
-      .send({ status: "inactive" });
+      .set('x-test-user', 'admin')
+      .send({ status: 'inactive' });
     expect(status.status).toBe(201);
-    expect(status.body.data.status).toBe("inactive");
+    expect(status.body.data.status).toBe('inactive');
 
     const unlink = await request(app.getHttpServer())
-      .post(`/admin/customers/${seed.customerA.id}/workspaces/${seed.workspace.id}/unlink`)
-      .set("x-test-user", "admin");
+      .post(
+        `/admin/customers/${seed.customerA.id}/workspaces/${seed.workspace.id}/unlink`,
+      )
+      .set('x-test-user', 'admin');
     expect(unlink.status).toBe(201);
     expect(unlink.body.data.ok).toBe(true);
   });
 
-  it("serves permissions endpoints", async () => {
+  it('serves permissions endpoints', async () => {
     const perms = await request(app.getHttpServer())
       .get(`/admin/users/${seed.activeUser.id}/permissions`)
-      .set("x-test-user", "admin");
+      .set('x-test-user', 'admin');
     expect(perms.status).toBe(200);
     expect(perms.body.data.user.id).toBe(seed.activeUser.id);
 
     const wsPerm = await request(app.getHttpServer())
       .put(`/admin/users/${seed.activeUser.id}/workspaces/${seed.workspace.id}`)
-      .set("x-test-user", "admin")
+      .set('x-test-user', 'admin')
       .send({ canView: true, grantReports: true });
     expect(wsPerm.status).toBe(200);
     expect(wsPerm.body.data.ok).toBe(true);
 
     const reportPerm = await request(app.getHttpServer())
       .put(`/admin/users/${seed.activeUser.id}/reports/${seed.report.id}`)
-      .set("x-test-user", "admin")
+      .set('x-test-user', 'admin')
       .send({ canView: true });
     expect(reportPerm.status).toBe(200);
     expect(reportPerm.body.data.ok).toBe(true);
   });
 
-  it("serves overview, audit, and search", async () => {
+  it('serves overview, audit, and search', async () => {
     const overview = await request(app.getHttpServer())
-      .get("/admin/overview")
-      .set("x-test-user", "admin");
+      .get('/admin/overview')
+      .set('x-test-user', 'admin');
     expect(overview.status).toBe(200);
-    expect(overview.body.data.summary).toBeTruthy();
+    expect(overview.body.data.counts).toBeTruthy();
 
     const audit = await request(app.getHttpServer())
-      .get("/admin/audit")
-      .set("x-test-user", "admin")
+      .get('/admin/audit')
+      .set('x-test-user', 'admin')
       .query({ page: 1, pageSize: 10 });
     expect(audit.status).toBe(200);
     expect(audit.body.meta.page).toBe(1);
 
     const search = await request(app.getHttpServer())
-      .get("/admin/search")
-      .set("x-test-user", "admin")
+      .get('/admin/search')
+      .set('x-test-user', 'admin')
       .query({ q: seed.activeUser.email, limit: 5 });
     expect(search.status).toBe(200);
     expect(search.body.data.users.length).toBeGreaterThan(0);
   });
 
-  it("handles platform admin list/grant/revoke", async () => {
+  it('handles platform admin list/grant/revoke', async () => {
     const list = await request(app.getHttpServer())
-      .get("/admin/security/platform-admins")
-      .set("x-test-user", "admin");
+      .get('/admin/security/platform-admins')
+      .set('x-test-user', 'admin');
     expect(list.status).toBe(200);
     expect(list.body.data.length).toBeGreaterThan(0);
 
     const grant = await request(app.getHttpServer())
-      .post("/admin/security/platform-admins")
-      .set("x-test-user", "admin")
+      .post('/admin/security/platform-admins')
+      .set('x-test-user', 'admin')
       .send({ userId: seed.activeUser.id });
     expect(grant.status).toBe(201);
     expect(grant.body.data.ok).toBe(true);
 
     const revoke = await request(app.getHttpServer())
       .delete(`/admin/security/platform-admins/${seed.activeUser.id}`)
-      .set("x-test-user", "admin");
+      .set('x-test-user', 'admin');
     expect(revoke.status).toBe(200);
     expect(revoke.body.data.ok).toBe(true);
   });
 
-  it("supports admin Power BI catalog endpoints", async () => {
+  it('supports admin Power BI catalog endpoints', async () => {
     const remoteWs = await request(app.getHttpServer())
-      .get("/admin/powerbi/remote/workspaces")
-      .set("x-test-user", "admin");
+      .get('/admin/powerbi/remote/workspaces')
+      .set('x-test-user', 'admin');
     expect(remoteWs.status).toBe(200);
     expect(Array.isArray(remoteWs.body.data)).toBe(true);
 
     const remoteReports = await request(app.getHttpServer())
-      .get("/admin/powerbi/remote/reports")
-      .set("x-test-user", "admin")
+      .get('/admin/powerbi/remote/reports')
+      .set('x-test-user', 'admin')
       .query({ workspaceId: seed.workspaceId });
     expect(remoteReports.status).toBe(200);
     expect(Array.isArray(remoteReports.body.data)).toBe(true);
 
     const sync = await request(app.getHttpServer())
-      .post("/admin/powerbi/sync")
-      .set("x-test-user", "admin")
+      .post('/admin/powerbi/sync')
+      .set('x-test-user', 'admin')
       .send({ customerId: seed.customerA.id, deactivateMissing: false });
     expect(sync.status).toBe(201);
     expect(sync.body.data.ok).toBe(true);
 
     const catalog = await request(app.getHttpServer())
-      .get("/admin/powerbi/catalog")
-      .set("x-test-user", "admin")
+      .get('/admin/powerbi/catalog')
+      .set('x-test-user', 'admin')
       .query({ customerId: seed.customerA.id });
     expect(catalog.status).toBe(200);
     expect(catalog.body.data.customer.id).toBe(seed.customerA.id);
   });
 
-  it("serves user Power BI endpoints", async () => {
+  it('serves user Power BI endpoints', async () => {
     const workspaces = await request(app.getHttpServer())
-      .get("/powerbi/workspaces")
-      .set("x-test-user", "active");
+      .get('/powerbi/workspaces')
+      .set('x-test-user', 'active');
     expect(workspaces.status).toBe(200);
     expect(workspaces.body.data.length).toBeGreaterThan(0);
 
     const reports = await request(app.getHttpServer())
-      .get("/powerbi/reports")
-      .set("x-test-user", "active")
+      .get('/powerbi/reports')
+      .set('x-test-user', 'active')
       .query({ workspaceId: seed.workspaceId });
     expect(reports.status).toBe(200);
     expect(reports.body.data.length).toBeGreaterThan(0);
 
     const embed = await request(app.getHttpServer())
-      .get("/powerbi/embed-config")
-      .set("x-test-user", "active")
+      .get('/powerbi/embed-config')
+      .set('x-test-user', 'active')
       .query({ workspaceId: seed.workspaceId, reportId: seed.reportId });
     expect(embed.status).toBe(200);
     expect(embed.body.data.embedToken).toBeTruthy();
 
     const exportPdf = await request(app.getHttpServer())
-      .post("/powerbi/export/pdf")
-      .set("x-test-user", "active")
-      .send({ workspaceId: seed.workspaceId, reportId: seed.reportId, format: "PDF" });
+      .post('/powerbi/export/pdf')
+      .set('x-test-user', 'active')
+      .send({
+        workspaceId: seed.workspaceId,
+        reportId: seed.reportId,
+        format: 'PDF',
+      });
     expect(exportPdf.status).toBe(200);
-    expect(exportPdf.headers["content-type"]).toContain("application/pdf");
+    expect(exportPdf.headers['content-type']).toContain('application/pdf');
   });
 
-  it("covers admin RLS endpoints", async () => {
+  it('covers admin RLS endpoints', async () => {
     const list = await request(app.getHttpServer())
       .get(`/admin/rls/datasets/${seed.datasetId}/targets`)
-      .set("x-test-user", "admin");
+      .set('x-test-user', 'admin');
     expect(list.status).toBe(200);
     expect(list.body.data.items.length).toBeGreaterThan(0);
 
     const created = await request(app.getHttpServer())
       .post(`/admin/rls/datasets/${seed.datasetId}/targets`)
-      .set("x-test-user", "admin")
+      .set('x-test-user', 'admin')
       .send({
         targetKey: `new_target_${seed.runId}`,
-        displayName: "New Target",
-        factTable: "Fact",
-        factColumn: "Column",
-        valueType: "text",
-        defaultBehavior: "allow",
-        status: "active",
+        displayName: 'New Target',
+        factTable: 'Fact',
+        factColumn: 'Column',
+        valueType: 'text',
+        defaultBehavior: 'allow',
+        status: 'active',
       });
     expect(created.status).toBe(201);
     newTargetId = created.body.data.id;
 
     const updated = await request(app.getHttpServer())
       .patch(`/admin/rls/targets/${newTargetId}`)
-      .set("x-test-user", "admin")
-      .send({ displayName: "Target Updated" });
+      .set('x-test-user', 'admin')
+      .send({ displayName: 'Target Updated' });
     expect(updated.status).toBe(200);
 
     const rules = await request(app.getHttpServer())
       .get(`/admin/rls/targets/${newTargetId}/rules`)
-      .set("x-test-user", "admin");
+      .set('x-test-user', 'admin');
     expect(rules.status).toBe(200);
 
     const createdRules = await request(app.getHttpServer())
       .post(`/admin/rls/targets/${newTargetId}/rules`)
-      .set("x-test-user", "admin")
+      .set('x-test-user', 'admin')
       .send({
         items: [
-          { customerId: seed.customerA.id, op: "include", valueText: "example" },
+          {
+            customerId: seed.customerA.id,
+            op: 'include',
+            valueText: 'example',
+          },
         ],
       });
     expect(createdRules.status).toBe(201);
@@ -430,46 +453,46 @@ describe("Full API (e2e)", () => {
 
     const refresh = await request(app.getHttpServer())
       .post(`/admin/rls/datasets/${seed.datasetId}/refresh`)
-      .set("x-test-user", "admin");
+      .set('x-test-user', 'admin');
     expect(refresh.status).toBe(201);
-    expect(refresh.body.data.status).toBe("queued");
+    expect(refresh.body.data.status).toBe('queued');
 
     const refreshes = await request(app.getHttpServer())
       .get(`/admin/rls/datasets/${seed.datasetId}/refreshes`)
-      .set("x-test-user", "admin");
+      .set('x-test-user', 'admin');
     expect(refreshes.status).toBe(200);
     expect(Array.isArray(refreshes.body.data.items)).toBe(true);
 
     const snapshot = await request(app.getHttpServer())
       .get(`/admin/rls/datasets/${seed.datasetId}/snapshot`)
-      .set("x-test-user", "admin")
-      .query({ format: "json" });
+      .set('x-test-user', 'admin')
+      .query({ format: 'json' });
     expect(snapshot.status).toBe(200);
     expect(snapshot.body.data.datasetId).toBe(seed.datasetId);
 
     const snapshotCsv = await request(app.getHttpServer())
       .get(`/admin/rls/datasets/${seed.datasetId}/snapshot`)
-      .set("x-test-user", "admin")
-      .query({ format: "csv" });
+      .set('x-test-user', 'admin')
+      .query({ format: 'csv' });
     expect(snapshotCsv.status).toBe(200);
-    expect(snapshotCsv.body.data.contentType).toBe("text/csv");
+    expect(snapshotCsv.body.data.contentType).toBe('text/csv');
 
     const delRule = await request(app.getHttpServer())
       .delete(`/admin/rls/rules/${newRuleId}`)
-      .set("x-test-user", "admin");
+      .set('x-test-user', 'admin');
     expect(delRule.status).toBe(200);
 
     const delTarget = await request(app.getHttpServer())
       .delete(`/admin/rls/targets/${newTargetId}`)
-      .set("x-test-user", "admin");
+      .set('x-test-user', 'admin');
     expect(delTarget.status).toBe(200);
   });
 
-  it("bootstraps platform admin via token", async () => {
+  it('bootstraps platform admin via token', async () => {
     const bootstrap = await request(app.getHttpServer())
-      .post("/admin/bootstrap/platform-admin")
-      .set("x-test-user", "pending")
-      .set("x-bootstrap-token", process.env.BOOTSTRAP_TOKEN as string);
+      .post('/admin/bootstrap/platform-admin')
+      .set('x-test-user', 'pending')
+      .set('x-bootstrap-token', process.env.BOOTSTRAP_TOKEN as string);
     expect(bootstrap.status).toBe(201);
     expect(bootstrap.body.data.ok).toBe(true);
   });

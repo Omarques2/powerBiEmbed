@@ -31,15 +31,65 @@ type EffectiveIdentity = {
   customData?: string;
 };
 
+type PbiListResponse<T> = {
+  value: T[];
+};
+
+type PbiWorkspace = {
+  id?: string;
+  name?: string;
+  isReadOnly?: boolean;
+  type?: string;
+};
+
+type PbiReport = {
+  id?: string;
+  name?: string;
+  datasetId?: string;
+  embedUrl?: string;
+};
+
+type PbiDatasetInfo = {
+  isEffectiveIdentityRequired?: boolean;
+  isEffectiveIdentityRolesRequired?: boolean;
+};
+
+type PbiGenerateTokenRequest = {
+  reports: Array<{ id: string }>;
+  datasets: Array<{ id: string }>;
+  targetWorkspaces: Array<{ id: string }>;
+  identities?: EffectiveIdentity[];
+};
+
+type PbiGenerateTokenResponse = {
+  token?: string;
+  expiration?: string;
+};
+
+type PbiRefreshResponse = Record<string, unknown>;
+
+function describeAxiosError(err: unknown): { status?: number; data?: unknown } {
+  if (axios.isAxiosError(err)) {
+    return { status: err.response?.status, data: err.response?.data };
+  }
+  return {};
+}
+
 @Injectable()
 export class PowerBiService {
   private cachedAadToken?: { token: string; expiresAt: number };
 
   constructor(private readonly config: ConfigService) {}
 
-  private get tenantId() { return this.config.get<string>('PBI_TENANT_ID'); }
-  private get clientId() { return this.config.get<string>('PBI_CLIENT_ID'); }
-  private get clientSecret() { return this.config.get<string>('PBI_CLIENT_SECRET'); }
+  private get tenantId() {
+    return this.config.get<string>('PBI_TENANT_ID');
+  }
+  private get clientId() {
+    return this.config.get<string>('PBI_CLIENT_ID');
+  }
+  private get clientSecret() {
+    return this.config.get<string>('PBI_CLIENT_SECRET');
+  }
 
   // 1) Obter token do Entra (client credentials)
   private async getAadAccessToken(): Promise<string> {
@@ -68,9 +118,11 @@ export class PowerBiService {
       this.cachedAadToken = { token, expiresAt: now + expiresInMs };
 
       return token;
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const { status, data } = describeAxiosError(err);
+      const message = err instanceof Error ? err.message : String(err);
       throw new InternalServerErrorException(
-        `Falha ao obter token Entra: ${err?.response?.status} ${JSON.stringify(err?.response?.data)}`
+        `Falha ao obter token Entra: ${status ?? 'unknown'} ${JSON.stringify(data ?? message)}`,
       );
     }
   }
@@ -84,7 +136,7 @@ export class PowerBiService {
     return res.data;
   }
 
-  private async pbiPost<T>(path: string, payload: any): Promise<T> {
+  private async pbiPost<T>(path: string, payload: unknown): Promise<T> {
     const aad = await this.getAadAccessToken();
     const url = `https://api.powerbi.com/v1.0/myorg${path}`;
     const res = await axios.post<T>(url, payload, {
@@ -106,7 +158,12 @@ export class PowerBiService {
   private async resolveEffectiveIdentity(
     workspaceId: string,
     datasetId: string,
-    opts?: { username?: string; roles?: string[]; customData?: string; forceIdentity?: boolean },
+    opts?: {
+      username?: string;
+      roles?: string[];
+      customData?: string;
+      forceIdentity?: boolean;
+    },
   ): Promise<EffectiveIdentity | null> {
     if (!opts?.username) return null;
 
@@ -115,12 +172,14 @@ export class PowerBiService {
 
     if (!includeIdentity) {
       try {
-        const ds = await this.pbiGet<any>(`/groups/${workspaceId}/datasets/${datasetId}`);
+        const ds = await this.pbiGet<PbiDatasetInfo>(
+          `/groups/${workspaceId}/datasets/${datasetId}`,
+        );
         const requiresIdentity = !!ds?.isEffectiveIdentityRequired;
         const requiresRoles = !!ds?.isEffectiveIdentityRolesRequired;
         includeIdentity = requiresIdentity || requiresRoles;
         if (!requiresRoles) roles = [];
-      } catch (_err: any) {
+      } catch {
         includeIdentity = true;
       }
     }
@@ -156,7 +215,9 @@ export class PowerBiService {
         const code = status?.error?.code;
         const message = status?.error?.message ?? 'Export failed';
         const suffix = code ? `${code} - ${message}` : message;
-        throw new InternalServerErrorException(`Falha ao exportar PDF: ${suffix}`);
+        throw new InternalServerErrorException(
+          `Falha ao exportar PDF: ${suffix}`,
+        );
       }
 
       await new Promise((resolve) => setTimeout(resolve, intervalMs));
@@ -171,7 +232,10 @@ export class PowerBiService {
     );
   }
 
-  private async stampPdfTitle(pdfBytes: ArrayBuffer, title: string): Promise<Uint8Array> {
+  private async stampPdfTitle(
+    pdfBytes: ArrayBuffer,
+    title: string,
+  ): Promise<Uint8Array> {
     const pdfDoc = await PDFDocument.load(pdfBytes);
     const font = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
     const fontSize = 28;
@@ -214,13 +278,18 @@ export class PowerBiService {
 
   private isPngBuffer(buffer: Buffer): boolean {
     if (buffer.length < 8) return false;
-    return buffer.slice(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+    return buffer
+      .slice(0, 8)
+      .equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
   }
 
   private isZipBuffer(buffer: Buffer): boolean {
     if (buffer.length < 4) return false;
     const sig = buffer.slice(0, 4);
-    return sig.equals(Buffer.from([0x50, 0x4b, 0x03, 0x04])) || sig.equals(Buffer.from([0x50, 0x4b, 0x05, 0x06]));
+    return (
+      sig.equals(Buffer.from([0x50, 0x4b, 0x03, 0x04])) ||
+      sig.equals(Buffer.from([0x50, 0x4b, 0x05, 0x06]))
+    );
   }
 
   private describeInvalidPdf(buffer: Buffer): string {
@@ -228,60 +297,75 @@ export class PowerBiService {
     return `Export retornou bytes invalidos (prefixo: ${prefix || 'vazio'})`;
   }
 
-  async refreshDatasetInGroup(workspaceId: string, datasetId: string) {
-    return this.pbiPost<any>(`/groups/${workspaceId}/datasets/${datasetId}/refreshes`, {});
+  async refreshDatasetInGroup(
+    workspaceId: string,
+    datasetId: string,
+  ): Promise<PbiRefreshResponse> {
+    return this.pbiPost<PbiRefreshResponse>(
+      `/groups/${workspaceId}/datasets/${datasetId}/refreshes`,
+      {},
+    );
   }
 
   async listDatasetRefreshesInGroup(workspaceId: string, datasetId: string) {
-    const res = await this.pbiGet<{ value: any[] }>(
-      `/groups/${workspaceId}/datasets/${datasetId}/refreshes?$top=10`
+    const res = await this.pbiGet<PbiListResponse<Record<string, unknown>>>(
+      `/groups/${workspaceId}/datasets/${datasetId}/refreshes?$top=10`,
     );
     return res.value ?? [];
   }
 
   async listWorkspaces() {
-    const res = await this.pbiGet<{ value: any[] }>(`/groups`);
-    return res.value.map(g => ({
-        id: g.id,
-        name: g.name,
-        isReadOnly: g.isReadOnly,
-        type: g.type,
+    const res = await this.pbiGet<PbiListResponse<PbiWorkspace>>(`/groups`);
+    return res.value.map((g) => ({
+      id: g.id ?? '',
+      name: g.name ?? null,
+      isReadOnly: g.isReadOnly ?? false,
+      type: g.type ?? null,
     }));
-    }
+  }
 
   async listReports(workspaceId: string) {
-    const res = await this.pbiGet<{ value: any[] }>(`/groups/${workspaceId}/reports`);
-    return res.value.map(r => ({
-        workspaceId,
-        id: r.id,
-        name: r.name,
-        datasetId: r.datasetId,
-        embedUrl: r.embedUrl,
+    const res = await this.pbiGet<PbiListResponse<PbiReport>>(
+      `/groups/${workspaceId}/reports`,
+    );
+    return res.value.map((r) => ({
+      workspaceId,
+      id: r.id ?? '',
+      name: r.name ?? null,
+      datasetId: r.datasetId ?? null,
+      embedUrl: r.embedUrl ?? null,
     }));
-    }
+  }
 
   // 2) Gerar embed config para um report (workspace + report)
   async getEmbedConfig(
     workspaceId: string,
     reportId: string,
-    opts?: { username: string; roles?: string[]; customData?: string; forceIdentity?: boolean },
+    opts?: {
+      username: string;
+      roles?: string[];
+      customData?: string;
+      forceIdentity?: boolean;
+    },
   ) {
     // 2.1 Buscar metadados do relatório para pegar embedUrl e datasetId
     // GET /groups/{groupId}/reports/{reportId}
-    const report = await this.pbiGet<any>(`/groups/${workspaceId}/reports/${reportId}`);
+    const report = await this.pbiGet<PbiReport>(
+      `/groups/${workspaceId}/reports/${reportId}`,
+    );
 
     const embedUrl = report?.embedUrl;
     const datasetId = report?.datasetId;
 
     if (!embedUrl || !datasetId) {
       throw new InternalServerErrorException(
-        `Report sem embedUrl/datasetId. Resposta: ${JSON.stringify(report)}`
+        `Report sem embedUrl/datasetId. Resposta: ${JSON.stringify(report)}`,
       );
     }
 
     // 2.2 Gerar embed token
     // POST /GenerateToken
-    const tokenPayload: any = {
+    const tokenPayload: PbiGenerateTokenRequest = {
       reports: [{ id: reportId }],
       datasets: [{ id: datasetId }],
       targetWorkspaces: [{ id: workspaceId }],
@@ -293,12 +377,14 @@ export class PowerBiService {
 
       if (!includeIdentity) {
         try {
-          const ds = await this.pbiGet<any>(`/groups/${workspaceId}/datasets/${datasetId}`);
+          const ds = await this.pbiGet<PbiDatasetInfo>(
+            `/groups/${workspaceId}/datasets/${datasetId}`,
+          );
           const requiresIdentity = !!ds?.isEffectiveIdentityRequired;
           const requiresRoles = !!ds?.isEffectiveIdentityRolesRequired;
           includeIdentity = requiresIdentity || requiresRoles;
           if (!requiresRoles) roles = [];
-        } catch (_err: any) {
+        } catch {
           includeIdentity = true;
         }
       }
@@ -315,14 +401,16 @@ export class PowerBiService {
       }
     }
 
-    let tokenRes: any;
+    let tokenRes: PbiGenerateTokenResponse;
     try {
-      tokenRes = await this.pbiPost<any>(`/GenerateToken`, tokenPayload);
-    } catch (err: any) {
-      const status = err?.response?.status;
-      const data = err?.response?.data;
+      tokenRes = await this.pbiPost<PbiGenerateTokenResponse>(
+        `/GenerateToken`,
+        tokenPayload,
+      );
+    } catch (err: unknown) {
+      const { status, data } = describeAxiosError(err);
       throw new InternalServerErrorException(
-        `Falha ao gerar embed token: ${status ?? 'unknown'} ${JSON.stringify(data ?? {})}`
+        `Falha ao gerar embed token: ${status ?? 'unknown'} ${JSON.stringify(data ?? {})}`,
       );
     }
 
@@ -331,7 +419,7 @@ export class PowerBiService {
 
     if (!embedToken) {
       throw new InternalServerErrorException(
-        `Falha ao gerar embed token: ${JSON.stringify(tokenRes)}`
+        `Falha ao gerar embed token: ${JSON.stringify(tokenRes)}`,
       );
     }
 
@@ -360,18 +448,31 @@ export class PowerBiService {
       relaxedPdfCheck?: boolean;
     },
   ): Promise<{ buffer: Buffer; kind: ExportKind }> {
-    const report = await this.pbiGet<any>(`/groups/${workspaceId}/reports/${reportId}`);
+    const report = await this.pbiGet<PbiReport>(
+      `/groups/${workspaceId}/reports/${reportId}`,
+    );
     const datasetId = report?.datasetId;
 
     if (!datasetId) {
       throw new InternalServerErrorException(
-        `Report sem datasetId. Resposta: ${JSON.stringify(report)}`
+        `Report sem datasetId. Resposta: ${JSON.stringify(report)}`,
       );
     }
 
     const format = (opts?.format ?? 'PDF').toUpperCase() as ExportFormat;
-    const payload: any = { format };
-    const identity = await this.resolveEffectiveIdentity(workspaceId, datasetId, opts);
+    const payload: {
+      format: ExportFormat;
+      powerBIReportConfiguration?: {
+        identities?: EffectiveIdentity[];
+        defaultBookmark?: { state: string };
+        pages?: Array<{ pageName: string }>;
+      };
+    } = { format };
+    const identity = await this.resolveEffectiveIdentity(
+      workspaceId,
+      datasetId,
+      opts,
+    );
 
     if (identity || opts?.bookmarkState || opts?.pageName) {
       payload.powerBIReportConfiguration = {};
@@ -379,10 +480,14 @@ export class PowerBiService {
         payload.powerBIReportConfiguration.identities = [identity];
       }
       if (opts?.bookmarkState) {
-        payload.powerBIReportConfiguration.defaultBookmark = { state: opts.bookmarkState };
+        payload.powerBIReportConfiguration.defaultBookmark = {
+          state: opts.bookmarkState,
+        };
       }
       if (opts?.pageName) {
-        payload.powerBIReportConfiguration.pages = [{ pageName: opts.pageName }];
+        payload.powerBIReportConfiguration.pages = [
+          { pageName: opts.pageName },
+        ];
       }
     }
 
@@ -392,21 +497,30 @@ export class PowerBiService {
         `/groups/${workspaceId}/reports/${reportId}/ExportTo`,
         payload,
       );
-    } catch (err: any) {
-      const status = err?.response?.status;
-      const data = err?.response?.data;
-      const code = data?.error?.code;
-      const message = data?.error?.message ?? data?.message ?? JSON.stringify(data ?? {});
+    } catch (err: unknown) {
+      const { status, data } = describeAxiosError(err);
+      const dataObj =
+        data && typeof data === 'object'
+          ? (data as {
+              error?: { code?: string; message?: string };
+              message?: string;
+            })
+          : undefined;
+      const code = dataObj?.error?.code;
+      const message =
+        dataObj?.error?.message ??
+        dataObj?.message ??
+        JSON.stringify(data ?? {});
       const suffix = code ? `${code} - ${message}` : message;
       throw new InternalServerErrorException(
-        `Falha ao iniciar exportacao PDF: ${status ?? 'unknown'} ${suffix}`
+        `Falha ao iniciar exportacao PDF: ${status ?? 'unknown'} ${suffix}`,
       );
     }
 
     const exportId = exportRes?.id;
     if (!exportId) {
       throw new InternalServerErrorException(
-        `Falha ao iniciar exportacao PDF: ${JSON.stringify(exportRes)}`
+        `Falha ao iniciar exportacao PDF: ${JSON.stringify(exportRes)}`,
       );
     }
 
@@ -416,12 +530,18 @@ export class PowerBiService {
       fileBytes = await this.pbiGetBinary(
         `/groups/${workspaceId}/reports/${reportId}/exports/${exportId}/file`,
       );
-    } catch (err: any) {
-      const status = err?.response?.status;
-      const data = err?.response?.data;
-      const message = data?.error?.message ?? data?.message ?? JSON.stringify(data ?? {});
+    } catch (err: unknown) {
+      const { status, data } = describeAxiosError(err);
+      const dataObj =
+        data && typeof data === 'object'
+          ? (data as { error?: { message?: string }; message?: string })
+          : undefined;
+      const message =
+        dataObj?.error?.message ??
+        dataObj?.message ??
+        JSON.stringify(data ?? {});
       throw new InternalServerErrorException(
-        `Falha ao baixar PDF: ${status ?? 'unknown'} ${message}`
+        `Falha ao baixar PDF: ${status ?? 'unknown'} ${message}`,
       );
     }
 
@@ -430,26 +550,36 @@ export class PowerBiService {
     if (format === 'PDF') {
       const relaxed = opts?.relaxedPdfCheck === true;
       if (!this.isPdfBuffer(rawBuffer, relaxed)) {
-        throw new InternalServerErrorException(this.describeInvalidPdf(rawBuffer));
+        throw new InternalServerErrorException(
+          this.describeInvalidPdf(rawBuffer),
+        );
       }
 
-      if (!opts?.title || opts?.skipStamp) return { buffer: rawBuffer, kind: 'pdf' };
+      if (!opts?.title || opts?.skipStamp)
+        return { buffer: rawBuffer, kind: 'pdf' };
 
       try {
         const stamped = await this.stampPdfTitle(fileBytes, opts.title);
         const stampedBuffer = Buffer.from(stamped);
-        const finalBuffer = this.isPdfBuffer(stampedBuffer, relaxed) ? stampedBuffer : rawBuffer;
+        const finalBuffer = this.isPdfBuffer(stampedBuffer, relaxed)
+          ? stampedBuffer
+          : rawBuffer;
         return { buffer: finalBuffer, kind: 'pdf' };
-      } catch (err: any) {
-        console.warn('Falha ao carimbar PDF, retornando original.', err?.message ?? err);
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        console.warn('Falha ao carimbar PDF, retornando original.', message);
         return { buffer: rawBuffer, kind: 'pdf' };
       }
     }
 
     if (format === 'PNG') {
-      if (this.isPngBuffer(rawBuffer)) return { buffer: rawBuffer, kind: 'png' };
-      if (this.isZipBuffer(rawBuffer)) return { buffer: rawBuffer, kind: 'zip' };
-      throw new InternalServerErrorException(this.describeInvalidPdf(rawBuffer));
+      if (this.isPngBuffer(rawBuffer))
+        return { buffer: rawBuffer, kind: 'png' };
+      if (this.isZipBuffer(rawBuffer))
+        return { buffer: rawBuffer, kind: 'zip' };
+      throw new InternalServerErrorException(
+        this.describeInvalidPdf(rawBuffer),
+      );
     }
 
     return { buffer: rawBuffer, kind: 'pdf' };

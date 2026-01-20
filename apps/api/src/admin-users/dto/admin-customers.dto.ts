@@ -1,6 +1,6 @@
-import { IsIn, IsNotEmpty, IsOptional, IsString } from "class-validator";
+import { IsIn, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
-const CUSTOMER_STATUSES = ["active", "inactive"] as const;
+const CUSTOMER_STATUSES = ['active', 'inactive'] as const;
 
 export class CreateCustomerDto {
   @IsString()

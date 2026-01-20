@@ -1,31 +1,29 @@
-import { Injectable } from "@nestjs/common";
-import { PrismaService } from "../prisma/prisma.service";
-
-type Claims = Record<string, any>;
+import { Injectable } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
+import type { Claims } from '../auth/claims.type';
 
 @Injectable()
 export class UsersService {
   constructor(private readonly prisma: PrismaService) {}
 
   private pickEmail(claims: Claims): string | null {
-    // vários IdPs colocam emails como array
+    // varios IdPs colocam emails como array
     const emails = claims.emails;
     if (Array.isArray(emails) && emails.length) return String(emails[0]);
 
-    return (
-      (claims.email && String(claims.email)) ||
-      (claims.preferred_username && String(claims.preferred_username)) ||
-      (claims.upn && String(claims.upn)) ||
-      null
-    );
+    const raw =
+      claims.email ?? claims.preferred_username ?? claims.upn ?? undefined;
+    if (!raw) return null;
+
+    return typeof raw === 'string' && raw.trim().length > 0 ? raw : null;
   }
 
   async upsertFromClaims(claims: Claims) {
-    const entraSub = String(claims.sub);
-    const entraOid = claims.oid ? String(claims.oid) : null;
+    const entraSub = claims.sub;
+    const entraOid = claims.oid ?? null;
 
-    const email = this.pickEmail(claims); // mantenha sua lógica atual
-    const displayName = claims.name ? String(claims.name) : null;
+    const email = this.pickEmail(claims); // mantenha sua logica atual
+    const displayName = claims.name ?? null;
 
     return this.prisma.user.upsert({
       where: { entraSub: entraSub },
@@ -34,7 +32,7 @@ export class UsersService {
         entraOid: entraOid ?? undefined,
         email: email ?? undefined,
         displayName: displayName ?? undefined,
-        status: "pending",                
+        status: 'pending',
         lastLoginAt: new Date(),
       },
       update: {
@@ -42,14 +40,14 @@ export class UsersService {
         email: email ?? undefined,
         displayName: displayName ?? undefined,
         lastLoginAt: new Date(),
-        // NÃO mexe em status aqui
+        // nao mexe em status aqui
       },
     });
   }
 
   async listActiveMemberships(userId: string) {
     return this.prisma.userCustomerMembership.findMany({
-      where: { userId: userId, isActive: true, customer: { status: "active" } },
+      where: { userId: userId, isActive: true, customer: { status: 'active' } },
       include: { customer: true },
     });
   }
@@ -59,8 +57,8 @@ export class UsersService {
       where: {
         userId: userId,
         customerId: null,
-        application: { appKey: "PBI_EMBED" },
-        appRole: { roleKey: "platform_admin" },
+        application: { appKey: 'PBI_EMBED' },
+        appRole: { roleKey: 'platform_admin' },
       },
       select: { id: true },
     });
