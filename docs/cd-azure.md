@@ -24,7 +24,7 @@ Este guia descreve como configurar o CD no Azure para a API (Container Apps) e o
    ```
    {
      "clientId": "",
-     "github-actions-cd":"",
+     "clientSecret": "",
      "subscriptionId": "",
      "tenantId": ""
    }
@@ -144,7 +144,10 @@ Em `Settings -> Secrets and variables -> Actions`:
 - `STAGING_API_BASE_URL` (ex: https://<staging-url>)
 - `PROD_API_BASE_URL` (ex: https://<prod-url>)
 - `AZURE_STATIC_WEB_APPS_API_TOKEN`
- - `VITE_API_BASE_URL` (URL do backend para o build do web)
+- `VITE_API_BASE_URL` (URL do backend para o build do web)
+
+## 8.1) Node para o build do web
+O build do front usa Vite 7 (Node 20+). Garanta `NODE_VERSION=20.19.0` no job `web`.
 
 ## 8) Workflow CD
 Arquivo: `.github/workflows/cd-main.yml`
