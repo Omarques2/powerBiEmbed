@@ -44,6 +44,20 @@ export class ActiveUserGuard implements CanActivate {
       throw new ForbiddenException({ code: "PENDING_APPROVAL", message: "User pending approval" });
     }
 
+    const isPlatformAdmin = await this.prisma.userAppRole.findFirst({
+      where: {
+        userId: user.id,
+        customerId: null,
+        application: { appKey: "PBI_EMBED" },
+        appRole: { roleKey: "platform_admin" },
+      },
+      select: { id: true },
+    });
+
+    if (isPlatformAdmin) {
+      return true;
+    }
+
     // Exigir pelo menos 1 customer ativo (opcional mas altamente recomendado)
     const hasMembership = await this.prisma.userCustomerMembership.findFirst({
       where: { userId: user.id, isActive: true, customer: { status: "active" } },

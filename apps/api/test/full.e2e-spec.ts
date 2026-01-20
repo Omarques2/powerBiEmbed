@@ -124,6 +124,14 @@ describe("Full API (e2e)", () => {
     expect(res.body.data.memberships.length).toBeGreaterThan(0);
   });
 
+  it("treats platform admin as active without customer membership", async () => {
+    const res = await request(app.getHttpServer())
+      .get("/users/me")
+      .set("x-test-user", "admin");
+    expect(res.status).toBe(200);
+    expect(res.body.data.status).toBe("active");
+  });
+
   it("serves admin basics (me, customers, pending)", async () => {
     const me = await request(app.getHttpServer())
       .get("/admin/me")

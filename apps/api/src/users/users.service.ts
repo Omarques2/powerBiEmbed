@@ -53,4 +53,17 @@ export class UsersService {
       include: { customer: true },
     });
   }
+
+  async isPlatformAdmin(userId: string): Promise<boolean> {
+    const row = await this.prisma.userAppRole.findFirst({
+      where: {
+        userId: userId,
+        customerId: null,
+        application: { appKey: "PBI_EMBED" },
+        appRole: { roleKey: "platform_admin" },
+      },
+      select: { id: true },
+    });
+    return Boolean(row);
+  }
 }

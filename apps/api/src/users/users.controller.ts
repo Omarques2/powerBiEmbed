@@ -17,6 +17,7 @@ export class UsersController {
 
     // Opcional: carregar memberships (para informar o usuário)
     const memberships = await this.usersService.listActiveMemberships(user.id);
+    const isPlatformAdmin = await this.usersService.isPlatformAdmin(user.id);
 
     const hasCustomer = memberships.length > 0;
 
@@ -24,7 +25,7 @@ export class UsersController {
     const effectiveStatus =
       user.status === "disabled"
         ? "disabled"
-        : user.status === "active" && hasCustomer
+        : user.status === "active" && (hasCustomer || isPlatformAdmin)
           ? "active"
           : "pending";
 
