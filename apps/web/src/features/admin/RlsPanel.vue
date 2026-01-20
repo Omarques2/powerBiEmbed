@@ -275,7 +275,8 @@
             Selecione um report com dataset para cadastrar regras.
           </div>
 
-          <div v-else-if="!targets.length"
+          <div
+            v-else-if="!targets.length"
             class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700
                    dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-200"
           >
@@ -422,7 +423,8 @@
             Selecione um report com dataset para gerar o guia PBIX.
           </div>
 
-          <div v-else-if="!targets.length"
+          <div
+            v-else-if="!targets.length"
             class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700
                    dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-200"
           >
