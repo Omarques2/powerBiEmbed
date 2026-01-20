@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
-import type { rls_rule } from "@prisma/client";
+import type { RlsRule } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { RlsRefreshService } from "./rls-refresh.service";
 import { buildSnapshotCsv, RlsSnapshot, RlsSnapshotRule, RlsSnapshotTarget } from "./rls-snapshot";
@@ -85,9 +85,9 @@ export class AdminRlsService {
 
   async listTargets(datasetIdRaw: string) {
     const datasetId = ensureUuid("datasetId", datasetIdRaw);
-    const rows = await this.prisma.rls_target.findMany({
-      where: { dataset_id: datasetId },
-      orderBy: { created_at: "asc" },
+    const rows = await this.prisma.rlsTarget.findMany({
+      where: { datasetId: datasetId },
+      orderBy: { createdAt: "asc" },
     });
     return { items: rows.map((row) => this.toTargetDto(row)) };
   }
@@ -107,8 +107,8 @@ export class AdminRlsService {
     const status = (input?.status ?? "draft") as TargetStatus;
     if (!TARGET_STATUSES.has(status)) throw new BadRequestException("status is invalid");
 
-    const existing = await this.prisma.rls_target.findFirst({
-      where: { dataset_id: datasetId, target_key: targetKey },
+    const existing = await this.prisma.rlsTarget.findFirst({
+      where: { datasetId: datasetId, targetKey: targetKey },
       select: { id: true },
     });
     if (existing) throw new BadRequestException("targetKey already exists for dataset");
@@ -117,26 +117,26 @@ export class AdminRlsService {
 
     try {
       const created = await this.prisma.$transaction(async (tx) => {
-        const row = await tx.rls_target.create({
+        const row = await tx.rlsTarget.create({
           data: {
-            dataset_id: datasetId,
-            target_key: targetKey,
-            display_name: displayName,
-            fact_table: factTable,
-            fact_column: factColumn,
-            value_type: valueType,
-            default_behavior: defaultBehavior,
+            datasetId: datasetId,
+            targetKey: targetKey,
+            displayName: displayName,
+            factTable: factTable,
+            factColumn: factColumn,
+            valueType: valueType,
+            defaultBehavior: defaultBehavior,
             status,
           },
         });
 
-        await tx.audit_log.create({
+        await tx.auditLog.create({
           data: {
-            actor_user_id: actorUserId,
+            actorUserId: actorUserId,
             action: "RLS_TARGET_CREATED",
-            entity_type: "rls_target",
-            entity_id: row.id,
-            after_data: this.toTargetDto(row),
+            entityType: "rls_target",
+            entityId: row.id,
+            afterData: this.toTargetDto(row),
           },
         });
 
@@ -151,43 +151,43 @@ export class AdminRlsService {
 
   async updateTarget(targetIdRaw: string, input: UpdateTargetInput, actorSub?: string | null) {
     const targetId = ensureUuid("targetId", targetIdRaw);
-    const target = await this.prisma.rls_target.findUnique({ where: { id: targetId } });
+    const target = await this.prisma.rlsTarget.findUnique({ where: { id: targetId } });
     if (!target) throw new NotFoundException("Target not found");
 
     const patch: Record<string, unknown> = {};
 
     if (input?.targetKey !== undefined) {
       const nextKey = ensureTargetKey(input.targetKey);
-      if (nextKey !== target.target_key) {
-        const existing = await this.prisma.rls_target.findFirst({
-          where: { dataset_id: target.dataset_id, target_key: nextKey },
+      if (nextKey !== target.targetKey) {
+        const existing = await this.prisma.rlsTarget.findFirst({
+          where: { datasetId: target.datasetId, targetKey: nextKey },
           select: { id: true },
         });
         if (existing) throw new BadRequestException("targetKey already exists for dataset");
-        patch.target_key = nextKey;
+        patch.targetKey = nextKey;
       }
     }
 
-    if (input?.displayName !== undefined) patch.display_name = ensureText("displayName", input.displayName);
-    if (input?.factTable !== undefined) patch.fact_table = ensureText("factTable", input.factTable, 200);
-    if (input?.factColumn !== undefined) patch.fact_column = ensureText("factColumn", input.factColumn, 200);
+    if (input?.displayName !== undefined) patch.displayName = ensureText("displayName", input.displayName);
+    if (input?.factTable !== undefined) patch.factTable = ensureText("factTable", input.factTable, 200);
+    if (input?.factColumn !== undefined) patch.factColumn = ensureText("factColumn", input.factColumn, 200);
 
     if (input?.valueType !== undefined) {
       const valueType = String(input.valueType ?? "").trim() as ValueType;
       if (!VALUE_TYPES.has(valueType)) throw new BadRequestException("valueType is invalid");
-      if (valueType !== target.value_type) {
-        const rulesCount = await this.prisma.rls_rule.count({ where: { target_id: target.id } });
+      if (valueType !== target.valueType) {
+        const rulesCount = await this.prisma.rlsRule.count({ where: { targetId: target.id } });
         if (rulesCount > 0) {
           throw new BadRequestException("valueType cannot change while rules exist");
         }
-        patch.value_type = valueType;
+        patch.valueType = valueType;
       }
     }
 
     if (input?.defaultBehavior !== undefined) {
       const defaultBehavior = String(input.defaultBehavior ?? "").trim() as DefaultBehavior;
       if (!DEFAULT_BEHAVIORS.has(defaultBehavior)) throw new BadRequestException("defaultBehavior is invalid");
-      patch.default_behavior = defaultBehavior;
+      patch.defaultBehavior = defaultBehavior;
     }
 
     if (input?.status !== undefined) {
@@ -205,15 +205,15 @@ export class AdminRlsService {
 
     try {
       const updated = await this.prisma.$transaction(async (tx) => {
-        const row = await tx.rls_target.update({ where: { id: targetId }, data: patch });
-        await tx.audit_log.create({
+        const row = await tx.rlsTarget.update({ where: { id: targetId }, data: patch });
+        await tx.auditLog.create({
           data: {
-            actor_user_id: actorUserId,
+            actorUserId: actorUserId,
             action: "RLS_TARGET_UPDATED",
-            entity_type: "rls_target",
-            entity_id: row.id,
-            before_data: before,
-            after_data: this.toTargetDto(row),
+            entityType: "rls_target",
+            entityId: row.id,
+            beforeData: before,
+            afterData: this.toTargetDto(row),
           },
         });
         return row;
@@ -231,14 +231,14 @@ export class AdminRlsService {
     const actorUserId = await this.resolveActorUserId(actorSub ?? null);
     try {
       await this.prisma.$transaction(async (tx) => {
-        const row = await tx.rls_target.delete({ where: { id: targetId } });
-        await tx.audit_log.create({
+        const row = await tx.rlsTarget.delete({ where: { id: targetId } });
+        await tx.auditLog.create({
           data: {
-            actor_user_id: actorUserId,
+            actorUserId: actorUserId,
             action: "RLS_TARGET_DELETED",
-            entity_type: "rls_target",
-            entity_id: row.id,
-            before_data: this.toTargetDto(row),
+            entityType: "rls_target",
+            entityId: row.id,
+            beforeData: this.toTargetDto(row),
           },
         });
       });
@@ -251,29 +251,29 @@ export class AdminRlsService {
 
   async listRules(targetIdRaw: string, customerIdRaw?: string) {
     const targetId = ensureUuid("targetId", targetIdRaw);
-    const target = await this.prisma.rls_target.findUnique({ where: { id: targetId }, select: { id: true } });
+    const target = await this.prisma.rlsTarget.findUnique({ where: { id: targetId }, select: { id: true } });
     if (!target) throw new NotFoundException("Target not found");
 
-    const where: { target_id: string; customer_id?: string } = { target_id: targetId };
-    if (customerIdRaw) where.customer_id = ensureUuid("customerId", customerIdRaw);
+    const where: { targetId: string; customerId?: string } = { targetId: targetId };
+    if (customerIdRaw) where.customerId = ensureUuid("customerId", customerIdRaw);
 
-    const rows = await this.prisma.rls_rule.findMany({
+    const rows = await this.prisma.rlsRule.findMany({
       where,
-      orderBy: { created_at: "asc" },
+      orderBy: { createdAt: "asc" },
     });
     return { items: rows.map((row) => this.toRuleDto(row)) };
   }
 
   async createRules(targetIdRaw: string, items: CreateRuleInput[], actorSub?: string | null) {
     const targetId = ensureUuid("targetId", targetIdRaw);
-    const target = await this.prisma.rls_target.findUnique({ where: { id: targetId } });
+    const target = await this.prisma.rlsTarget.findUnique({ where: { id: targetId } });
     if (!target) throw new NotFoundException("Target not found");
 
     if (!Array.isArray(items) || items.length === 0) {
       throw new BadRequestException("items is required");
     }
 
-    const normalized = items.map((item, idx) => this.normalizeRuleItem(item, idx, target.value_type as ValueType));
+    const normalized = items.map((item, idx) => this.normalizeRuleItem(item, idx, target.valueType as ValueType));
     const seen = new Set<string>();
     for (const rule of normalized) {
       const key = `${rule.customerId}|${rule.op}|${rule.valueText ?? ""}|${rule.valueInt ?? ""}|${rule.valueUuid ?? ""}`;
@@ -284,7 +284,7 @@ export class AdminRlsService {
     }
 
     const customerIds = Array.from(new Set(normalized.map((x) => x.customerId)));
-    const customers = await this.prisma.customers.findMany({
+    const customers = await this.prisma.customer.findMany({
       where: { id: { in: customerIds } },
       select: { id: true },
     });
@@ -298,29 +298,29 @@ export class AdminRlsService {
 
     try {
       const created = await this.prisma.$transaction(async (tx) => {
-        const rows: rls_rule[] = [];
+        const rows: RlsRule[] = [];
         for (const rule of normalized) {
-          const row = await tx.rls_rule.create({
+          const row = await tx.rlsRule.create({
             data: {
-              target_id: target.id,
-              customer_id: rule.customerId,
+              targetId: target.id,
+              customerId: rule.customerId,
               op: rule.op,
-              value_text: rule.valueText,
-              value_int: rule.valueInt,
-              value_uuid: rule.valueUuid,
+              valueText: rule.valueText,
+              valueInt: rule.valueInt,
+              valueUuid: rule.valueUuid,
             },
           });
           rows.push(row);
         }
 
-        const uniqueCustomerIds = Array.from(new Set(rows.map((r) => r.customer_id)));
-        await tx.audit_log.create({
+        const uniqueCustomerIds = Array.from(new Set(rows.map((r) => r.customerId)));
+        await tx.auditLog.create({
           data: {
-            actor_user_id: actorUserId,
+            actorUserId: actorUserId,
             action: "RLS_RULE_CREATED",
-            entity_type: "rls_rule",
-            entity_id: null,
-            after_data: {
+            entityType: "rls_rule",
+            entityId: null,
+            afterData: {
               targetId: target.id,
               count: rows.length,
               ruleIds: rows.map((r) => r.id),
@@ -345,14 +345,14 @@ export class AdminRlsService {
     const actorUserId = await this.resolveActorUserId(actorSub ?? null);
     try {
       await this.prisma.$transaction(async (tx) => {
-        const row = await tx.rls_rule.delete({ where: { id: ruleId } });
-        await tx.audit_log.create({
+        const row = await tx.rlsRule.delete({ where: { id: ruleId } });
+        await tx.auditLog.create({
           data: {
-            actor_user_id: actorUserId,
+            actorUserId: actorUserId,
             action: "RLS_RULE_DELETED",
-            entity_type: "rls_rule",
-            entity_id: row.id,
-            before_data: this.toRuleDto(row),
+            entityType: "rls_rule",
+            entityId: row.id,
+            beforeData: this.toRuleDto(row),
           },
         });
       });
@@ -368,13 +368,13 @@ export class AdminRlsService {
     const workspaceId = await this.resolveWorkspaceIdForDataset(datasetId);
     const actorUserId = await this.resolveActorUserId(actorSub ?? null);
     const result = await this.refreshSvc.requestRefresh(workspaceId, datasetId);
-    await this.prisma.audit_log.create({
+    await this.prisma.auditLog.create({
       data: {
-        actor_user_id: actorUserId,
+        actorUserId: actorUserId,
         action: "RLS_REFRESH_REQUESTED",
-        entity_type: "rls_dataset",
-        entity_id: datasetId,
-        after_data: {
+        entityType: "rls_dataset",
+        entityId: datasetId,
+        afterData: {
           status: result.status,
           pending: result.pending ?? false,
           scheduledAt: result.scheduledAt ?? null,
@@ -399,14 +399,14 @@ export class AdminRlsService {
       throw new BadRequestException("format must be json or csv");
     }
 
-    const targets = await this.prisma.rls_target.findMany({
-      where: { dataset_id: datasetId },
-      orderBy: { created_at: "asc" },
+    const targets = await this.prisma.rlsTarget.findMany({
+      where: { datasetId: datasetId },
+      orderBy: { createdAt: "asc" },
     });
 
     if (!targets.length) {
-      const catalogRow = await this.prisma.bi_reports.findFirst({
-        where: { dataset_id: datasetId },
+      const catalogRow = await this.prisma.biReport.findFirst({
+        where: { datasetId: datasetId },
         select: { id: true },
       });
       if (!catalogRow) throw new NotFoundException("Dataset not found");
@@ -414,44 +414,44 @@ export class AdminRlsService {
 
     const targetIds = targets.map((t) => t.id);
     const rules = targetIds.length
-      ? await this.prisma.rls_rule.findMany({
-          where: { target_id: { in: targetIds } },
-          include: { customers: { select: { code: true, name: true } } },
-          orderBy: { created_at: "asc" },
+      ? await this.prisma.rlsRule.findMany({
+          where: { targetId: { in: targetIds } },
+          include: { customer: { select: { code: true, name: true } } },
+          orderBy: { createdAt: "asc" },
         })
       : [];
 
     const snapshotTargets: RlsSnapshotTarget[] = targets.map((t) => ({
       id: t.id,
-      datasetId: t.dataset_id,
-      targetKey: t.target_key,
-      displayName: t.display_name,
-      factTable: t.fact_table,
-      factColumn: t.fact_column,
-      valueType: t.value_type,
-      defaultBehavior: t.default_behavior,
+      datasetId: t.datasetId,
+      targetKey: t.targetKey,
+      displayName: t.displayName,
+      factTable: t.factTable,
+      factColumn: t.factColumn,
+      valueType: t.valueType,
+      defaultBehavior: t.defaultBehavior,
       status: t.status,
-      createdAt: t.created_at?.toISOString ? t.created_at.toISOString() : String(t.created_at),
+      createdAt: t.createdAt?.toISOString ? t.createdAt.toISOString() : String(t.createdAt),
     }));
 
     const targetById = new Map<string, RlsSnapshotTarget>();
     snapshotTargets.forEach((t) => targetById.set(t.id, t));
 
     const snapshotRules: RlsSnapshotRule[] = rules.map((r) => {
-      const target = targetById.get(r.target_id);
+      const target = targetById.get(r.targetId);
       return {
         id: r.id,
-        targetId: r.target_id,
+        targetId: r.targetId,
         targetKey: target?.targetKey ?? null,
         targetDisplayName: target?.displayName ?? null,
-        customerId: r.customer_id,
-        customerCode: r.customers?.code ?? null,
-        customerName: r.customers?.name ?? null,
+        customerId: r.customerId,
+        customerCode: r.customer?.code ?? null,
+        customerName: r.customer?.name ?? null,
         op: r.op,
-        valueText: r.value_text,
-        valueInt: r.value_int,
-        valueUuid: r.value_uuid,
-        createdAt: r.created_at?.toISOString ? r.created_at.toISOString() : String(r.created_at),
+        valueText: r.valueText,
+        valueInt: r.valueInt,
+        valueUuid: r.valueUuid,
+        createdAt: r.createdAt?.toISOString ? r.createdAt.toISOString() : String(r.createdAt),
       };
     });
 
@@ -463,13 +463,13 @@ export class AdminRlsService {
     };
 
     const actorUserId = await this.resolveActorUserId(actorSub ?? null);
-    await this.prisma.audit_log.create({
+    await this.prisma.auditLog.create({
       data: {
-        actor_user_id: actorUserId,
+        actorUserId: actorUserId,
         action: "RLS_SNAPSHOT_EXPORTED",
-        entity_type: "rls_dataset",
-        entity_id: datasetId,
-        after_data: {
+        entityType: "rls_dataset",
+        entityId: datasetId,
+        afterData: {
           format,
           targets: snapshotTargets.length,
           rules: snapshotRules.length,
@@ -529,8 +529,8 @@ export class AdminRlsService {
 
   private async resolveActorUserId(actorSub: string | null): Promise<string | null> {
     if (!actorSub) return null;
-    const actor = await this.prisma.users.findUnique({
-      where: { entra_sub: actorSub },
+    const actor = await this.prisma.user.findUnique({
+      where: { entraSub: actorSub },
       select: { id: true },
     });
     return actor?.id ?? null;
@@ -539,46 +539,46 @@ export class AdminRlsService {
   private toTargetDto(row: any) {
     return {
       id: row.id,
-      datasetId: row.dataset_id,
-      targetKey: row.target_key,
-      displayName: row.display_name,
-      factTable: row.fact_table,
-      factColumn: row.fact_column,
-      valueType: row.value_type,
-      defaultBehavior: row.default_behavior,
+      datasetId: row.datasetId,
+      targetKey: row.targetKey,
+      displayName: row.displayName,
+      factTable: row.factTable,
+      factColumn: row.factColumn,
+      valueType: row.valueType,
+      defaultBehavior: row.defaultBehavior,
       status: row.status,
-      createdAt: row.created_at?.toISOString ? row.created_at.toISOString() : row.created_at,
+      createdAt: row.createdAt?.toISOString ? row.createdAt.toISOString() : row.createdAt,
     };
   }
 
   private toRuleDto(row: any) {
     return {
       id: row.id,
-      targetId: row.target_id,
-      customerId: row.customer_id,
+      targetId: row.targetId,
+      customerId: row.customerId,
       op: row.op,
-      valueText: row.value_text,
-      valueInt: row.value_int,
-      valueUuid: row.value_uuid,
-      createdAt: row.created_at?.toISOString ? row.created_at.toISOString() : row.created_at,
+      valueText: row.valueText,
+      valueInt: row.valueInt,
+      valueUuid: row.valueUuid,
+      createdAt: row.createdAt?.toISOString ? row.createdAt.toISOString() : row.createdAt,
     };
   }
 
   private async resolveWorkspaceIdForDataset(datasetId: string) {
-    const row = await this.prisma.bi_reports.findFirst({
+    const row = await this.prisma.biReport.findFirst({
       where: {
-        dataset_id: datasetId,
-        bi_workspaces: { is_active: true },
+        datasetId: datasetId,
+        workspace: { isActive: true },
       },
       select: {
-        bi_workspaces: {
-          select: { workspace_id: true },
+        workspace: {
+          select: { workspaceId: true },
         },
       },
-      orderBy: { created_at: "asc" },
+      orderBy: { createdAt: "asc" },
     });
 
-    const workspaceId = row?.bi_workspaces?.workspace_id;
+    const workspaceId = row?.workspace?.workspaceId;
     if (!workspaceId) {
       throw new NotFoundException("Dataset not found in catalog");
     }

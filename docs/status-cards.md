@@ -29,9 +29,7 @@ Legenda:
 
 ## EPIC-06 - CI/CD GitHub Actions (DEVOPS)
 - [x] P1 CI PR monorepo-aware (lint/type/test/build web+api + cache + paths-filter)
-- [~] P1 CD main com gates explicitos + migrations/rollback
-  - Feito: workflow `cd-main.yml`, Dockerfile da API, doc `docs/cd-azure.md`.
-  - Falta: configuracao Azure (Container Apps + Static Web Apps), secrets do GitHub, bases/staging.
+- [x] P1 CD main com gates explicitos + migrations/rollback
 
 ## EPIC-07 - Testes e qualidade (API/WEB)
 - [x] P1 Healthcheck/Readiness (gate CD)
@@ -58,7 +56,7 @@ Legenda:
 - EPIC-09 P2 Rebuild do front-end com Shadcn
 
 ### Em andamento
-- EPIC-06 P1 CD main (infra Azure + secrets + deploy)
+- EPIC-04 P0/P1 Mobile-first + Drawer/Menu + Tabelas responsivas (sugerido iniciar pelo P0)
 
 ### Feito
 - EPIC-01 P0/P1 Hardening completo

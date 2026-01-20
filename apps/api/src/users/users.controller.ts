@@ -30,13 +30,13 @@ export class UsersController {
 
     return {
       email: user.email ?? null,
-      displayName: user.display_name ?? null,
+      displayName: user.displayName ?? null,
       status: effectiveStatus,
       rawStatus: user.status, // útil para debug
       memberships: memberships.map(m => ({
-        customerId: m.customer_id,
+        customerId: m.customerId,
         role: m.role,
-        isActive: m.is_active,
+        isActive: m.isActive,
       })),
     };
   }

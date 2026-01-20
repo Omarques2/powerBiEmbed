@@ -27,30 +27,30 @@ export class UsersService {
     const email = this.pickEmail(claims); // mantenha sua lógica atual
     const displayName = claims.name ? String(claims.name) : null;
 
-    return this.prisma.users.upsert({
-      where: { entra_sub: entraSub },
+    return this.prisma.user.upsert({
+      where: { entraSub: entraSub },
       create: {
-        entra_sub: entraSub,
-        entra_oid: entraOid ?? undefined,
+        entraSub: entraSub,
+        entraOid: entraOid ?? undefined,
         email: email ?? undefined,
-        display_name: displayName ?? undefined,
+        displayName: displayName ?? undefined,
         status: "pending",                
-        last_login_at: new Date(),
+        lastLoginAt: new Date(),
       },
       update: {
-        entra_oid: entraOid ?? undefined,
+        entraOid: entraOid ?? undefined,
         email: email ?? undefined,
-        display_name: displayName ?? undefined,
-        last_login_at: new Date(),
+        displayName: displayName ?? undefined,
+        lastLoginAt: new Date(),
         // NÃO mexe em status aqui
       },
     });
   }
 
   async listActiveMemberships(userId: string) {
-    return this.prisma.user_customer_memberships.findMany({
-      where: { user_id: userId, is_active: true, customers: { status: "active" } },
-      include: { customers: true },
+    return this.prisma.userCustomerMembership.findMany({
+      where: { userId: userId, isActive: true, customer: { status: "active" } },
+      include: { customer: true },
     });
   }
 }

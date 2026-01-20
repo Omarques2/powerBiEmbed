@@ -49,8 +49,8 @@ export class AdminCustomersController {
 
 /**
    * Unlink (revogar) um workspace do customer de forma consistente:
-   * - bi_workspaces.is_active = false
-   * - bi_reports.is_active = false (do workspace)
+   * - bi_workspaces.isActive = false
+   * - bi_reports.isActive = false (do workspace)
    * - revoga permissões (workspace + reports) de usuários com membership ativo no customer
    * - audit_log
    */

@@ -15,18 +15,18 @@ export class ActiveUserGuard implements CanActivate {
 
     const entraSub = String(claims.sub);
 
-    const user = await this.prisma.users.findUnique({
-      where: { entra_sub: entraSub },
+    const user = await this.prisma.user.findUnique({
+      where: { entraSub: entraSub },
       select: { id: true, status: true },
     });
 
     // Se por algum motivo ainda não existe no DB, trate como pending
     if (!user) {
-      await this.prisma.users.create({
+      await this.prisma.user.create({
         data: {
-          entra_sub: entraSub,
+          entraSub: entraSub,
           status: "pending",
-          last_login_at: new Date(),
+          lastLoginAt: new Date(),
         },
       });
 
@@ -45,8 +45,8 @@ export class ActiveUserGuard implements CanActivate {
     }
 
     // Exigir pelo menos 1 customer ativo (opcional mas altamente recomendado)
-    const hasMembership = await this.prisma.user_customer_memberships.findFirst({
-      where: { user_id: user.id, is_active: true, customers: { status: "active" } },
+    const hasMembership = await this.prisma.userCustomerMembership.findFirst({
+      where: { userId: user.id, isActive: true, customer: { status: "active" } },
       select: { id: true },
     });
 

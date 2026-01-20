@@ -4,6 +4,7 @@ import request from "supertest";
 import { App } from "supertest/types";
 import { AppModule } from "../src/app.module";
 import { PrismaService } from "../src/prisma/prisma.service";
+import { applyGlobals } from "./helpers/e2e-utils";
 
 describe("AppController (e2e)", () => {
   let app: INestApplication<App>;
@@ -26,12 +27,17 @@ describe("AppController (e2e)", () => {
       .compile();
 
     app = moduleFixture.createNestApplication();
+    applyGlobals(app);
     await app.init();
   });
 
-  it("/ (GET) returns 404 when no root controller is registered", () => {
-    return request(app.getHttpServer())
-      .get("/")
-      .expect(404);
+  afterEach(async () => {
+    await app.close();
+  });
+
+  it("/ (GET) returns hello world payload", async () => {
+    const res = await request(app.getHttpServer()).get("/");
+    expect(res.status).toBe(200);
+    expect(res.body.data).toBe("Hello World!");
   });
 });

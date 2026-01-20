@@ -31,56 +31,56 @@ export class AdminBootstrapController {
     const user = await this.usersService.upsertFromClaims(claims);
 
     // 2) Sobe status para active (quebra o paradoxo)
-    await this.prisma.users.update({
+    await this.prisma.user.update({
       where: { id: user.id },
       data: { status: "active" },
     });
 
     // 3) Seed application + role
-    const app = await this.prisma.applications.upsert({
-      where: { app_key: "PBI_EMBED" },
-      create: { app_key: "PBI_EMBED", name: "Power BI Embed" },
+    const app = await this.prisma.application.upsert({
+      where: { appKey: "PBI_EMBED" },
+      create: { appKey: "PBI_EMBED", name: "Power BI Embed" },
       update: { name: "Power BI Embed" },
       select: { id: true },
     });
 
-    const role = await this.prisma.app_roles.upsert({
-      where: { application_id_role_key: { application_id: app.id, role_key: "platform_admin" } },
-      create: { application_id: app.id, role_key: "platform_admin", name: "Platform Admin" },
+    const role = await this.prisma.appRole.upsert({
+      where: { applicationId_roleKey: { applicationId: app.id, roleKey: "platform_admin" } },
+      create: { applicationId: app.id, roleKey: "platform_admin", name: "Platform Admin" },
       update: { name: "Platform Admin" },
       select: { id: true },
     });
 
-    // 4) Atribui role para o usuário (customer_id null)
-    const existing = await this.prisma.user_app_roles.findFirst({
-    where: {
-        user_id: user.id,
-        application_id: app.id,
-        app_role_id: role.id,
-        customer_id: null,
-    },
-    select: { id: true },
+    // 4) Atribui role para o usuário (customerId null)
+    const existing = await this.prisma.userAppRole.findFirst({
+      where: {
+        userId: user.id,
+        applicationId: app.id,
+        appRoleId: role.id,
+        customerId: null,
+      },
+      select: { id: true },
     });
 
     if (!existing) {
-    await this.prisma.user_app_roles.create({
+      await this.prisma.userAppRole.create({
         data: {
-        user_id: user.id,
-        application_id: app.id,
-        customer_id: null,
-        app_role_id: role.id,
+          userId: user.id,
+          applicationId: app.id,
+          customerId: null,
+          appRoleId: role.id,
         },
-    });
+      });
     }
 
     // 5) Audita
-    await this.prisma.audit_log.create({
+    await this.prisma.auditLog.create({
       data: {
-        actor_user_id: user.id,
+        actorUserId: user.id,
         action: "PLATFORM_ADMIN_BOOTSTRAPPED",
-        entity_type: "users",
-        entity_id: user.id,
-        after_data: {
+        entityType: "users",
+        entityId: user.id,
+        afterData: {
           application: "PBI_EMBED",
           role: "platform_admin",
         },

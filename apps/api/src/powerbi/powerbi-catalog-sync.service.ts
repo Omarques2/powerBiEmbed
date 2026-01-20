@@ -17,7 +17,7 @@ export class PowerBiCatalogSyncService {
     const customerId = (input.customerId ?? "").trim();
     if (!customerId) throw new BadRequestException("customerId is required");
 
-    const customer = await this.prisma.customers.findUnique({
+    const customer = await this.prisma.customer.findUnique({
       where: { id: customerId },
       select: { id: true, status: true },
     });
@@ -44,30 +44,30 @@ export class PowerBiCatalogSyncService {
 
     await this.prisma.$transaction(async (tx) => {
       for (const w of remoteWorkspaces) {
-        const row = await tx.bi_workspaces.upsert({
-          where: { customer_id_workspace_id: { customer_id: customerId, workspace_id: w.id } },
+        const row = await tx.biWorkspace.upsert({
+          where: { customerId_workspaceId: { customerId: customerId, workspaceId: w.id } },
           create: {
-            customer_id: customerId,
-            workspace_id: w.id,
-            workspace_name: w.name ?? undefined,
-            is_active: true,
+            customerId: customerId,
+            workspaceId: w.id,
+            workspaceName: w.name ?? undefined,
+            isActive: true,
           },
           update: {
-            workspace_name: w.name ?? undefined,
-            is_active: true,
+            workspaceName: w.name ?? undefined,
+            isActive: true,
           },
-          select: { id: true, workspace_id: true },
+          select: { id: true, workspaceId: true },
         });
 
-        upsertedWorkspaceRefIds.push({ workspaceId: row.workspace_id, workspaceRefId: row.id });
+        upsertedWorkspaceRefIds.push({ workspaceId: row.workspaceId, workspaceRefId: row.id });
       }
 
       // Opcional: desativar workspaces que sumiram (somente se NÃO estiver usando filtro)
       if (input.deactivateMissing && !input.workspaceIds?.length) {
         const remoteSet = new Set(remoteWorkspaces.map(w => w.id));
-        await tx.bi_workspaces.updateMany({
-          where: { customer_id: customerId, workspace_id: { notIn: Array.from(remoteSet) } },
-          data: { is_active: false },
+        await tx.biWorkspace.updateMany({
+          where: { customerId: customerId, workspaceId: { notIn: Array.from(remoteSet) } },
+          data: { isActive: false },
         });
       }
     });
@@ -94,19 +94,19 @@ export class PowerBiCatalogSyncService {
 
       await this.prisma.$transaction(async (tx) => {
         for (const r of remoteReports) {
-          await tx.bi_reports.upsert({
-            where: { workspace_ref_id_report_id: { workspace_ref_id: ws.workspaceRefId, report_id: r.id } },
+          await tx.biReport.upsert({
+            where: { workspaceRefId_reportId: { workspaceRefId: ws.workspaceRefId, reportId: r.id } },
             create: {
-              workspace_ref_id: ws.workspaceRefId,
-              report_id: r.id,
-              report_name: r.name ?? undefined,
-              dataset_id: r.datasetId ?? undefined,
-              is_active: true,
+              workspaceRefId: ws.workspaceRefId,
+              reportId: r.id,
+              reportName: r.name ?? undefined,
+              datasetId: r.datasetId ?? undefined,
+              isActive: true,
             },
             update: {
-              report_name: r.name ?? undefined,
-              dataset_id: r.datasetId ?? undefined,
-              is_active: true,
+              reportName: r.name ?? undefined,
+              datasetId: r.datasetId ?? undefined,
+              isActive: true,
             },
           });
           reportsUpserted += 1;
@@ -114,9 +114,9 @@ export class PowerBiCatalogSyncService {
 
         if (input.deactivateMissing) {
           const remoteSet = new Set(remoteReports.map(r => r.id));
-          const res = await tx.bi_reports.updateMany({
-            where: { workspace_ref_id: ws.workspaceRefId, report_id: { notIn: Array.from(remoteSet) } },
-            data: { is_active: false },
+          const res = await tx.biReport.updateMany({
+            where: { workspaceRefId: ws.workspaceRefId, reportId: { notIn: Array.from(remoteSet) } },
+            data: { isActive: false },
           });
           reportsDeactivated += res.count;
         }
@@ -137,30 +137,30 @@ export class PowerBiCatalogSyncService {
     const customerId = (customerIdRaw ?? "").trim();
     if (!customerId) throw new BadRequestException("customerId is required");
 
-    const customer = await this.prisma.customers.findUnique({
+    const customer = await this.prisma.customer.findUnique({
       where: { id: customerId },
       select: { id: true, status: true, code: true, name: true },
     });
     if (!customer) throw new NotFoundException("Customer not found");
 
-    const workspaces = await this.prisma.bi_workspaces.findMany({
-      where: { customer_id: customerId },
-      orderBy: [{ is_active: "desc" }, { created_at: "asc" }],
+    const workspaces = await this.prisma.biWorkspace.findMany({
+      where: { customerId: customerId },
+      orderBy: [{ isActive: "desc" }, { createdAt: "asc" }],
       select: {
         id: true,
-        workspace_id: true,
-        workspace_name: true,
-        is_active: true,
-        created_at: true,
-        bi_reports: {
-          orderBy: [{ is_active: "desc" }, { created_at: "asc" }],
+        workspaceId: true,
+        workspaceName: true,
+        isActive: true,
+        createdAt: true,
+        reports: {
+          orderBy: [{ isActive: "desc" }, { createdAt: "asc" }],
           select: {
             id: true,
-            report_id: true,
-            report_name: true,
-            dataset_id: true,
-            is_active: true,
-            created_at: true,
+            reportId: true,
+            reportName: true,
+            datasetId: true,
+            isActive: true,
+            createdAt: true,
           },
         },
       },
@@ -170,17 +170,17 @@ export class PowerBiCatalogSyncService {
       customer,
       workspaces: workspaces.map((w) => ({
         workspaceRefId: w.id,
-        workspaceId: w.workspace_id,
-        name: w.workspace_name ?? String(w.workspace_id),
-        isActive: w.is_active,
-        createdAt: w.created_at,
-        reports: w.bi_reports.map((r) => ({
+        workspaceId: w.workspaceId,
+        name: w.workspaceName ?? String(w.workspaceId),
+        isActive: w.isActive,
+        createdAt: w.createdAt,
+        reports: w.reports.map((r) => ({
           reportRefId: r.id,
-          reportId: r.report_id,
-          name: r.report_name ?? String(r.report_id),
-          datasetId: r.dataset_id,
-          isActive: r.is_active,
-          createdAt: r.created_at,
+          reportId: r.reportId,
+          name: r.reportName ?? String(r.reportId),
+          datasetId: r.datasetId,
+          isActive: r.isActive,
+          createdAt: r.createdAt,
         })),
       })),
     };

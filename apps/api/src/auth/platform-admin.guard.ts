@@ -11,8 +11,8 @@ export class PlatformAdminGuard implements CanActivate {
     const sub = req.user?.sub ? String(req.user.sub) : null;
     if (!sub) throw new ForbiddenException({ code: "NO_SUBJECT" });
 
-    const user = await this.prisma.users.findUnique({
-      where: { entra_sub: sub },
+    const user = await this.prisma.user.findUnique({
+      where: { entraSub: sub },
       select: { id: true, status: true },
     });
 
@@ -20,12 +20,12 @@ export class PlatformAdminGuard implements CanActivate {
     if (user.status !== "active") throw new ForbiddenException({ code: "ADMIN_NOT_ACTIVE" });
 
 
-    const adminRole = await this.prisma.user_app_roles.findFirst({
+    const adminRole = await this.prisma.userAppRole.findFirst({
       where: {
-        user_id: user.id,
-        customer_id: null,
-        applications: { app_key: "PBI_EMBED" },
-        app_roles: { role_key: "platform_admin" },
+        userId: user.id,
+        customerId: null,
+        application: { appKey: "PBI_EMBED" },
+        appRole: { roleKey: "platform_admin" },
       },
       select: { id: true },
     });

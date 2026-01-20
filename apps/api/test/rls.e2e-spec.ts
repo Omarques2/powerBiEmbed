@@ -6,6 +6,7 @@ import { AppModule } from "../src/app.module";
 import { PrismaService } from "../src/prisma/prisma.service";
 import { AuthGuard } from "../src/auth/auth.guard";
 import { PlatformAdminGuard } from "../src/auth/platform-admin.guard";
+import { applyGlobals } from "./helpers/e2e-utils";
 
 describe("Admin RLS (e2e)", () => {
   jest.setTimeout(30000);
@@ -31,11 +32,12 @@ describe("Admin RLS (e2e)", () => {
       .compile();
 
     app = moduleFixture.createNestApplication();
+    applyGlobals(app);
     await app.init();
 
     prisma = app.get(PrismaService);
 
-    const customer = await prisma.customers.create({
+    const customer = await prisma.customer.create({
       data: { code: customerCode, name: "RLS Test Customer", status: "active" },
       select: { id: true },
     });
@@ -44,11 +46,11 @@ describe("Admin RLS (e2e)", () => {
 
   afterAll(async () => {
     if (targetId) {
-      await prisma.rls_rule.deleteMany({ where: { target_id: targetId } });
-      await prisma.rls_target.deleteMany({ where: { id: targetId } });
+      await prisma.rlsRule.deleteMany({ where: { targetId: targetId } });
+      await prisma.rlsTarget.deleteMany({ where: { id: targetId } });
     }
     if (customerId) {
-      await prisma.customers.deleteMany({ where: { id: customerId } });
+      await prisma.customer.deleteMany({ where: { id: customerId } });
     }
     if (prisma) {
       await prisma.$disconnect();
@@ -72,8 +74,8 @@ describe("Admin RLS (e2e)", () => {
       })
       .expect(201);
 
-    expect(res.body?.id).toBeTruthy();
-    targetId = res.body.id;
+    expect(res.body?.data?.id).toBeTruthy();
+    targetId = res.body.data.id;
   });
 
   it("rejects duplicate targetKey", async () => {
@@ -121,7 +123,7 @@ describe("Admin RLS (e2e)", () => {
       })
       .expect(201);
 
-    createdRuleId = first.body?.created?.[0]?.id ?? null;
+    createdRuleId = first.body?.data?.created?.[0]?.id ?? null;
 
     await request(app.getHttpServer())
       .post(`/admin/rls/targets/${targetId}/rules`)

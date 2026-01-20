@@ -159,3 +159,6 @@ Critérios de aceite:
 - Sem regressao de acessibilidade e responsividade.
 - Build e testes web ok.
 Dependencias: EPIC-06 CD main concluido; EPIC-04/05 concluido ou incorporado na migracao.
+
+## Referencia de CD (Azure)
+Para configuracao e manutencao de CD, veja `docs/cd-azure.md`.
