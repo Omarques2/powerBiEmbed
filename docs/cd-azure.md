@@ -48,7 +48,7 @@ O workflow usa GHCR (`ghcr.io`). Para o Azure puxar imagens privadas:
    - `AZURE_CONTAINER_REGISTRY_USERNAME` = seu user/organization do GitHub (o mesmo que aparece em `ghcr.io/<usuario>`).
 4. Confirme o nome da imagem usado no workflow:
    - Em `.github/workflows/cd-main.yml`, o `IMAGE_NAME` e o `REGISTRY` geram a imagem:  
-     `ghcr.io/<github_owner>/pbi-embed-api:<sha>`
+     `ghcr.io/<github_owner_lower>/pbi-embed-api:<sha>` (owner sempre em minusculas).
 
 ## 4) Criar recursos no Azure (API)
 1. Criar Resource Group:
