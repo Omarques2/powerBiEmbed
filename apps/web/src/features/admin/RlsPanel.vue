@@ -615,24 +615,15 @@
                 </div>
               </div>
 
-              <div class="flex flex-col gap-2">
+              <div class="flex items-end justify-end">
                 <button
                   type="button"
-                  class="w-full rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800
+                  class="rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800
                          disabled:opacity-60 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
                   :disabled="ruleModalSaving"
                   @click="openRuleCreate"
                 >
                   + Nova regra
-                </button>
-                <button
-                  type="button"
-                  class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs hover:bg-slate-50
-                         disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
-                  :disabled="loadingRules"
-                  @click="loadRules"
-                >
-                  {{ loadingRules ? "Carregando..." : "Recarregar regras" }}
                 </button>
               </div>
             </div>
@@ -1714,79 +1705,22 @@ function buildGuideSteps(t: RlsTarget): GuideStep[] {
         : "Defina value_text como Text.";
   return [
     {
-      key: "shortcut",
-      title: "Atalho: tabelas prontas (opcional)",
-      subtitle: "Use Sec_*/Dim_* ja filtradas",
-      bullets: [
-        `A API cria a view Sec_${t.targetKey} automaticamente ao salvar o target.`,
-        `Se o banco ja fornece Sec_${t.targetKey} e Dim_${t.targetKey}, pule as etapas 1-3.`,
-        "No Navigator, selecione diretamente as tabelas prontas.",
-        "Confirme tipos: customer_id/user_id como Text e value_* conforme value_type.",
-        "Se estiver tudo ok, avance direto para relacionamentos e role.",
-      ],
-      tips: [
-        "Esse caminho elimina o filtro manual por target_key no Power Query.",
-      ],
-      screenshotHint: "Navigator mostrando Sec_ e Dim_ prontos.",
-    },
-    {
-      key: "import",
-      title: "Importar sec_rls_base (Postgres)",
-      subtitle: "Conector PostgreSQL + Navigator",
+      key: "connect",
+      title: `Conectar Sec_${t.targetKey} (Postgres)`,
+      subtitle: "Import direto da view pronta",
       bullets: [
         "Abra o Power BI Desktop.",
         "Home -> Get Data -> PostgreSQL database.",
         "Preencha Server e Database e clique OK.",
         "Autentique com usuario/senha (tipo Database).",
-        "Se for a primeira vez, escolha credencial Database e marque Salvar.",
-        "No Navigator, abra o schema (ex: public) e selecione sec_rls_base.",
+        `No Navigator, abra o schema (ex: public) e selecione Sec_${t.targetKey}.`,
         "Clique Transform Data para abrir o Power Query.",
-        "Load direto funciona, mas Transform Data e recomendado.",
-      ],
-      tips: ["Use Transform Data para ajustar tipos e criar as queries derivadas."],
-      links: [
-        { label: "Conector PostgreSQL", href: "https://learn.microsoft.com/power-bi/connect-data/desktop-postgresql" },
-      ],
-      screenshotHint: "Tela do Navigator com sec_rls_base selecionado.",
-    },
-    {
-      key: "types",
-      title: "Ajustar tipos e nome da query",
-      subtitle: "Power Query Editor",
-      bullets: [
-        "Renomeie a query para sec_rls_base (se vier com prefixo de schema).",
-        "Confirme as colunas: customer_id, user_id, target_key, op e colunas de valor.",
-        "Defina customer_id e user_id como Text (compatibilidade com CUSTOMDATA()/USERNAME()).",
-        "Se customer_id vier como Guid, altere para Text.",
-        "Defina target_key e op como Text.",
-        "Use Transform -> Data Type para ajustar os tipos.",
-        valueTypeHint,
-        "Se houver normalizacao na Dim, aplique o mesmo na coluna de valor.",
+        "Confirme tipos: customer_id/user_id como Text e value_* conforme value_type.",
       ],
       tips: [
-        "Evite deixar customer_id/user_id como Guid para nao quebrar a comparacao com CUSTOMDATA()/USERNAME().",
+        `A API cria a view Sec_${t.targetKey} automaticamente ao salvar o target.`,
       ],
-      links: [
-        { label: "Power Query overview", href: "https://learn.microsoft.com/power-bi/transform-model/desktop-query-overview" },
-      ],
-      screenshotHint: "Editor do Power Query com tipos ajustados.",
-    },
-    {
-      key: "sec",
-      title: `Criar Sec_${t.targetKey}`,
-      subtitle: "Filtro por target_key",
-      bullets: [
-        "Clique com o botao direito em sec_rls_base -> Reference (nao Duplicate).",
-        `Renomeie para Sec_${t.targetKey}.`,
-        `Filtre target_key = "${t.targetKey}".`,
-        `Mantenha apenas customer_id, user_id, op e ${valueCol}.`,
-        "Use Choose Columns para remover colunas nao usadas.",
-        `Aplique Trim/Clean/Upper em ${valueCol} se fizer o mesmo na Dim.`,
-      ],
-      tips: [
-        "Reference evita reimportar dados e deixa o modelo mais leve.",
-      ],
-      screenshotHint: "Filtro aplicado em target_key e colunas escolhidas.",
+      screenshotHint: `Navigator mostrando Sec_${t.targetKey}.`,
     },
     {
       key: "dim",
@@ -1812,7 +1746,7 @@ function buildGuideSteps(t: RlsTarget): GuideStep[] {
       subtitle: "Carregar no modelo",
       bullets: [
         "Clique Close & Apply.",
-        "Aguarde carregar sec_rls_base, Sec_*, Dim_* e a tabela de fato.",
+        "Aguarde carregar Sec_*, Dim_* e a tabela de fato.",
       ],
       tips: [
         "Se o load demorar muito, revise as colunas mantidas nas queries.",
@@ -1997,4 +1931,3 @@ onMounted(async () => {
   await loadActiveUsers();
 });
 </script>
-

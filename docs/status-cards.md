@@ -42,7 +42,7 @@ Legenda:
 - [ ] P2 Modularizar AdminUsersService por dominio
 
 ## EPIC-10 - Controle granular de reports + RLS reutilizavel (API/WEB)
-- [x] P1 Acesso por report (nao apenas por workspace)
+- [ ] P1 Acesso por report (nao apenas por workspace)
 - [x] P1 RLS reutilizavel (targets/regras por dataset)
   - Opcao 3 dataset-first implementada (sem vinculos).
   - Nota operacional: RLS embed confirmado com todas as fontes em Import (Postgres + Lakehouse).

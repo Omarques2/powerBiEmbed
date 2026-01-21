@@ -169,6 +169,7 @@ Estrategia:
 Aceite:
 - Customer pode ter acesso parcial aos reports de uma workspace.
 - Usuarios do customer herdam somente os reports marcados.
+Status atual: pendente.
 
 Card P1 - API/WEB | RLS reutilizavel (target/rule global + vinculo)  
 Contexto: hoje regras precisam ser recriadas por customer mesmo para o mesmo dataset/report.  
@@ -185,6 +186,7 @@ Aceite:
 Nota operacional:
 - Embed com RLS exige effective identity; se houver multiplas fontes, todas devem estar em Import e suportar effective identity.
  - Status atual: RLS validado com Postgres e Lakehouse em Import; DirectQuery/PowerQuery nao suportou effective identity no embed.
+Status atual: concluido.
 
 ### EPIC-11: Documentacao e onboarding (PBIX)
 Card P1 - DOC | Atualizar Guia PBIX (nomes de tabelas)  
@@ -207,6 +209,7 @@ Aceite:
 - Tabelas filtradas e nomeadas de acordo com o passo 3 do guia.
 Referencia:
 - `docs/pbix-guide.md`
+Status atual: concluido.
 
 ## Mini-roteiro (Opcao 3 + EPIC-11)
 1. UX dataset-first (WEB):
@@ -217,8 +220,8 @@ Referencia:
    - Manter schema atual; ajustar endpoints para dataset-first.
    - Criar Sec_<target_key> automaticamente no backend.
 3. Guia PBIX (EPIC-11):
-   - Atualizar nomes e DAX (CUSTOMDATA + USERNAME).
-   - Documentar caminho "tabelas prontas" e passos reduzidos.
+    - Atualizar nomes e DAX (CUSTOMDATA + USERNAME).
+    - Guia usa Sec_<target_key> direto no Postgres (sem sec_rls_base).
 4. Testes:
    - E2E: criar target -> regra customer/usuario -> snapshot.
    - Manual: fluxo completo na UI + export do snapshot.
