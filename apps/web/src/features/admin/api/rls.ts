@@ -22,7 +22,8 @@ export type RlsTarget = {
 export type RlsRule = {
   id: string;
   targetId: string;
-  customerId: string;
+  customerId: string | null;
+  userId: string | null;
   op: RlsRuleOp;
   valueText: string | null;
   valueInt: number | null;
@@ -48,9 +49,12 @@ export type RlsSnapshotRule = {
   targetId: string;
   targetKey: string | null;
   targetDisplayName: string | null;
-  customerId: string;
+  customerId: string | null;
   customerCode: string | null;
   customerName: string | null;
+  userId: string | null;
+  userEmail: string | null;
+  userDisplayName: string | null;
   op: RlsRuleOp;
   valueText: string | null;
   valueInt: number | null;
@@ -65,6 +69,15 @@ export type RlsSnapshot = {
   rules: RlsSnapshotRule[];
 };
 
+export type RlsDatasetSummary = {
+  datasetId: string;
+  reportCount: number;
+  workspaceCount: number;
+  sampleReportId: string | null;
+  sampleReportName: string | null;
+  sampleWorkspaceId: string | null;
+  sampleWorkspaceName: string | null;
+};
 
 export type CreateTargetPayload = {
   targetKey: string;
@@ -79,7 +92,8 @@ export type CreateTargetPayload = {
 export type UpdateTargetPayload = Partial<CreateTargetPayload>;
 
 export type CreateRulePayload = {
-  customerId: string;
+  customerId?: string;
+  userId?: string;
   op: RlsRuleOp;
   valueText?: string | null;
   valueInt?: number | null;
@@ -89,6 +103,11 @@ export type CreateRulePayload = {
 export async function listRlsTargets(datasetId: string) {
   const res = await http.get(`/admin/rls/datasets/${encodeURIComponent(datasetId)}/targets`);
   return unwrapData(res.data as ApiEnvelope<{ items: RlsTarget[] }>);
+}
+
+export async function listRlsDatasets() {
+  const res = await http.get("/admin/rls/datasets");
+  return unwrapData(res.data as ApiEnvelope<{ items: RlsDatasetSummary[] }>);
 }
 
 export async function createRlsTarget(datasetId: string, payload: CreateTargetPayload) {
@@ -106,9 +125,9 @@ export async function deleteRlsTarget(targetId: string) {
   return unwrapData(res.data as ApiEnvelope<{ ok: boolean }>);
 }
 
-export async function listRlsRules(targetId: string, customerId?: string) {
+export async function listRlsRules(targetId: string, opts?: { customerId?: string; userId?: string }) {
   const res = await http.get(`/admin/rls/targets/${encodeURIComponent(targetId)}/rules`, {
-    params: { customerId },
+    params: { customerId: opts?.customerId, userId: opts?.userId },
   });
   return unwrapData(res.data as ApiEnvelope<{ items: RlsRule[] }>);
 }

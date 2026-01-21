@@ -60,16 +60,13 @@ export class PowerBiController {
   ) {
     if (!req.user) throw new BadRequestException('Missing user claims');
     const user = await this.usersService.upsertFromClaims(req.user);
-    await this.biAuthz.assertCanViewReport(
+    const access = await this.biAuthz.resolveReportAccess(
       user.id,
       query.workspaceId,
       query.reportId,
     );
-    const customerId = await this.biAuthz.getWorkspaceCustomerId(
-      user.id,
-      query.workspaceId,
-    );
-    const username = user.email ?? user.id;
+    const customerId = access.customerId;
+    const username = user.id;
     return this.svc.getEmbedConfig(query.workspaceId, query.reportId, {
       username,
       roles: ['CustomerRLS'],
@@ -100,12 +97,13 @@ export class PowerBiController {
 
     if (!req.user) throw new BadRequestException('Missing user claims');
     const user = await this.usersService.upsertFromClaims(req.user);
-    await this.biAuthz.assertCanViewReport(user.id, workspaceId, reportId);
-    const customerId = await this.biAuthz.getWorkspaceCustomerId(
+    const access = await this.biAuthz.resolveReportAccess(
       user.id,
       workspaceId,
+      reportId,
     );
-    const username = user.email ?? user.id;
+    const customerId = access.customerId;
+    const username = user.id;
 
     const result = await this.svc.exportReportFile(workspaceId, reportId, {
       username,

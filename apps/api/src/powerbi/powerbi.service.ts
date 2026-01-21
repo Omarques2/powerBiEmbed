@@ -93,7 +93,10 @@ function getPbiErrorMessage(data: unknown, fallback?: string): string {
   return fallback ?? 'unknown';
 }
 
-function isEffectiveIdentityUnsupported(data: unknown, fallback?: string): boolean {
+function isEffectiveIdentityUnsupported(
+  data: unknown,
+  fallback?: string,
+): boolean {
   const text = getPbiErrorMessage(data, fallback).toLowerCase();
   return text.includes('effective identity is not supported');
 }

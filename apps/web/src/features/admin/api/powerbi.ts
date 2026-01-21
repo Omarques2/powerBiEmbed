@@ -59,6 +59,7 @@ export type CustomerCatalog = {
       name: string;
       datasetId: string | null;
       isActive: boolean;
+      canView: boolean;
       createdAt: string;
     }>;
   }>;
@@ -69,14 +70,41 @@ export async function getPowerBiCatalog(customerId: string) {
   return unwrapData(res.data as ApiEnvelope<CustomerCatalog>);
 }
 
+export type GlobalCatalog = {
+  workspaces: Array<{
+    workspaceRefId: string;
+    workspaceId: string;
+    name: string;
+    isActive: boolean;
+    createdAt: string;
+    reports: Array<{
+      reportRefId: string;
+      reportId: string;
+      name: string;
+      datasetId: string | null;
+      isActive: boolean;
+      createdAt: string;
+    }>;
+  }>;
+};
+
+export async function getPowerBiGlobalCatalog() {
+  const res = await http.get("/admin/powerbi/catalog/global");
+  return unwrapData(res.data as ApiEnvelope<GlobalCatalog>);
+}
+
 export async function unlinkCustomerWorkspace(customerId: string, workspaceRefId: string) {
   const res = await http.post(`/admin/customers/${customerId}/workspaces/${workspaceRefId}/unlink`);
   return unwrapData(
     res.data as ApiEnvelope<{
       ok: boolean;
       workspace: { workspaceRefId: string; isActive: boolean };
-      reports: { totalFound: number; deactivated: number };
-      permissions: { usersConsidered: number; workspacePermsRevoked: number; reportPermsRevoked: number };
+      reports: { totalFound: number; permissionsRevoked: number };
     }>,
   );
+}
+
+export async function setCustomerReportPermission(customerId: string, reportRefId: string, canView: boolean) {
+  const res = await http.put(`/admin/customers/${customerId}/reports/${reportRefId}`, { canView });
+  return unwrapData(res.data as ApiEnvelope<{ ok: boolean; workspaceActivated?: boolean }>);
 }

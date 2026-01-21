@@ -28,6 +28,11 @@ import {
 export class AdminRlsController {
   constructor(private readonly svc: AdminRlsService) {}
 
+  @Get('datasets')
+  listDatasets() {
+    return this.svc.listDatasets();
+  }
+
   @Get('datasets/:datasetId/targets')
   listTargets(@Param('datasetId', ParseUUIDPipe) datasetId: string) {
     return this.svc.listTargets(datasetId);
@@ -67,7 +72,7 @@ export class AdminRlsController {
     @Param('targetId', ParseUUIDPipe) targetId: string,
     @Query() query: ListRulesQueryDto,
   ) {
-    return this.svc.listRules(targetId, query.customerId);
+    return this.svc.listRules(targetId, query.customerId, query.userId);
   }
 
   @Post('targets/:targetId/rules')

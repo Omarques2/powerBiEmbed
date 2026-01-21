@@ -52,7 +52,8 @@ model Customer {
   name         String
   status       String                    @default("active")
   createdAt    DateTime                  @default(now()) @map("created_at") @db.Timestamptz(6)
-  workspaces   BiWorkspace[]
+  workspaceLinks BiCustomerWorkspace[]
+  reportPermissions BiCustomerReportPermission[]
   userAppRoles UserAppRole[]
   memberships  UserCustomerMembership[]
   rlsRules     RlsRule[]
@@ -85,8 +86,7 @@ model User {
   createdAt            DateTime                  @default(now()) @map("created_at") @db.Timestamptz(6)
   lastLoginAt          DateTime?                 @map("last_login_at") @db.Timestamptz(6)
   status               UserStatus                @default(pending)
-  reportPermissions    BiReportPermission[]
-  workspacePermissions BiWorkspacePermission[]
+  rlsRules             RlsRule[]
   userAppRoles         UserAppRole[]
   memberships          UserCustomerMembership[]
   auditLogsAsActor     AuditLog[]                @relation("audit_actor")
@@ -116,17 +116,14 @@ model AuditLog {
 
 model BiWorkspace {
   id          String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  customerId  String                   @map("customer_id") @db.Uuid
   workspaceId String                   @map("workspace_id") @db.Uuid
   workspaceName String?                @map("workspace_name")
   isActive    Boolean                  @default(true) @map("is_active")
   createdAt   DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
   reports     BiReport[]
-  permissions BiWorkspacePermission[]
-  customer    Customer                 @relation(fields: [customerId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  customerLinks BiCustomerWorkspace[]
 
-  @@unique([customerId, workspaceId])
-  @@index([customerId], map: "idx_bi_workspaces_customer")
+  @@unique([workspaceId])
   @@map("bi_workspaces")
 }
 
@@ -138,7 +135,7 @@ model BiReport {
   datasetId     String?              @map("dataset_id") @db.Uuid
   isActive      Boolean              @default(true) @map("is_active")
   createdAt     DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
-  permissions   BiReportPermission[]
+  customerPermissions BiCustomerReportPermission[]
   workspace     BiWorkspace          @relation(fields: [workspaceRefId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@unique([workspaceRefId, reportId])
@@ -146,40 +143,40 @@ model BiReport {
   @@map("bi_reports")
 }
 
-model BiWorkspacePermission {
+model BiCustomerWorkspace {
   id             String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId         String      @map("user_id") @db.Uuid
+  customerId     String      @map("customer_id") @db.Uuid
   workspaceRefId String      @map("workspace_ref_id") @db.Uuid
-  canView        Boolean     @default(true) @map("can_view")
+  isActive       Boolean     @default(true) @map("is_active")
   createdAt      DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
-  user           User        @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  customer       Customer    @relation(fields: [customerId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   workspace      BiWorkspace @relation(fields: [workspaceRefId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
-  @@unique([userId, workspaceRefId])
-  @@index([userId], map: "idx_bi_ws_perm_user")
-  @@index([workspaceRefId], map: "idx_bi_ws_perm_workspace")
-  @@map("bi_workspace_permissions")
+  @@unique([customerId, workspaceRefId])
+  @@index([customerId], map: "idx_bi_cws_customer")
+  @@index([workspaceRefId], map: "idx_bi_cws_workspace")
+  @@map("bi_customer_workspaces")
 }
 
-model BiReportPermission {
-  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId      String    @map("user_id") @db.Uuid
-  reportRefId String    @map("report_ref_id") @db.Uuid
-  canView     Boolean   @default(true) @map("can_view")
-  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  report      BiReport  @relation(fields: [reportRefId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+model BiCustomerReportPermission {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  customerId  String   @map("customer_id") @db.Uuid
+  reportRefId String   @map("report_ref_id") @db.Uuid
+  canView     Boolean  @default(true) @map("can_view")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  customer    Customer @relation(fields: [customerId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  report      BiReport @relation(fields: [reportRefId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
-  @@unique([userId, reportRefId])
-  @@index([reportRefId], map: "idx_bi_report_perm_report")
-  @@index([userId], map: "idx_bi_report_perm_user")
-  @@map("bi_report_permissions")
+  @@unique([customerId, reportRefId])
+  @@index([customerId], map: "idx_bi_crp_customer")
+  @@index([reportRefId], map: "idx_bi_crp_report")
+  @@map("bi_customer_report_permissions")
 }
 
 model RlsTarget {
   id              String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   datasetId       String            @map("dataset_id") @db.Uuid
-  targetKey       String            @map("target_key")
+  targetKey       String            @unique @map("target_key")
   displayName     String            @map("display_name")
   factTable       String            @map("fact_table")
   factColumn      String            @map("fact_column")
@@ -189,26 +186,27 @@ model RlsTarget {
   createdAt       DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
   rules           RlsRule[]
 
-  @@unique([datasetId, targetKey])
   @@index([datasetId], map: "idx_rls_target_dataset")
-  @@index([targetKey], map: "idx_rls_target_key")
   @@map("rls_target")
 }
 
 model RlsRule {
   id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   targetId   String    @map("target_id") @db.Uuid
-  customerId String    @map("customer_id") @db.Uuid
+  customerId String?   @map("customer_id") @db.Uuid
+  userId     String?   @map("user_id") @db.Uuid
   op         RlsRuleOp
   valueText  String?   @map("value_text")
   valueInt   Int?      @map("value_int")
   valueUuid  String?   @map("value_uuid") @db.Uuid
   createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   target     RlsTarget @relation(fields: [targetId], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  customer   Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  customer   Customer? @relation(fields: [customerId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  user       User?     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@index([targetId], map: "idx_rls_rule_target")
   @@index([customerId], map: "idx_rls_rule_customer")
+  @@index([userId], map: "idx_rls_rule_user")
   @@map("rls_rule")
 }
 

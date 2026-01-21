@@ -51,6 +51,7 @@ export class AdminPermissionsController {
     const actorSub = req.user?.sub ? String(req.user.sub) : null;
     return this.svc.setWorkspacePermission(
       userId,
+      body.customerId,
       workspaceRefId,
       body.canView,
       body?.grantReports ?? true,
@@ -68,6 +69,7 @@ export class AdminPermissionsController {
     const actorSub = req.user?.sub ? String(req.user.sub) : null;
     return this.svc.setReportPermission(
       userId,
+      body.customerId,
       reportRefId,
       body.canView,
       actorSub,

@@ -160,51 +160,9 @@ export class AdminUsersService {
       let rpGranted = 0;
 
       if (grantCustomerWorkspaces) {
-        // 1) Workspaces ativos do customer
-        const workspaces = await tx.biWorkspace.findMany({
-          where: {
-            customerId: customerId,
-            isActive: true,
-            customer: { status: 'active' },
-          },
-          select: { id: true },
-        });
-
-        if (workspaces.length) {
-          const wsRes = await tx.biWorkspacePermission.createMany({
-            data: workspaces.map((ws) => ({
-              userId: userId,
-              workspaceRefId: ws.id,
-              canView: true,
-            })),
-            skipDuplicates: true,
-          });
-
-          wsGranted = wsRes.count;
-
-          // 2) Reports ativos nos workspaces (permissão por report)
-          const reports = await tx.biReport.findMany({
-            where: {
-              workspaceRefId: { in: workspaces.map((w) => w.id) },
-              isActive: true,
-              workspace: { isActive: true, customer: { status: 'active' } },
-            },
-            select: { id: true },
-          });
-
-          if (reports.length) {
-            const rpRes = await tx.biReportPermission.createMany({
-              data: reports.map((r) => ({
-                userId: userId,
-                reportRefId: r.id,
-                canView: true,
-              })),
-              skipDuplicates: true,
-            });
-
-            rpGranted = rpRes.count;
-          }
-        }
+        const granted = await this.grantCustomerCatalogAccessTx(tx, customerId);
+        wsGranted = granted.wsGranted;
+        rpGranted = granted.rpGranted;
       }
 
       const after = {
@@ -306,16 +264,6 @@ export class AdminUsersService {
         data: { isActive: false },
       });
 
-      await tx.biWorkspacePermission.updateMany({
-        where: { userId: userId },
-        data: { canView: false },
-      });
-
-      await tx.biReportPermission.updateMany({
-        where: { userId: userId },
-        data: { canView: false },
-      });
-
       const after = { user: { id: userId, status: 'disabled' } };
 
       await tx.auditLog.create({
@@ -353,52 +301,55 @@ export class AdminUsersService {
 
   private async grantCustomerCatalogAccessTx(
     tx: Prisma.TransactionClient,
-    userId: string,
     customerId: string,
   ) {
-    // 1) Workspaces ativos do customer
-    const workspaces = await tx.biWorkspace.findMany({
-      where: {
-        customerId: customerId,
-        isActive: true,
-        customer: { status: 'active' },
-      },
-      select: { id: true },
+    const links = await tx.biCustomerWorkspace.findMany({
+      where: { customerId: customerId },
+      select: { workspaceRefId: true, isActive: true },
     });
 
+    const workspaceRefIds = links.map((l) => l.workspaceRefId);
     let wsGranted = 0;
     let rpGranted = 0;
 
-    if (workspaces.length) {
-      const wsRes = await tx.biWorkspacePermission.createMany({
-        data: workspaces.map((ws) => ({
-          userId: userId,
-          workspaceRefId: ws.id,
-          canView: true,
-        })),
-        skipDuplicates: true,
+    if (workspaceRefIds.length) {
+      const wsRes = await tx.biCustomerWorkspace.updateMany({
+        where: {
+          customerId: customerId,
+          workspaceRefId: { in: workspaceRefIds },
+          isActive: false,
+        },
+        data: { isActive: true },
       });
       wsGranted = wsRes.count;
 
       const reports = await tx.biReport.findMany({
         where: {
-          workspaceRefId: { in: workspaces.map((w) => w.id) },
+          workspaceRefId: { in: workspaceRefIds },
           isActive: true,
-          workspace: { isActive: true, customer: { status: 'active' } },
         },
         select: { id: true },
       });
 
       if (reports.length) {
-        const rpRes = await tx.biReportPermission.createMany({
-          data: reports.map((r) => ({
-            userId: userId,
-            reportRefId: r.id,
+        const reportIds = reports.map((r) => r.id);
+        const updated = await tx.biCustomerReportPermission.updateMany({
+          where: {
+            customerId: customerId,
+            reportRefId: { in: reportIds },
+          },
+          data: { canView: true },
+        });
+        const created = await tx.biCustomerReportPermission.createMany({
+          data: reportIds.map((reportRefId) => ({
+            customerId: customerId,
+            reportRefId,
             canView: true,
           })),
           skipDuplicates: true,
         });
-        rpGranted = rpRes.count;
+
+        rpGranted = updated.count + created.count;
       }
     }
 
@@ -407,42 +358,19 @@ export class AdminUsersService {
 
   private async revokeCustomerCatalogAccessTx(
     tx: Prisma.TransactionClient,
-    userId: string,
     customerId: string,
   ) {
-    // Descobre workspaces do customer e revoga apenas os que pertencem ao customer
-    const workspaces = await tx.biWorkspace.findMany({
-      where: { customerId: customerId },
-      select: { id: true },
+    const wsRes = await tx.biCustomerWorkspace.updateMany({
+      where: { customerId: customerId, isActive: true },
+      data: { isActive: false },
     });
 
-    const wsIds = workspaces.map((w) => w.id);
-    let wsRevoked = 0;
-    let rpRevoked = 0;
+    const rpRes = await tx.biCustomerReportPermission.updateMany({
+      where: { customerId: customerId, canView: true },
+      data: { canView: false },
+    });
 
-    if (wsIds.length) {
-      const wsRes = await tx.biWorkspacePermission.updateMany({
-        where: { userId: userId, workspaceRefId: { in: wsIds } },
-        data: { canView: false },
-      });
-      wsRevoked = wsRes.count;
-
-      const reports = await tx.biReport.findMany({
-        where: { workspaceRefId: { in: wsIds } },
-        select: { id: true },
-      });
-
-      const rpIds = reports.map((r) => r.id);
-      if (rpIds.length) {
-        const rpRes = await tx.biReportPermission.updateMany({
-          where: { userId: userId, reportRefId: { in: rpIds } },
-          data: { canView: false },
-        });
-        rpRevoked = rpRes.count;
-      }
-    }
-
-    return { wsRevoked, rpRevoked };
+    return { wsRevoked: wsRes.count, rpRevoked: rpRes.count };
   }
 
   // ------------------------------------------
@@ -518,20 +446,12 @@ export class AdminUsersService {
 
       // regra recomendada: se está desativando, revoga permissões do customer
       if (!isActive && revokeCustomerPermissions) {
-        revoked = await this.revokeCustomerCatalogAccessTx(
-          tx,
-          userId,
-          customerId,
-        );
+        revoked = await this.revokeCustomerCatalogAccessTx(tx, customerId);
       }
 
       // se está ativando e pediu grant, aplica grant
       if (isActive && grantCustomerWorkspaces) {
-        granted = await this.grantCustomerCatalogAccessTx(
-          tx,
-          userId,
-          customerId,
-        );
+        granted = await this.grantCustomerCatalogAccessTx(tx, customerId);
       }
 
       await tx.auditLog.create({
@@ -640,18 +560,10 @@ export class AdminUsersService {
       let revoked = { wsRevoked: 0, rpRevoked: 0 };
 
       if (!nextIsActive && revokeCustomerPermissions) {
-        revoked = await this.revokeCustomerCatalogAccessTx(
-          tx,
-          userId,
-          customerId,
-        );
+        revoked = await this.revokeCustomerCatalogAccessTx(tx, customerId);
       }
       if (nextIsActive && grantCustomerWorkspaces) {
-        granted = await this.grantCustomerCatalogAccessTx(
-          tx,
-          userId,
-          customerId,
-        );
+        granted = await this.grantCustomerCatalogAccessTx(tx, customerId);
       }
 
       await tx.auditLog.create({
@@ -730,7 +642,7 @@ export class AdminUsersService {
       });
 
       const revoked = revokeCustomerPermissions
-        ? await this.revokeCustomerCatalogAccessTx(tx, userId, customerId)
+        ? await this.revokeCustomerCatalogAccessTx(tx, customerId)
         : { wsRevoked: 0, rpRevoked: 0 };
 
       await tx.auditLog.create({
@@ -832,7 +744,7 @@ export class AdminUsersService {
       }
 
       const revoked = revokeFromCustomerPermissions
-        ? await this.revokeCustomerCatalogAccessTx(tx, userId, fromCustomerId)
+        ? await this.revokeCustomerCatalogAccessTx(tx, fromCustomerId)
         : { wsRevoked: 0, rpRevoked: 0 };
 
       // 2) cria/ativa destino
@@ -852,7 +764,7 @@ export class AdminUsersService {
 
       const granted =
         toIsActive && grantToCustomerWorkspaces
-          ? await this.grantCustomerCatalogAccessTx(tx, userId, toCustomerId)
+          ? await this.grantCustomerCatalogAccessTx(tx, toCustomerId)
           : { wsGranted: 0, rpGranted: 0 };
 
       await tx.auditLog.create({
@@ -987,6 +899,8 @@ export class AdminUsersService {
       select: { id: true, code: true, name: true, status: true },
     });
     if (!customer) throw new NotFoundException('Customer not found');
+    if (customer.status !== 'active')
+      throw new BadRequestException('Customer is not active');
 
     const next: { code?: string; name?: string } = {};
 
@@ -1094,28 +1008,17 @@ export class AdminUsersService {
       let reportsDeactivated = 0;
 
       if (status === 'inactive') {
-        const wsRes = await tx.biWorkspace.updateMany({
+        const wsRes = await tx.biCustomerWorkspace.updateMany({
           where: { customerId: customerId, isActive: true },
           data: { isActive: false },
         });
         workspacesDeactivated = wsRes.count;
 
-        // desativa reports de workspaces desse customer
-        const wsRefs = await tx.biWorkspace.findMany({
-          where: { customerId: customerId },
-          select: { id: true },
+        const rpRes = await tx.biCustomerReportPermission.updateMany({
+          where: { customerId: customerId, canView: true },
+          data: { canView: false },
         });
-
-        if (wsRefs.length) {
-          const rpRes = await tx.biReport.updateMany({
-            where: {
-              workspaceRefId: { in: wsRefs.map((w) => w.id) },
-              isActive: true,
-            },
-            data: { isActive: false },
-          });
-          reportsDeactivated = rpRes.count;
-        }
+        reportsDeactivated = rpRes.count;
       }
 
       await tx.auditLog.create({
@@ -1150,95 +1053,70 @@ export class AdminUsersService {
     const actorUserId = await this.resolveActorUserId(actorSub);
 
     return this.prisma.$transaction(async (tx) => {
-      const ws = await tx.biWorkspace.findUnique({
-        where: { id: workspaceRefId },
+      const link = await tx.biCustomerWorkspace.findUnique({
+        where: {
+          customerId_workspaceRefId: {
+            customerId: customerId,
+            workspaceRefId: workspaceRefId,
+          },
+        },
         select: {
           id: true,
-          customerId: true,
-          workspaceId: true,
-          workspaceName: true,
           isActive: true,
-          customer: { select: { id: true, status: true } },
+          workspace: {
+            select: {
+              id: true,
+              workspaceId: true,
+              workspaceName: true,
+              isActive: true,
+            },
+          },
         },
       });
-      if (!ws) throw new NotFoundException('Workspace not found');
-      if (ws.customerId !== customerId)
-        throw new BadRequestException(
-          'Workspace does not belong to this customer',
-        );
+      if (!link) throw new NotFoundException('Workspace link not found');
 
       const before = {
         workspace: {
-          workspaceRefId: ws.id,
-          workspaceId: ws.workspaceId,
-          name: ws.workspaceName ?? null,
-          isActive: ws.isActive,
+          workspaceRefId: link.workspace.id,
+          workspaceId: link.workspace.workspaceId,
+          name: link.workspace.workspaceName ?? null,
+          isActive: link.isActive && link.workspace.isActive,
         },
       };
 
-      // 1) Desativa workspace
-      await tx.biWorkspace.update({
-        where: { id: workspaceRefId },
+      // 1) Desativa o link customer -> workspace
+      await tx.biCustomerWorkspace.update({
+        where: {
+          customerId_workspaceRefId: {
+            customerId: customerId,
+            workspaceRefId: workspaceRefId,
+          },
+        },
         data: { isActive: false },
       });
 
-      // 2) Desativa reports do workspace
+      // 2) Revoga reports do workspace para o customer
       const reports = await tx.biReport.findMany({
         where: { workspaceRefId: workspaceRefId },
         select: { id: true, reportId: true, isActive: true },
       });
 
       const repIds = reports.map((r) => r.id);
+      let reportPermsRevoked = 0;
 
-      const repDeact = await tx.biReport.updateMany({
-        where: { workspaceRefId: workspaceRefId },
-        data: { isActive: false },
-      });
-
-      // 3) Descobre usuários do customer (membership ativo)
-      const memberRows = await tx.userCustomerMembership.findMany({
-        where: {
-          customerId: customerId,
-          isActive: true,
-          customer: { status: 'active' },
-        },
-        select: { userId: true },
-      });
-
-      const userIds = memberRows.map((m) => m.userId);
-
-      let wsPermRevoked = 0;
-      let rpPermRevoked = 0;
-
-      if (userIds.length) {
-        const wsPermRes = await tx.biWorkspacePermission.updateMany({
-          where: {
-            workspaceRefId: workspaceRefId,
-            userId: { in: userIds },
-          },
+      if (repIds.length) {
+        const rpRes = await tx.biCustomerReportPermission.updateMany({
+          where: { customerId: customerId, reportRefId: { in: repIds } },
           data: { canView: false },
         });
-        wsPermRevoked = wsPermRes.count;
-
-        if (repIds.length) {
-          const rpPermRes = await tx.biReportPermission.updateMany({
-            where: {
-              reportRefId: { in: repIds },
-              userId: { in: userIds },
-            },
-            data: { canView: false },
-          });
-          rpPermRevoked = rpPermRes.count;
-        }
+        reportPermsRevoked = rpRes.count;
       }
 
       const after = {
         workspace: { workspaceRefId, isActive: false },
-        reports: { totalFound: reports.length, deactivated: repDeact.count },
-        permissions: {
-          usersConsidered: userIds.length,
-          workspacePermsRevoked: wsPermRevoked,
-          reportPermsRevoked: rpPermRevoked,
+        reports: {
+          totalFound: reports.length,
+          permissionsRevoked: reportPermsRevoked,
         },
       };
 
@@ -1254,6 +1132,106 @@ export class AdminUsersService {
       });
 
       return { ok: true, ...after };
+    });
+  }
+
+  async setCustomerReportPermission(
+    customerId: string,
+    reportRefId: string,
+    canView: boolean,
+    actorSub: string | null,
+  ) {
+    const customer = await this.prisma.customer.findUnique({
+      where: { id: customerId },
+      select: { id: true, code: true, name: true, status: true },
+    });
+    if (!customer) throw new NotFoundException('Customer not found');
+
+    const report = await this.prisma.biReport.findUnique({
+      where: { id: reportRefId },
+      select: {
+        id: true,
+        workspaceRefId: true,
+        reportId: true,
+        reportName: true,
+      },
+    });
+    if (!report) throw new NotFoundException('Report not found');
+
+    const actorUserId = await this.resolveActorUserId(actorSub);
+
+    return this.prisma.$transaction(async (tx) => {
+      const beforePerm = await tx.biCustomerReportPermission.findUnique({
+        where: {
+          customerId_reportRefId: {
+            customerId: customerId,
+            reportRefId: reportRefId,
+          },
+        },
+        select: { id: true, canView: true },
+      });
+
+      let workspaceActivated = false;
+      if (canView) {
+        const link = await tx.biCustomerWorkspace.upsert({
+          where: {
+            customerId_workspaceRefId: {
+              customerId: customerId,
+              workspaceRefId: report.workspaceRefId,
+            },
+          },
+          create: {
+            customerId: customerId,
+            workspaceRefId: report.workspaceRefId,
+            isActive: true,
+          },
+          update: { isActive: true },
+          select: { isActive: true },
+        });
+        workspaceActivated = link.isActive;
+      }
+
+      await tx.biCustomerReportPermission.upsert({
+        where: {
+          customerId_reportRefId: {
+            customerId: customerId,
+            reportRefId: reportRefId,
+          },
+        },
+        create: {
+          customerId: customerId,
+          reportRefId: reportRefId,
+          canView: canView,
+        },
+        update: { canView: canView },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          actorUserId: actorUserId,
+          action: 'CUSTOMER_REPORT_PERMISSION_UPDATED',
+          entityType: 'bi_reports',
+          entityId: reportRefId,
+          beforeData: {
+            customerId,
+            reportRefId,
+            canView: beforePerm?.canView ?? null,
+          },
+          afterData: {
+            customerId,
+            reportRefId,
+            canView,
+            workspaceActivated,
+            customer: {
+              id: customer.id,
+              code: customer.code,
+              name: customer.name,
+            },
+          },
+        },
+      });
+
+      return { ok: true, workspaceActivated };
     });
   }
 
@@ -1431,52 +1409,57 @@ export class AdminUsersService {
     });
     if (!customer) throw new NotFoundException('Customer not found');
 
-    const workspaces = await this.prisma.biWorkspace.findMany({
-      where: {
-        customerId: effectiveCustomerId,
-        isActive: true,
-        customer: { status: 'active' },
-      },
-      orderBy: { createdAt: 'asc' },
-      select: { id: true, workspaceId: true, workspaceName: true },
-    });
-
-    const wsPerms = await this.prisma.biWorkspacePermission.findMany({
-      where: {
-        userId: userId,
-        workspaceRefId: { in: workspaces.map((w) => w.id) },
-      },
-      select: { workspaceRefId: true, canView: true },
-    });
-
-    const reports = await this.prisma.biReport.findMany({
-      where: {
-        workspaceRefId: { in: workspaces.map((w) => w.id) },
-        isActive: true,
-        workspace: { isActive: true, customer: { status: 'active' } },
-      },
+    const links = await this.prisma.biCustomerWorkspace.findMany({
+      where: { customerId: effectiveCustomerId },
       orderBy: { createdAt: 'asc' },
       select: {
-        id: true,
         workspaceRefId: true,
-        reportId: true,
-        reportName: true,
-        datasetId: true,
+        isActive: true,
+        createdAt: true,
+        workspace: {
+          select: {
+            id: true,
+            workspaceId: true,
+            workspaceName: true,
+            isActive: true,
+          },
+        },
       },
     });
 
-    const rpPerms = await this.prisma.biReportPermission.findMany({
-      where: {
-        userId: userId,
-        reportRefId: { in: reports.map((r) => r.id) },
-      },
-      select: { reportRefId: true, canView: true },
-    });
+    const workspaceRefIds = links.map((l) => l.workspaceRefId);
+    const reports = workspaceRefIds.length
+      ? await this.prisma.biReport.findMany({
+          where: {
+            workspaceRefId: { in: workspaceRefIds },
+            isActive: true,
+            workspace: { isActive: true },
+          },
+          orderBy: { createdAt: 'asc' },
+          select: {
+            id: true,
+            workspaceRefId: true,
+            reportId: true,
+            reportName: true,
+            datasetId: true,
+            isActive: true,
+          },
+        })
+      : [];
 
-    const wsPermMap = new Map(
-      wsPerms.map((p) => [p.workspaceRefId, p.canView]),
+    const reportPerms = reports.length
+      ? await this.prisma.biCustomerReportPermission.findMany({
+          where: {
+            customerId: effectiveCustomerId,
+            reportRefId: { in: reports.map((r) => r.id) },
+          },
+          select: { reportRefId: true, canView: true },
+        })
+      : [];
+
+    const rpPermMap = new Map(
+      reportPerms.map((p) => [p.reportRefId, p.canView]),
     );
-    const rpPermMap = new Map(rpPerms.map((p) => [p.reportRefId, p.canView]));
 
     return {
       user: {
@@ -1493,19 +1476,23 @@ export class AdminUsersService {
         isActive: m.isActive,
         customer: m.customer,
       })),
-      workspaces: workspaces.map((w) => ({
-        workspaceRefId: w.id,
-        workspaceId: w.workspaceId,
-        name: w.workspaceName ?? String(w.workspaceId),
-        canView: wsPermMap.get(w.id) ?? false,
+      workspaces: links.map((link) => ({
+        workspaceRefId: link.workspace.id,
+        workspaceId: link.workspace.workspaceId,
+        name:
+          link.workspace.workspaceName ?? String(link.workspace.workspaceId),
+        canView: link.isActive && link.workspace.isActive,
         reports: reports
-          .filter((r) => r.workspaceRefId === w.id)
+          .filter((r) => r.workspaceRefId === link.workspaceRefId)
           .map((r) => ({
             reportRefId: r.id,
             reportId: r.reportId,
             name: r.reportName ?? String(r.reportId),
             datasetId: r.datasetId,
-            canView: rpPermMap.get(r.id) ?? false,
+            canView:
+              link.isActive && link.workspace.isActive && r.isActive
+                ? (rpPermMap.get(r.id) ?? false)
+                : false,
           })),
       })),
     };
@@ -1516,25 +1503,32 @@ export class AdminUsersService {
   // =========================
   async setWorkspacePermission(
     userId: string,
+    customerId: string,
     workspaceRefId: string,
     canView: boolean,
     grantReports: boolean,
     actorSub: string | null,
   ) {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: { id: true, status: true },
+    const { user, customer } = await this.assertUserAndCustomer(
+      userId,
+      customerId,
+    );
+
+    const membership = await this.prisma.userCustomerMembership.findUnique({
+      where: { userId_customerId: { userId: userId, customerId: customerId } },
+      select: { id: true },
     });
-    if (!user) throw new NotFoundException('User not found');
+    if (!membership) {
+      throw new BadRequestException('User is not member of customer');
+    }
 
     const ws = await this.prisma.biWorkspace.findUnique({
       where: { id: workspaceRefId },
       select: {
         id: true,
-        customerId: true,
-        isActive: true,
         workspaceId: true,
         workspaceName: true,
+        isActive: true,
       },
     });
     if (!ws) throw new NotFoundException('Workspace not found');
@@ -1542,102 +1536,112 @@ export class AdminUsersService {
     const actorUserId = await this.resolveActorUserId(actorSub);
 
     return this.prisma.$transaction(async (tx) => {
-      const beforePerm = await tx.biWorkspacePermission.findUnique({
+      const beforeLink = await tx.biCustomerWorkspace.findUnique({
         where: {
-          userId_workspaceRefId: {
-            userId: userId,
+          customerId_workspaceRefId: {
+            customerId: customerId,
             workspaceRefId: workspaceRefId,
           },
         },
-        select: { id: true, canView: true },
+        select: { id: true, isActive: true },
       });
 
-      const up = await tx.biWorkspacePermission.upsert({
-        where: {
-          userId_workspaceRefId: {
-            userId: userId,
-            workspaceRefId: workspaceRefId,
-          },
-        },
-        create: {
-          userId: userId,
-          workspaceRefId: workspaceRefId,
-          canView: canView,
-        },
-        update: { canView: canView },
-        select: { id: true, canView: true },
+      const reports = await tx.biReport.findMany({
+        where: { workspaceRefId: workspaceRefId },
+        select: { id: true },
       });
+      const reportIds = reports.map((r) => r.id);
 
       let reportsAffected = 0;
 
-      if (!canView) {
-        // Desabilita também reports desse workspace
-        const repIds = await tx.biReport.findMany({
-          where: { workspaceRefId: workspaceRefId },
-          select: { id: true },
-        });
-        if (repIds.length) {
-          const r = await tx.biReportPermission.updateMany({
-            where: {
-              userId: userId,
-              reportRefId: { in: repIds.map((x) => x.id) },
+      if (canView) {
+        await tx.biCustomerWorkspace.upsert({
+          where: {
+            customerId_workspaceRefId: {
+              customerId: customerId,
+              workspaceRefId: workspaceRefId,
             },
-            data: { canView: false },
-          });
-          reportsAffected = r.count;
-        }
-      } else if (grantReports) {
-        const reps = await tx.biReport.findMany({
-          where: { workspaceRefId: workspaceRefId, isActive: true },
-          select: { id: true },
+          },
+          create: {
+            customerId: customerId,
+            workspaceRefId: workspaceRefId,
+            isActive: true,
+          },
+          update: { isActive: true },
         });
 
-        if (reps.length) {
-          // cria novos
-          const created = await tx.biReportPermission.createMany({
-            data: reps.map((r) => ({
-              userId: userId,
-              reportRefId: r.id,
+        if (grantReports && reportIds.length) {
+          const updated = await tx.biCustomerReportPermission.updateMany({
+            where: { customerId: customerId, reportRefId: { in: reportIds } },
+            data: { canView: true },
+          });
+          const created = await tx.biCustomerReportPermission.createMany({
+            data: reportIds.map((reportRefId) => ({
+              customerId: customerId,
+              reportRefId,
               canView: true,
             })),
             skipDuplicates: true,
           });
+          reportsAffected = updated.count + created.count;
+        }
+      } else {
+        await tx.biCustomerWorkspace.updateMany({
+          where: { customerId: customerId, workspaceRefId: workspaceRefId },
+          data: { isActive: false },
+        });
 
-          // garante que existentes fiquem true
-          const updated = await tx.biReportPermission.updateMany({
-            where: {
-              userId: userId,
-              reportRefId: { in: reps.map((r) => r.id) },
-            },
-            data: { canView: true },
+        if (reportIds.length) {
+          const rpRes = await tx.biCustomerReportPermission.updateMany({
+            where: { customerId: customerId, reportRefId: { in: reportIds } },
+            data: { canView: false },
           });
-
-          reportsAffected = Math.max(created.count, updated.count);
+          reportsAffected = rpRes.count;
         }
       }
+
+      const afterLink = await tx.biCustomerWorkspace.findUnique({
+        where: {
+          customerId_workspaceRefId: {
+            customerId: customerId,
+            workspaceRefId: workspaceRefId,
+          },
+        },
+        select: { id: true, isActive: true },
+      });
 
       await tx.auditLog.create({
         data: {
           actorUserId: actorUserId,
-          action: 'WORKSPACE_PERM_UPDATED',
-          entityType: 'bi_workspaces',
-          entityId: workspaceRefId,
+          action: 'CUSTOMER_WORKSPACE_PERMISSION_UPDATED',
+          entityType: 'bi_customer_workspaces',
+          entityId: afterLink?.id ?? beforeLink?.id ?? null,
           beforeData: {
-            userId,
+            customerId,
             workspaceRefId,
-            canView: beforePerm?.canView ?? null,
+            canView: beforeLink?.isActive ?? false,
           },
           afterData: {
-            userId,
+            customerId,
             workspaceRefId,
-            canView: up.canView,
+            canView: afterLink?.isActive ?? canView,
             grantReports,
             reportsAffected,
+            actorTarget: { userId: userId, email: user.email ?? null },
+            customer: {
+              id: customer.id,
+              code: customer.code,
+              name: customer.name,
+            },
           },
         },
       });
 
-      return { ok: true, reportsAffected };
+      return {
+        ok: true,
+        workspace: { workspaceRefId: ws.id, canView: canView },
+        reportsAffected,
+      };
     });
   }
 
@@ -1646,56 +1650,110 @@ export class AdminUsersService {
   // =========================
   async setReportPermission(
     userId: string,
+    customerId: string,
     reportRefId: string,
     canView: boolean,
     actorSub: string | null,
   ) {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
+    const { user, customer } = await this.assertUserAndCustomer(
+      userId,
+      customerId,
+    );
+
+    const membership = await this.prisma.userCustomerMembership.findUnique({
+      where: { userId_customerId: { userId: userId, customerId: customerId } },
       select: { id: true },
     });
-    if (!user) throw new NotFoundException('User not found');
+    if (!membership) {
+      throw new BadRequestException('User is not member of customer');
+    }
 
     const rep = await this.prisma.biReport.findUnique({
       where: { id: reportRefId },
-      select: { id: true, isActive: true, workspaceRefId: true },
+      select: {
+        id: true,
+        workspaceRefId: true,
+        reportId: true,
+        reportName: true,
+      },
     });
     if (!rep) throw new NotFoundException('Report not found');
 
     const actorUserId = await this.resolveActorUserId(actorSub);
 
     return this.prisma.$transaction(async (tx) => {
-      const beforePerm = await tx.biReportPermission.findUnique({
+      const beforePerm = await tx.biCustomerReportPermission.findUnique({
         where: {
-          userId_reportRefId: { userId: userId, reportRefId: reportRefId },
+          customerId_reportRefId: {
+            customerId: customerId,
+            reportRefId: reportRefId,
+          },
         },
         select: { id: true, canView: true },
       });
 
-      await tx.biReportPermission.upsert({
+      let workspaceActivated = false;
+      if (canView) {
+        const link = await tx.biCustomerWorkspace.upsert({
+          where: {
+            customerId_workspaceRefId: {
+              customerId: customerId,
+              workspaceRefId: rep.workspaceRefId,
+            },
+          },
+          create: {
+            customerId: customerId,
+            workspaceRefId: rep.workspaceRefId,
+            isActive: true,
+          },
+          update: { isActive: true },
+          select: { isActive: true },
+        });
+        workspaceActivated = link.isActive;
+      }
+
+      await tx.biCustomerReportPermission.upsert({
         where: {
-          userId_reportRefId: { userId: userId, reportRefId: reportRefId },
+          customerId_reportRefId: {
+            customerId: customerId,
+            reportRefId: reportRefId,
+          },
         },
-        create: { userId: userId, reportRefId: reportRefId, canView: canView },
+        create: {
+          customerId: customerId,
+          reportRefId: reportRefId,
+          canView: canView,
+        },
         update: { canView: canView },
       });
 
       await tx.auditLog.create({
         data: {
           actorUserId: actorUserId,
-          action: 'REPORT_PERM_UPDATED',
+          action: 'CUSTOMER_REPORT_PERMISSION_UPDATED',
           entityType: 'bi_reports',
           entityId: reportRefId,
           beforeData: {
-            userId,
+            customerId,
             reportRefId,
             canView: beforePerm?.canView ?? null,
           },
-          afterData: { userId, reportRefId, canView },
+          afterData: {
+            customerId,
+            reportRefId,
+            canView,
+            workspaceActivated,
+            actorTarget: { userId: userId, email: user.email ?? null },
+            customer: {
+              id: customer.id,
+              code: customer.code,
+              name: customer.name,
+            },
+          },
         },
       });
 
-      return { ok: true };
+      return { ok: true, workspaceActivated };
     });
   }
 
@@ -2132,7 +2190,6 @@ export class AdminUsersService {
             id: true,
             workspaceId: true,
             workspaceName: true,
-            customerId: true,
             isActive: true,
           },
         }),
@@ -2176,7 +2233,6 @@ export class AdminUsersService {
           id: w.id,
           workspaceId: w.workspaceId,
           name: w.workspaceName ?? w.workspaceId,
-          customerId: w.customerId,
           isActive: w.isActive,
         })),
         reports: reports.map((r) => ({

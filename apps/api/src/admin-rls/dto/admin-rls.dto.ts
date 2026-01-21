@@ -6,6 +6,7 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  ValidateIf,
   ValidateNested,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
@@ -72,8 +73,15 @@ export class UpdateTargetDto {
 }
 
 export class CreateRuleDto {
+  @ValidateIf((o: CreateRuleDto) => !o.userId)
   @IsUUID()
-  customerId!: string;
+  @IsOptional()
+  customerId?: string;
+
+  @ValidateIf((o: CreateRuleDto) => !o.customerId)
+  @IsUUID()
+  @IsOptional()
+  userId?: string;
 
   @IsIn(RULE_OPS)
   op!: (typeof RULE_OPS)[number];
@@ -112,6 +120,10 @@ export class ListRulesQueryDto {
   @IsOptional()
   @IsUUID()
   customerId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  userId?: string;
 }
 
 export class SnapshotQueryDto {

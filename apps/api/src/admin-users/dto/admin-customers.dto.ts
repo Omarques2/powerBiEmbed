@@ -1,4 +1,12 @@
-import { IsIn, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import {
+  IsBoolean,
+  IsIn,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+} from 'class-validator';
+import { Transform } from 'class-transformer';
+import { toBoolean } from '../../common/dto/transformers';
 
 const CUSTOMER_STATUSES = ['active', 'inactive'] as const;
 
@@ -31,4 +39,10 @@ export class UpdateCustomerDto {
 export class UpdateCustomerStatusDto {
   @IsIn(CUSTOMER_STATUSES)
   status!: (typeof CUSTOMER_STATUSES)[number];
+}
+
+export class UpdateCustomerReportPermissionDto {
+  @Transform(toBoolean)
+  @IsBoolean()
+  canView!: boolean;
 }

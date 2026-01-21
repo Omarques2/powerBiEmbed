@@ -3,6 +3,7 @@ import {
   IsInt,
   IsOptional,
   IsString,
+  IsUUID,
   Max,
   Min,
 } from 'class-validator';
@@ -29,6 +30,9 @@ export class PermissionsListQueryDto {
 }
 
 export class SetWorkspacePermissionDto {
+  @IsUUID()
+  customerId!: string;
+
   @Transform(toBoolean)
   @IsBoolean()
   canView!: boolean;
@@ -40,6 +44,9 @@ export class SetWorkspacePermissionDto {
 }
 
 export class SetReportPermissionDto {
+  @IsUUID()
+  customerId!: string;
+
   @Transform(toBoolean)
   @IsBoolean()
   canView!: boolean;

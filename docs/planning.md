@@ -165,6 +165,7 @@ Estrategia:
 - Modelo de permissao por report (permitir/negado por customer).
 - UI para marcar reports por customer (lista por workspace).
 - Ajustar resolucao de acesso no Power BI (usuarios herdam do customer).
+ - Evolucao UX (Opcao 3): fluxo dataset-first (Dataset -> Targets -> Regras).
 Aceite:
 - Customer pode ter acesso parcial aos reports de uma workspace.
 - Usuarios do customer herdam somente os reports marcados.
@@ -174,14 +175,16 @@ Contexto: hoje regras precisam ser recriadas por customer mesmo para o mesmo dat
 Objetivo: criar targets/rules reutilizaveis, vinculados a workspace/report e aplicaveis por customer/usuario.  
 Escopo: API (modelagem + endpoints), WEB (UI de associacao).  
 Estrategia:
-- Definir targets/rules globais e mapear para workspace/report.
+- Targets e regras estritamente por dataset (sem vinculos).
 - Permitir aplicar regras por customer e opcionalmente por usuario.
-- Manter comportamento atual como fallback.
+- Gerar Sec_<target_key> automaticamente no backend (view pronta para importar no Power BI).
+ - Evolucao UX (Opcao 3): Dataset -> Targets -> Regras.
 Aceite:
-- Regras globais reutilizaveis por workspace/report.
-- Vinculo por customer e opcionalmente por usuario.
+- Regras reutilizaveis por dataset (customer e opcionalmente por usuario).
+- Sec_<target_key> criado automaticamente no backend.
 Nota operacional:
 - Embed com RLS exige effective identity; se houver multiplas fontes, todas devem estar em Import e suportar effective identity.
+ - Status atual: RLS validado com Postgres e Lakehouse em Import; DirectQuery/PowerQuery nao suportou effective identity no embed.
 
 ### EPIC-11: Documentacao e onboarding (PBIX)
 Card P1 - DOC | Atualizar Guia PBIX (nomes de tabelas)  
@@ -202,6 +205,23 @@ Estrategia:
 Aceite:
 - Guia mostra caminho alternativo sem as 3 etapas iniciais.
 - Tabelas filtradas e nomeadas de acordo com o passo 3 do guia.
+Referencia:
+- `docs/pbix-guide.md`
+
+## Mini-roteiro (Opcao 3 + EPIC-11)
+1. UX dataset-first (WEB):
+   - Novo fluxo: Dataset -> Targets -> Regras.
+   - Targets e regras por dataset, sem dependencia de customer/workspace/report.
+   - Regras com escopo (customer/usuario) e filtros rapidos.
+2. API/DB:
+   - Manter schema atual; ajustar endpoints para dataset-first.
+   - Criar Sec_<target_key> automaticamente no backend.
+3. Guia PBIX (EPIC-11):
+   - Atualizar nomes e DAX (CUSTOMDATA + USERNAME).
+   - Documentar caminho "tabelas prontas" e passos reduzidos.
+4. Testes:
+   - E2E: criar target -> regra customer/usuario -> snapshot.
+   - Manual: fluxo completo na UI + export do snapshot.
 
 
 ## Roadmap por fases

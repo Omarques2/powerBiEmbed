@@ -16,9 +16,12 @@ export type RlsSnapshotRule = {
   targetId: string;
   targetKey: string | null;
   targetDisplayName: string | null;
-  customerId: string;
+  customerId: string | null;
   customerCode: string | null;
   customerName: string | null;
+  userId: string | null;
+  userEmail: string | null;
+  userDisplayName: string | null;
   op: string;
   valueText: string | null;
   valueInt: number | null;
@@ -62,6 +65,9 @@ export function buildSnapshotCsv(snapshot: RlsSnapshot): string {
     'customer_id',
     'customer_code',
     'customer_name',
+    'user_id',
+    'user_email',
+    'user_display_name',
     'op',
     'value_text',
     'value_int',
@@ -87,9 +93,12 @@ export function buildSnapshotCsv(snapshot: RlsSnapshot): string {
       target?.valueType ?? '',
       target?.defaultBehavior ?? '',
       target?.status ?? '',
-      rule.customerId,
+      rule.customerId ?? '',
       rule.customerCode ?? '',
       rule.customerName ?? '',
+      rule.userId ?? '',
+      rule.userEmail ?? '',
+      rule.userDisplayName ?? '',
       rule.op,
       rule.valueText ?? '',
       rule.valueInt ?? '',

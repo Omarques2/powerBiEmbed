@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
@@ -32,7 +33,8 @@ type CreateTargetInput = {
 type UpdateTargetInput = Partial<CreateTargetInput>;
 
 type CreateRuleInput = {
-  customerId: string;
+  customerId?: string;
+  userId?: string;
   op: RuleOp;
   valueText?: string | null;
   valueInt?: number | string | null;
@@ -97,6 +99,79 @@ export class AdminRlsService {
     private readonly refreshSvc: RlsRefreshService,
   ) {}
 
+  async listDatasets() {
+    const rows = await this.prisma.biReport.findMany({
+      where: {
+        datasetId: { not: null },
+        isActive: true,
+        workspace: { isActive: true },
+      },
+      distinct: ['datasetId'],
+      select: { datasetId: true },
+      orderBy: { datasetId: 'asc' },
+    });
+
+    const datasetIds = rows
+      .map((row) => row.datasetId)
+      .filter((id): id is string => Boolean(id));
+
+    if (!datasetIds.length) {
+      return { items: [] };
+    }
+
+    const items = await Promise.all(
+      datasetIds.map(async (datasetId) => {
+        const reportCount = await this.prisma.biReport.count({
+          where: {
+            datasetId,
+            isActive: true,
+            workspace: { isActive: true },
+          },
+        });
+
+        const workspaceCount = await this.prisma.biWorkspace.count({
+          where: {
+            isActive: true,
+            reports: {
+              some: { datasetId, isActive: true },
+            },
+          },
+        });
+
+        const sample = await this.prisma.biReport.findFirst({
+          where: {
+            datasetId,
+            isActive: true,
+            workspace: { isActive: true },
+          },
+          orderBy: { createdAt: 'asc' },
+          select: {
+            reportId: true,
+            reportName: true,
+            workspace: {
+              select: {
+                workspaceId: true,
+                workspaceName: true,
+              },
+            },
+          },
+        });
+
+        return {
+          datasetId,
+          reportCount,
+          workspaceCount,
+          sampleReportId: sample?.reportId ?? null,
+          sampleReportName: sample?.reportName ?? null,
+          sampleWorkspaceId: sample?.workspace?.workspaceId ?? null,
+          sampleWorkspaceName: sample?.workspace?.workspaceName ?? null,
+        };
+      }),
+    );
+
+    return { items };
+  }
+
   async listTargets(datasetIdRaw: string) {
     const datasetId = ensureUuid('datasetId', datasetIdRaw);
     const rows = await this.prisma.rlsTarget.findMany({
@@ -129,11 +204,10 @@ export class AdminRlsService {
       throw new BadRequestException('status is invalid');
 
     const existing = await this.prisma.rlsTarget.findFirst({
-      where: { datasetId: datasetId, targetKey: targetKey },
+      where: { targetKey: targetKey },
       select: { id: true },
     });
-    if (existing)
-      throw new BadRequestException('targetKey already exists for dataset');
+    if (existing) throw new BadRequestException('targetKey already exists');
 
     const actorUserId = await this.resolveActorUserId(actorSub ?? null);
 
@@ -162,12 +236,14 @@ export class AdminRlsService {
           },
         });
 
+        await this.ensureSecViewFor(tx, targetKey);
+
         return row;
       });
       return this.toTargetDto(created);
     } catch (err) {
       if (isPrismaUnique(err))
-        throw new BadRequestException('targetKey already exists for dataset');
+        throw new BadRequestException('targetKey already exists');
       throw err;
     }
   }
@@ -184,17 +260,18 @@ export class AdminRlsService {
     if (!target) throw new NotFoundException('Target not found');
 
     const patch: Record<string, unknown> = {};
+    let nextTargetKey: string | null = null;
 
     if (input?.targetKey !== undefined) {
       const nextKey = ensureTargetKey(input.targetKey);
       if (nextKey !== target.targetKey) {
         const existing = await this.prisma.rlsTarget.findFirst({
-          where: { datasetId: target.datasetId, targetKey: nextKey },
+          where: { targetKey: nextKey, id: { not: targetId } },
           select: { id: true },
         });
-        if (existing)
-          throw new BadRequestException('targetKey already exists for dataset');
+        if (existing) throw new BadRequestException('targetKey already exists');
         patch.targetKey = nextKey;
+        nextTargetKey = nextKey;
       }
     }
 
@@ -244,6 +321,7 @@ export class AdminRlsService {
 
     const actorUserId = await this.resolveActorUserId(actorSub ?? null);
     const before = this.toTargetDto(target);
+    const targetKeyBefore = target.targetKey;
 
     try {
       const updated = await this.prisma.$transaction(async (tx) => {
@@ -251,6 +329,14 @@ export class AdminRlsService {
           where: { id: targetId },
           data: patch,
         });
+
+        if (nextTargetKey && nextTargetKey !== targetKeyBefore) {
+          await this.ensureSecViewFor(tx, nextTargetKey);
+          await this.dropSecViewFor(tx, targetKeyBefore);
+        } else {
+          await this.ensureSecViewFor(tx, targetKeyBefore);
+        }
+
         await tx.auditLog.create({
           data: {
             actorUserId: actorUserId,
@@ -266,7 +352,7 @@ export class AdminRlsService {
       return this.toTargetDto(updated);
     } catch (err) {
       if (isPrismaUnique(err))
-        throw new BadRequestException('targetKey already exists for dataset');
+        throw new BadRequestException('targetKey already exists');
       if (isPrismaNotFound(err))
         throw new NotFoundException('Target not found');
       throw err;
@@ -288,6 +374,7 @@ export class AdminRlsService {
             beforeData: this.toTargetDto(row),
           },
         });
+        await this.dropSecViewFor(tx, row.targetKey);
       });
       return { ok: true };
     } catch (err) {
@@ -297,7 +384,11 @@ export class AdminRlsService {
     }
   }
 
-  async listRules(targetIdRaw: string, customerIdRaw?: string) {
+  async listRules(
+    targetIdRaw: string,
+    customerIdRaw?: string,
+    userIdRaw?: string,
+  ) {
     const targetId = ensureUuid('targetId', targetIdRaw);
     const target = await this.prisma.rlsTarget.findUnique({
       where: { id: targetId },
@@ -305,11 +396,15 @@ export class AdminRlsService {
     });
     if (!target) throw new NotFoundException('Target not found');
 
-    const where: { targetId: string; customerId?: string } = {
+    const where: { targetId: string; customerId?: string; userId?: string } = {
       targetId: targetId,
     };
-    if (customerIdRaw)
+    if (customerIdRaw) {
       where.customerId = ensureUuid('customerId', customerIdRaw);
+    }
+    if (userIdRaw) {
+      where.userId = ensureUuid('userId', userIdRaw);
+    }
 
     const rows = await this.prisma.rlsRule.findMany({
       where,
@@ -338,7 +433,7 @@ export class AdminRlsService {
     );
     const seen = new Set<string>();
     for (const rule of normalized) {
-      const key = `${rule.customerId}|${rule.op}|${rule.valueText ?? ''}|${rule.valueInt ?? ''}|${rule.valueUuid ?? ''}`;
+      const key = `${rule.customerId ?? ''}|${rule.userId ?? ''}|${rule.op}|${rule.valueText ?? ''}|${rule.valueInt ?? ''}|${rule.valueUuid ?? ''}`;
       if (seen.has(key)) {
         throw new BadRequestException('Duplicate rule in request payload');
       }
@@ -346,18 +441,37 @@ export class AdminRlsService {
     }
 
     const customerIds = Array.from(
-      new Set(normalized.map((x) => x.customerId)),
-    );
-    const customers = await this.prisma.customer.findMany({
-      where: { id: { in: customerIds } },
-      select: { id: true },
-    });
-    if (customers.length !== customerIds.length) {
-      const found = new Set(customers.map((c) => c.id));
-      const missing = customerIds.filter((id) => !found.has(id));
-      throw new BadRequestException(
-        `Unknown customerId(s): ${missing.join(', ')}`,
-      );
+      new Set(normalized.map((x) => x.customerId).filter(Boolean)),
+    ) as string[];
+    if (customerIds.length) {
+      const customers = await this.prisma.customer.findMany({
+        where: { id: { in: customerIds } },
+        select: { id: true },
+      });
+      if (customers.length !== customerIds.length) {
+        const found = new Set(customers.map((c) => c.id));
+        const missing = customerIds.filter((id) => !found.has(id));
+        throw new BadRequestException(
+          `Unknown customerId(s): ${missing.join(', ')}`,
+        );
+      }
+    }
+
+    const userIds = Array.from(
+      new Set(normalized.map((x) => x.userId).filter(Boolean)),
+    ) as string[];
+    if (userIds.length) {
+      const users = await this.prisma.user.findMany({
+        where: { id: { in: userIds } },
+        select: { id: true },
+      });
+      if (users.length !== userIds.length) {
+        const found = new Set(users.map((u) => u.id));
+        const missing = userIds.filter((id) => !found.has(id));
+        throw new BadRequestException(
+          `Unknown userId(s): ${missing.join(', ')}`,
+        );
+      }
     }
 
     const actorUserId = await this.resolveActorUserId(actorSub ?? null);
@@ -369,7 +483,9 @@ export class AdminRlsService {
           const exists = await tx.rlsRule.findFirst({
             where: {
               targetId: target.id,
-              customerId: rule.customerId,
+              ...(rule.customerId
+                ? { customerId: rule.customerId }
+                : { userId: rule.userId }),
               op: rule.op,
               valueText: rule.valueText,
               valueInt: rule.valueInt,
@@ -385,7 +501,8 @@ export class AdminRlsService {
           const row = await tx.rlsRule.create({
             data: {
               targetId: target.id,
-              customerId: rule.customerId,
+              customerId: rule.customerId ?? undefined,
+              userId: rule.userId ?? undefined,
               op: rule.op,
               valueText: rule.valueText,
               valueInt: rule.valueInt,
@@ -396,7 +513,10 @@ export class AdminRlsService {
         }
 
         const uniqueCustomerIds = Array.from(
-          new Set(rows.map((r) => r.customerId)),
+          new Set(rows.map((r) => r.customerId).filter(Boolean)),
+        );
+        const uniqueUserIds = Array.from(
+          new Set(rows.map((r) => r.userId).filter(Boolean)),
         );
         await tx.auditLog.create({
           data: {
@@ -409,6 +529,7 @@ export class AdminRlsService {
               count: rows.length,
               ruleIds: rows.map((r) => r.id),
               customerIds: uniqueCustomerIds,
+              userIds: uniqueUserIds,
             },
           },
         });
@@ -504,7 +625,10 @@ export class AdminRlsService {
     const rules = targetIds.length
       ? await this.prisma.rlsRule.findMany({
           where: { targetId: { in: targetIds } },
-          include: { customer: { select: { code: true, name: true } } },
+          include: {
+            customer: { select: { code: true, name: true } },
+            user: { select: { id: true, email: true, displayName: true } },
+          },
           orderBy: { createdAt: 'asc' },
         })
       : [];
@@ -534,9 +658,12 @@ export class AdminRlsService {
         targetId: r.targetId,
         targetKey: target?.targetKey ?? null,
         targetDisplayName: target?.displayName ?? null,
-        customerId: r.customerId,
+        customerId: r.customerId ?? null,
         customerCode: r.customer?.code ?? null,
         customerName: r.customer?.name ?? null,
+        userId: r.userId ?? null,
+        userEmail: r.user?.email ?? null,
+        userDisplayName: r.user?.displayName ?? null,
         op: r.op,
         valueText: r.valueText,
         valueInt: r.valueInt,
@@ -586,7 +713,20 @@ export class AdminRlsService {
     index: number,
     valueType: ValueType,
   ) {
-    const customerId = ensureUuid('customerId', item?.customerId);
+    const rawCustomerId =
+      item?.customerId !== undefined && item?.customerId !== null
+        ? ensureUuid('customerId', item.customerId)
+        : null;
+    const rawUserId =
+      item?.userId !== undefined && item?.userId !== null
+        ? ensureUuid('userId', item.userId)
+        : null;
+
+    if ((rawCustomerId && rawUserId) || (!rawCustomerId && !rawUserId)) {
+      throw new BadRequestException(
+        `items[${index}] must provide exactly one of customerId or userId`,
+      );
+    }
     const op = String(item?.op ?? '').trim() as RuleOp;
     if (!RULE_OPS.has(op))
       throw new BadRequestException(`items[${index}].op is invalid`);
@@ -641,7 +781,14 @@ export class AdminRlsService {
       valueUuid = v;
     }
 
-    return { customerId, op, valueText, valueInt, valueUuid };
+    return {
+      customerId: rawCustomerId ?? undefined,
+      userId: rawUserId ?? undefined,
+      op,
+      valueText,
+      valueInt,
+      valueUuid,
+    };
   }
 
   private async resolveActorUserId(
@@ -678,6 +825,7 @@ export class AdminRlsService {
       id: row.id,
       targetId: row.targetId,
       customerId: row.customerId,
+      userId: row.userId,
       op: row.op,
       valueText: row.valueText,
       valueInt: row.valueInt,
@@ -708,5 +856,80 @@ export class AdminRlsService {
       throw new NotFoundException('Dataset not found in catalog');
     }
     return workspaceId;
+  }
+
+  private buildSecViewName(targetKey: string) {
+    return `sec_${targetKey}`;
+  }
+
+  private async ensureBaseView(executor: {
+    $executeRawUnsafe: (sql: string) => Promise<unknown>;
+  }) {
+    const sql = `
+      CREATE OR REPLACE VIEW "sec_rls_base" AS
+      SELECT
+        r.customer_id,
+        r.user_id,
+        t.target_key,
+        r.op,
+        r.value_text,
+        r.value_int,
+        r.value_uuid
+      FROM rls_rule r
+      JOIN rls_target t ON t.id = r.target_id
+      WHERE t.status = 'active';
+    `;
+    try {
+      await executor.$executeRawUnsafe(sql);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      throw new InternalServerErrorException(
+        `Failed to create sec_rls_base view: ${message}`,
+      );
+    }
+  }
+
+  private async ensureSecViewFor(
+    executor: { $executeRawUnsafe: (sql: string) => Promise<unknown> },
+    targetKey: string,
+  ) {
+    const viewName = this.buildSecViewName(targetKey);
+    const sql = `
+      CREATE OR REPLACE VIEW "${viewName}" AS
+      SELECT
+        customer_id,
+        user_id,
+        op,
+        value_text,
+        value_int,
+        value_uuid
+      FROM sec_rls_base
+      WHERE target_key = '${targetKey}';
+    `;
+    try {
+      await this.ensureBaseView(executor);
+      await executor.$executeRawUnsafe(sql);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      throw new InternalServerErrorException(
+        `Failed to create Sec view (${viewName}): ${message}`,
+      );
+    }
+  }
+
+  private async dropSecViewFor(
+    executor: { $executeRawUnsafe: (sql: string) => Promise<unknown> },
+    targetKey: string,
+  ) {
+    const viewName = this.buildSecViewName(targetKey);
+    const sql = `DROP VIEW IF EXISTS "${viewName}"`;
+    try {
+      await executor.$executeRawUnsafe(sql);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      throw new InternalServerErrorException(
+        `Failed to drop Sec view (${viewName}): ${message}`,
+      );
+    }
   }
 }

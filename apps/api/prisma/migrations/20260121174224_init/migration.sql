@@ -105,7 +105,6 @@ CREATE TABLE "audit_log" (
 -- CreateTable
 CREATE TABLE "bi_workspaces" (
     "id" UUID NOT NULL DEFAULT gen_random_uuid(),
-    "customer_id" UUID NOT NULL,
     "workspace_id" UUID NOT NULL,
     "workspace_name" TEXT,
     "is_active" BOOLEAN NOT NULL DEFAULT true,
@@ -128,25 +127,25 @@ CREATE TABLE "bi_reports" (
 );
 
 -- CreateTable
-CREATE TABLE "bi_workspace_permissions" (
+CREATE TABLE "bi_customer_workspaces" (
     "id" UUID NOT NULL DEFAULT gen_random_uuid(),
-    "user_id" UUID NOT NULL,
+    "customer_id" UUID NOT NULL,
     "workspace_ref_id" UUID NOT NULL,
-    "can_view" BOOLEAN NOT NULL DEFAULT true,
+    "is_active" BOOLEAN NOT NULL DEFAULT true,
     "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-    CONSTRAINT "bi_workspace_permissions_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "bi_customer_workspaces_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
-CREATE TABLE "bi_report_permissions" (
+CREATE TABLE "bi_customer_report_permissions" (
     "id" UUID NOT NULL DEFAULT gen_random_uuid(),
-    "user_id" UUID NOT NULL,
+    "customer_id" UUID NOT NULL,
     "report_ref_id" UUID NOT NULL,
     "can_view" BOOLEAN NOT NULL DEFAULT true,
     "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-    CONSTRAINT "bi_report_permissions_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "bi_customer_report_permissions_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -169,7 +168,8 @@ CREATE TABLE "rls_target" (
 CREATE TABLE "rls_rule" (
     "id" UUID NOT NULL DEFAULT gen_random_uuid(),
     "target_id" UUID NOT NULL,
-    "customer_id" UUID NOT NULL,
+    "customer_id" UUID,
+    "user_id" UUID,
     "op" "rls_rule_op" NOT NULL,
     "value_text" TEXT,
     "value_int" INTEGER,
@@ -219,10 +219,7 @@ CREATE INDEX "idx_audit_entity" ON "audit_log"("entity_type", "entity_id");
 CREATE INDEX "idx_audit_actor" ON "audit_log"("actor_user_id");
 
 -- CreateIndex
-CREATE INDEX "idx_bi_workspaces_customer" ON "bi_workspaces"("customer_id");
-
--- CreateIndex
-CREATE UNIQUE INDEX "bi_workspaces_customer_id_workspace_id_key" ON "bi_workspaces"("customer_id", "workspace_id");
+CREATE UNIQUE INDEX "bi_workspaces_workspace_id_key" ON "bi_workspaces"("workspace_id");
 
 -- CreateIndex
 CREATE INDEX "idx_bi_reports_workspace" ON "bi_reports"("workspace_ref_id");
@@ -231,37 +228,37 @@ CREATE INDEX "idx_bi_reports_workspace" ON "bi_reports"("workspace_ref_id");
 CREATE UNIQUE INDEX "bi_reports_workspace_ref_id_report_id_key" ON "bi_reports"("workspace_ref_id", "report_id");
 
 -- CreateIndex
-CREATE INDEX "idx_bi_ws_perm_user" ON "bi_workspace_permissions"("user_id");
+CREATE INDEX "idx_bi_cws_customer" ON "bi_customer_workspaces"("customer_id");
 
 -- CreateIndex
-CREATE INDEX "idx_bi_ws_perm_workspace" ON "bi_workspace_permissions"("workspace_ref_id");
+CREATE INDEX "idx_bi_cws_workspace" ON "bi_customer_workspaces"("workspace_ref_id");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "bi_workspace_permissions_user_id_workspace_ref_id_key" ON "bi_workspace_permissions"("user_id", "workspace_ref_id");
+CREATE UNIQUE INDEX "bi_customer_workspaces_customer_id_workspace_ref_id_key" ON "bi_customer_workspaces"("customer_id", "workspace_ref_id");
 
 -- CreateIndex
-CREATE INDEX "idx_bi_report_perm_report" ON "bi_report_permissions"("report_ref_id");
+CREATE INDEX "idx_bi_crp_customer" ON "bi_customer_report_permissions"("customer_id");
 
 -- CreateIndex
-CREATE INDEX "idx_bi_report_perm_user" ON "bi_report_permissions"("user_id");
+CREATE INDEX "idx_bi_crp_report" ON "bi_customer_report_permissions"("report_ref_id");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "bi_report_permissions_user_id_report_ref_id_key" ON "bi_report_permissions"("user_id", "report_ref_id");
+CREATE UNIQUE INDEX "bi_customer_report_permissions_customer_id_report_ref_id_key" ON "bi_customer_report_permissions"("customer_id", "report_ref_id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "rls_target_target_key_key" ON "rls_target"("target_key");
 
 -- CreateIndex
 CREATE INDEX "idx_rls_target_dataset" ON "rls_target"("dataset_id");
-
--- CreateIndex
-CREATE INDEX "idx_rls_target_key" ON "rls_target"("target_key");
-
--- CreateIndex
-CREATE UNIQUE INDEX "rls_target_dataset_id_target_key_key" ON "rls_target"("dataset_id", "target_key");
 
 -- CreateIndex
 CREATE INDEX "idx_rls_rule_target" ON "rls_rule"("target_id");
 
 -- CreateIndex
 CREATE INDEX "idx_rls_rule_customer" ON "rls_rule"("customer_id");
+
+-- CreateIndex
+CREATE INDEX "idx_rls_rule_user" ON "rls_rule"("user_id");
 
 -- AddForeignKey
 ALTER TABLE "app_roles" ADD CONSTRAINT "app_roles_application_id_fkey" FOREIGN KEY ("application_id") REFERENCES "applications"("id") ON DELETE CASCADE ON UPDATE NO ACTION;
@@ -288,25 +285,25 @@ ALTER TABLE "user_customer_memberships" ADD CONSTRAINT "user_customer_membership
 ALTER TABLE "audit_log" ADD CONSTRAINT "audit_log_actor_user_id_fkey" FOREIGN KEY ("actor_user_id") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE NO ACTION;
 
 -- AddForeignKey
-ALTER TABLE "bi_workspaces" ADD CONSTRAINT "bi_workspaces_customer_id_fkey" FOREIGN KEY ("customer_id") REFERENCES "customers"("id") ON DELETE CASCADE ON UPDATE NO ACTION;
-
--- AddForeignKey
 ALTER TABLE "bi_reports" ADD CONSTRAINT "bi_reports_workspace_ref_id_fkey" FOREIGN KEY ("workspace_ref_id") REFERENCES "bi_workspaces"("id") ON DELETE CASCADE ON UPDATE NO ACTION;
 
 -- AddForeignKey
-ALTER TABLE "bi_workspace_permissions" ADD CONSTRAINT "bi_workspace_permissions_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION;
+ALTER TABLE "bi_customer_workspaces" ADD CONSTRAINT "bi_customer_workspaces_customer_id_fkey" FOREIGN KEY ("customer_id") REFERENCES "customers"("id") ON DELETE CASCADE ON UPDATE NO ACTION;
 
 -- AddForeignKey
-ALTER TABLE "bi_workspace_permissions" ADD CONSTRAINT "bi_workspace_permissions_workspace_ref_id_fkey" FOREIGN KEY ("workspace_ref_id") REFERENCES "bi_workspaces"("id") ON DELETE CASCADE ON UPDATE NO ACTION;
+ALTER TABLE "bi_customer_workspaces" ADD CONSTRAINT "bi_customer_workspaces_workspace_ref_id_fkey" FOREIGN KEY ("workspace_ref_id") REFERENCES "bi_workspaces"("id") ON DELETE CASCADE ON UPDATE NO ACTION;
 
 -- AddForeignKey
-ALTER TABLE "bi_report_permissions" ADD CONSTRAINT "bi_report_permissions_report_ref_id_fkey" FOREIGN KEY ("report_ref_id") REFERENCES "bi_reports"("id") ON DELETE CASCADE ON UPDATE NO ACTION;
+ALTER TABLE "bi_customer_report_permissions" ADD CONSTRAINT "bi_customer_report_permissions_customer_id_fkey" FOREIGN KEY ("customer_id") REFERENCES "customers"("id") ON DELETE CASCADE ON UPDATE NO ACTION;
 
 -- AddForeignKey
-ALTER TABLE "bi_report_permissions" ADD CONSTRAINT "bi_report_permissions_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION;
+ALTER TABLE "bi_customer_report_permissions" ADD CONSTRAINT "bi_customer_report_permissions_report_ref_id_fkey" FOREIGN KEY ("report_ref_id") REFERENCES "bi_reports"("id") ON DELETE CASCADE ON UPDATE NO ACTION;
 
 -- AddForeignKey
 ALTER TABLE "rls_rule" ADD CONSTRAINT "rls_rule_target_id_fkey" FOREIGN KEY ("target_id") REFERENCES "rls_target"("id") ON DELETE CASCADE ON UPDATE NO ACTION;
 
 -- AddForeignKey
 ALTER TABLE "rls_rule" ADD CONSTRAINT "rls_rule_customer_id_fkey" FOREIGN KEY ("customer_id") REFERENCES "customers"("id") ON DELETE CASCADE ON UPDATE NO ACTION;
+
+-- AddForeignKey
+ALTER TABLE "rls_rule" ADD CONSTRAINT "rls_rule_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION;

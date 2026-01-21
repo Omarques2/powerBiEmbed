@@ -5,58 +5,117 @@ import { PrismaService } from '../prisma/prisma.service';
 export class BiAuthzService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async listAllowedWorkspaces(userId: string) {
-    const rows = await this.prisma.biWorkspacePermission.findMany({
+  private async getActiveCustomerIds(userId: string): Promise<string[]> {
+    const memberships = await this.prisma.userCustomerMembership.findMany({
       where: {
         userId: userId,
-        canView: true,
+        isActive: true,
+        customer: { status: 'active' },
+      },
+      select: { customerId: true },
+    });
+    return memberships.map((m) => m.customerId);
+  }
+
+  async listAllowedWorkspaces(userId: string) {
+    const customerIds = await this.getActiveCustomerIds(userId);
+    if (!customerIds.length) return [];
+
+    const workspaceLinks = await this.prisma.biCustomerWorkspace.findMany({
+      where: {
+        customerId: { in: customerIds },
+        isActive: true,
+        workspace: { isActive: true },
+        customer: { status: 'active' },
+      },
+      select: {
+        customerId: true,
+        workspaceRefId: true,
         workspace: {
-          isActive: true,
-          customer: { status: 'active' },
+          select: { workspaceId: true, workspaceName: true },
         },
       },
-      include: {
-        workspace: true,
-      },
-      orderBy: { createdAt: 'asc' },
     });
 
-    return rows.map((r) => ({
-      workspaceId: r.workspace.workspaceId,
-      name: r.workspace.workspaceName ?? String(r.workspace.workspaceId),
-      customerId: r.workspace.customerId,
-    }));
+    const workspaceByCustomer = new Map<string, Set<string>>();
+    for (const link of workspaceLinks) {
+      const set = workspaceByCustomer.get(link.customerId) ?? new Set<string>();
+      set.add(link.workspaceRefId);
+      workspaceByCustomer.set(link.customerId, set);
+    }
+
+    const reportPerms = await this.prisma.biCustomerReportPermission.findMany({
+      where: {
+        customerId: { in: customerIds },
+        canView: true,
+        customer: { status: 'active' },
+        report: { isActive: true, workspace: { isActive: true } },
+      },
+      select: {
+        customerId: true,
+        report: {
+          select: {
+            workspaceRefId: true,
+            workspace: { select: { workspaceId: true, workspaceName: true } },
+          },
+        },
+      },
+    });
+
+    const seen = new Set<string>();
+    const result: Array<{ workspaceId: string; name: string }> = [];
+
+    for (const perm of reportPerms) {
+      const allowed = workspaceByCustomer.get(perm.customerId);
+      if (!allowed?.has(perm.report.workspaceRefId)) continue;
+
+      const workspaceId = perm.report.workspace.workspaceId;
+      if (seen.has(workspaceId)) continue;
+      seen.add(workspaceId);
+
+      result.push({
+        workspaceId,
+        name:
+          perm.report.workspace.workspaceName ??
+          String(perm.report.workspace.workspaceId),
+      });
+    }
+
+    return result;
   }
 
   async listAllowedReports(userId: string, workspaceId: string) {
-    // 1) valida acesso ao workspace + workspace ativo + customer ativo
-    const wsPerm = await this.prisma.biWorkspacePermission.findFirst({
-      where: {
-        userId: userId,
-        canView: true,
-        workspace: {
-          workspaceId: workspaceId,
-          isActive: true,
-          customer: { status: 'active' },
-        },
-      },
-      include: { workspace: true },
+    const customerIds = await this.getActiveCustomerIds(userId);
+    if (!customerIds.length)
+      throw new ForbiddenException('No access to workspace');
+
+    const ws = await this.prisma.biWorkspace.findFirst({
+      where: { workspaceId: workspaceId, isActive: true },
+      select: { id: true },
     });
+    if (!ws) throw new ForbiddenException('No access to workspace');
 
-    if (!wsPerm) throw new ForbiddenException('No access to workspace');
-
-    // 2) permissões por report (canView=true) + report ativo
-    const perms = await this.prisma.biReportPermission.findMany({
+    const activeLinks = await this.prisma.biCustomerWorkspace.findMany({
       where: {
-        userId: userId,
+        customerId: { in: customerIds },
+        workspaceRefId: ws.id,
+        isActive: true,
+        customer: { status: 'active' },
+      },
+      select: { customerId: true },
+    });
+    const allowedCustomerIds = new Set(activeLinks.map((l) => l.customerId));
+    if (!allowedCustomerIds.size)
+      throw new ForbiddenException('No access to workspace');
+
+    const perms = await this.prisma.biCustomerReportPermission.findMany({
+      where: {
+        customerId: { in: Array.from(allowedCustomerIds) },
         canView: true,
         report: {
-          workspaceRefId: wsPerm.workspace.id,
+          workspaceRefId: ws.id,
           isActive: true,
-          workspace: {
-            isActive: true,
-            customer: { status: 'active' },
-          },
+          workspace: { isActive: true },
         },
       },
       select: {
@@ -79,27 +138,58 @@ export class BiAuthzService {
     }));
   }
 
-  async getWorkspaceCustomerId(userId: string, workspaceId: string) {
-    const wsPerm = await this.prisma.biWorkspacePermission.findFirst({
+  async resolveReportAccess(
+    userId: string,
+    workspaceId: string,
+    reportId: string,
+  ) {
+    const customerIds = await this.getActiveCustomerIds(userId);
+    if (!customerIds.length)
+      throw new ForbiddenException('No access to workspace/report');
+
+    const ws = await this.prisma.biWorkspace.findFirst({
+      where: { workspaceId: workspaceId, isActive: true },
+      select: { id: true },
+    });
+    if (!ws) throw new ForbiddenException('No access to workspace/report');
+
+    const links = await this.prisma.biCustomerWorkspace.findMany({
       where: {
-        userId: userId,
+        customerId: { in: customerIds },
+        workspaceRefId: ws.id,
+        isActive: true,
+        customer: { status: 'active' },
+      },
+      select: { customerId: true },
+    });
+    const allowedCustomerIds = links.map((l) => l.customerId);
+    if (!allowedCustomerIds.length)
+      throw new ForbiddenException('No access to workspace/report');
+
+    const perm = await this.prisma.biCustomerReportPermission.findFirst({
+      where: {
+        customerId: { in: allowedCustomerIds },
         canView: true,
-        workspace: {
-          workspaceId: workspaceId,
+        report: {
+          reportId: reportId,
+          workspaceRefId: ws.id,
           isActive: true,
-          customer: { status: 'active' },
+          workspace: { isActive: true },
         },
       },
       select: {
-        workspace: { select: { customerId: true } },
+        customerId: true,
+        report: { select: { id: true, datasetId: true } },
       },
     });
 
-    if (!wsPerm?.workspace?.customerId) {
-      throw new ForbiddenException('No access to workspace');
-    }
+    if (!perm) throw new ForbiddenException('No access to workspace/report');
 
-    return wsPerm.workspace.customerId;
+    return {
+      customerId: perm.customerId,
+      reportRefId: perm.report.id,
+      datasetId: perm.report.datasetId ?? null,
+    };
   }
 
   async assertCanViewReport(
@@ -107,23 +197,6 @@ export class BiAuthzService {
     workspaceId: string,
     reportId: string,
   ) {
-    const ok = await this.prisma.biReportPermission.findFirst({
-      where: {
-        userId: userId,
-        canView: true,
-        report: {
-          reportId: reportId,
-          isActive: true,
-          workspace: {
-            workspaceId: workspaceId,
-            isActive: true,
-            customer: { status: 'active' },
-          },
-        },
-      },
-      select: { id: true },
-    });
-
-    if (!ok) throw new ForbiddenException('No access to workspace/report');
+    await this.resolveReportAccess(userId, workspaceId, reportId);
   }
 }

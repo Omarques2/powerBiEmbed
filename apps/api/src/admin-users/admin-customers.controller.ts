@@ -15,6 +15,7 @@ import { AdminUsersService } from './admin-users.service';
 import type { AuthedRequest } from '../auth/authed-request.type';
 import {
   CreateCustomerDto,
+  UpdateCustomerReportPermissionDto,
   UpdateCustomerDto,
   UpdateCustomerStatusDto,
 } from './dto/admin-customers.dto';
@@ -59,9 +60,8 @@ export class AdminCustomersController {
 
   /**
    * Unlink (revogar) um workspace do customer de forma consistente:
-   * - bi_workspaces.isActive = false
-   * - bi_reports.isActive = false (do workspace)
-   * - revoga permissões (workspace + reports) de usuários com membership ativo no customer
+   * - bi_customer_workspaces.isActive = false
+   * - bi_customer_report_permissions.canView = false (reports do workspace)
    * - audit_log
    */
   @Post(':customerId/workspaces/:workspaceRefId/unlink')
@@ -74,6 +74,22 @@ export class AdminCustomersController {
     return this.svc.unlinkWorkspaceFromCustomer(
       customerId,
       workspaceRefId,
+      actorSub,
+    );
+  }
+
+  @Put(':customerId/reports/:reportRefId')
+  setReportPermission(
+    @Req() req: AuthedRequest,
+    @Param('customerId', ParseUUIDPipe) customerId: string,
+    @Param('reportRefId', ParseUUIDPipe) reportRefId: string,
+    @Body() body: UpdateCustomerReportPermissionDto,
+  ) {
+    const actorSub = req.user?.sub ? String(req.user.sub) : null;
+    return this.svc.setCustomerReportPermission(
+      customerId,
+      reportRefId,
+      body.canView,
       actorSub,
     );
   }

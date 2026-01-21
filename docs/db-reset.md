@@ -18,7 +18,11 @@ Este guia descreve como zerar o banco e recriar a baseline do schema. Use apenas
    - Abra o **Query Tool** e execute:
      - `CREATE EXTENSION IF NOT EXISTS "pgcrypto";`
      - `CREATE EXTENSION IF NOT EXISTS "citext";`
-5) Gere a nova baseline do Prisma e aplique:
+5) Remova views de RLS (se existirem):
+   - `DROP VIEW IF EXISTS "sec_rls_base";`
+   - Para remover todas as views `sec_*`:
+     - `DO $$ DECLARE r record; BEGIN FOR r IN SELECT table_schema, table_name FROM information_schema.views WHERE table_schema = 'public' AND table_name LIKE 'sec_%' LOOP EXECUTE format('DROP VIEW IF EXISTS %I.%I CASCADE', r.table_schema, r.table_name); END LOOP; END $$;`
+6) Gere a nova baseline do Prisma e aplique:
    - No terminal em `apps/api`:
      - `npx prisma migrate dev --name init`
 
@@ -29,7 +33,11 @@ Este guia descreve como zerar o banco e recriar a baseline do schema. Use apenas
 2) Habilite extensoes:
    - `CREATE EXTENSION IF NOT EXISTS "pgcrypto";`
    - `CREATE EXTENSION IF NOT EXISTS "citext";`
-3) Gere a nova baseline:
+3) Remova views de RLS (se existirem):
+   - `DROP VIEW IF EXISTS "sec_rls_base";`
+   - Para remover todas as views `sec_*`:
+     - `DO $$ DECLARE r record; BEGIN FOR r IN SELECT table_schema, table_name FROM information_schema.views WHERE table_schema = 'public' AND table_name LIKE 'sec_%' LOOP EXECUTE format('DROP VIEW IF EXISTS %I.%I CASCADE', r.table_schema, r.table_name); END LOOP; END $$;`
+4) Gere a nova baseline:
    - `npx prisma migrate dev --name init`
 
 ## Reativar Platform Admin (manual)

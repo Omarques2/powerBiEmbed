@@ -7,7 +7,7 @@
     >
       <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div class="min-w-0">
-          <div class="text-sm font-semibold text-slate-900 dark:text-slate-100">RLS por customer</div>
+          <div class="text-sm font-semibold text-slate-900 dark:text-slate-100">RLS por customer/usuario</div>
           <div class="mt-1 text-xs text-slate-600 dark:text-slate-300">
             Selecione o dataset e cadastre targets por coluna elegivel.
           </div>
@@ -17,64 +17,58 @@
           type="button"
           class="shrink-0 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs hover:bg-slate-50
                  disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
-          :disabled="loadingCatalog"
+          :disabled="loadingDatasets"
           @click="refresh"
         >
-          {{ loadingCatalog ? "Carregando..." : "Recarregar" }}
+          {{ loadingDatasets ? "Carregando..." : "Recarregar" }}
         </button>
       </div>
 
       <div
-        v-if="catalogError"
+        v-if="datasetsError"
         class="mt-3 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700
                dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-200"
       >
-        {{ catalogError }}
+        {{ datasetsError }}
       </div>
 
-      <div class="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-3">
+      <div class="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
         <div>
-          <label class="text-xs font-medium text-slate-700 dark:text-slate-300">Customer</label>
+          <label class="text-xs font-medium text-slate-700 dark:text-slate-300">Dataset</label>
           <select
-            v-model="customerId"
+            v-model="datasetId"
             class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
                    dark:border-slate-800 dark:bg-slate-900"
           >
             <option value="">-- selecione --</option>
-            <option v-for="c in customers" :key="c.id" :value="c.id">
-              {{ c.code }} - {{ c.name }} ({{ c.status }})
+            <option v-for="d in datasets" :key="d.datasetId" :value="d.datasetId">
+              {{ d.sampleWorkspaceName || "Workspace" }} / {{ d.sampleReportName || "Report" }}
             </option>
           </select>
         </div>
 
         <div>
-          <label class="text-xs font-medium text-slate-700 dark:text-slate-300">Workspace</label>
-          <select
-            v-model="workspaceRefId"
-            class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
-                   disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900"
-            :disabled="!catalog || loadingCatalog"
+          <label class="text-xs font-medium text-slate-700 dark:text-slate-300">Resumo</label>
+          <div
+            class="mt-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700
+                   dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200"
           >
-            <option value="">-- selecione --</option>
-            <option v-for="w in catalog?.workspaces ?? []" :key="w.workspaceRefId" :value="w.workspaceRefId">
-              {{ w.name }}{{ w.isActive ? "" : " (inativo)" }}
-            </option>
-          </select>
-        </div>
-
-        <div>
-          <label class="text-xs font-medium text-slate-700 dark:text-slate-300">Report</label>
-          <select
-            v-model="reportRefId"
-            class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
-                   disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900"
-            :disabled="!selectedWorkspace || loadingCatalog"
-          >
-            <option value="">-- selecione --</option>
-            <option v-for="r in availableReports" :key="r.reportRefId" :value="r.reportRefId">
-              {{ r.name }}{{ r.isActive ? "" : " (inativo)" }}
-            </option>
-          </select>
+            <div v-if="loadingDatasets">Carregando datasets...</div>
+            <div v-else-if="selectedDataset">
+              <div class="flex flex-wrap gap-2 text-[11px] text-slate-500 dark:text-slate-400">
+                <span>{{ selectedDataset.workspaceCount }} workspaces</span>
+                <span>{{ selectedDataset.reportCount }} reports</span>
+              </div>
+              <div class="mt-1">
+                <div class="truncate">
+                  {{ selectedDataset.sampleWorkspaceName || selectedDataset.sampleWorkspaceId || "-" }}
+                  /
+                  {{ selectedDataset.sampleReportName || selectedDataset.sampleReportId || "-" }}
+                </div>
+              </div>
+            </div>
+            <div v-else>Selecione um dataset para carregar targets e regras.</div>
+          </div>
         </div>
       </div>
 
@@ -82,7 +76,7 @@
         class="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700
                dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-200"
       >
-        <div v-if="loadingCatalog">Carregando catalogo do customer...</div>
+        <div v-if="loadingDatasets">Carregando datasets...</div>
         <div v-else-if="datasetId">
           <div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-2">
             <span class="text-slate-500 dark:text-slate-400">Dataset ID</span>
@@ -93,10 +87,286 @@
           </div>
         </div>
         <div v-else>
-          Selecione um report com dataset para habilitar targets e regras.
+          Selecione um dataset para habilitar targets e regras.
         </div>
       </div>
     </section>
+
+    <div v-if="targetModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
+      <div
+        class="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-4 shadow-xl
+               dark:border-slate-800 dark:bg-slate-900"
+      >
+        <div class="flex items-start justify-between gap-3">
+          <div class="min-w-0">
+            <div class="text-sm font-semibold text-slate-900 dark:text-slate-100">
+              {{ targetEditing ? "Editar target" : "Novo target" }}
+            </div>
+            <div class="mt-1 text-xs text-slate-600 dark:text-slate-300">
+              Defina a coluna base que sera usada no filtro RLS.
+            </div>
+          </div>
+          <button
+            type="button"
+            class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs hover:bg-slate-50
+                   disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+            :disabled="savingTarget"
+            @click="closeTargetModal"
+          >
+            Fechar
+          </button>
+        </div>
+
+        <div class="mt-4 grid grid-cols-1 gap-3">
+          <div>
+            <label class="text-xs font-medium text-slate-700 dark:text-slate-300">Display name</label>
+            <input
+              v-model="targetForm.displayName"
+              class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
+                     dark:border-slate-800 dark:bg-slate-900"
+              :disabled="savingTarget"
+              placeholder="ex: Instituicao Financeira"
+              @blur="fillTargetKeyFromName"
+            />
+          </div>
+
+          <div>
+            <label class="text-xs font-medium text-slate-700 dark:text-slate-300">target_key</label>
+            <input
+              v-model="targetForm.targetKey"
+              class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
+                     dark:border-slate-800 dark:bg-slate-900"
+              :disabled="savingTarget"
+              placeholder="ex: instituicao_financeira"
+            />
+          </div>
+
+          <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              <label class="text-xs font-medium text-slate-700 dark:text-slate-300">Fact table</label>
+              <input
+                v-model="targetForm.factTable"
+                class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
+                       dark:border-slate-800 dark:bg-slate-900"
+                :disabled="savingTarget"
+                placeholder="ex: LoteFormacao_2"
+              />
+            </div>
+            <div>
+              <label class="text-xs font-medium text-slate-700 dark:text-slate-300">Fact column</label>
+              <input
+                v-model="targetForm.factColumn"
+                class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
+                       dark:border-slate-800 dark:bg-slate-900"
+                :disabled="savingTarget"
+                placeholder="ex: Instituicao Financeira"
+              />
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div>
+              <label class="text-xs font-medium text-slate-700 dark:text-slate-300">Value type</label>
+              <select
+                v-model="targetForm.valueType"
+                class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
+                       dark:border-slate-800 dark:bg-slate-900"
+                :disabled="savingTarget"
+              >
+                <option value="text">text</option>
+                <option value="int">int</option>
+                <option value="uuid">uuid</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="text-xs font-medium text-slate-700 dark:text-slate-300">Default behavior</label>
+              <select
+                v-model="targetForm.defaultBehavior"
+                class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
+                       dark:border-slate-800 dark:bg-slate-900"
+                :disabled="savingTarget"
+              >
+                <option value="allow">allow</option>
+                <option value="deny">deny</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="text-xs font-medium text-slate-700 dark:text-slate-300">Status</label>
+              <select
+                v-model="targetForm.status"
+                class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
+                       dark:border-slate-800 dark:bg-slate-900"
+                :disabled="savingTarget"
+              >
+                <option value="draft">draft</option>
+                <option value="active">active</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-4 flex items-center justify-end gap-2">
+          <button
+            type="button"
+            class="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm hover:bg-slate-50
+                   disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+            :disabled="savingTarget"
+            @click="closeTargetModal"
+          >
+            Cancelar
+          </button>
+
+          <button
+            type="button"
+            class="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800
+                   disabled:opacity-60 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
+            :disabled="savingTarget || !canSaveTarget"
+            @click="saveTarget"
+          >
+            {{ savingTarget ? "Salvando..." : "Salvar" }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="ruleModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
+      <div
+        class="w-full max-w-3xl rounded-2xl border border-slate-200 bg-white p-4 shadow-xl
+               dark:border-slate-800 dark:bg-slate-900"
+      >
+        <div class="flex items-start justify-between gap-3">
+          <div class="min-w-0">
+            <div class="text-sm font-semibold text-slate-900 dark:text-slate-100">Nova regra</div>
+            <div class="mt-1 text-xs text-slate-600 dark:text-slate-300">
+              Informe o escopo e os valores permitidos/negados.
+            </div>
+          </div>
+          <button
+            type="button"
+            class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs hover:bg-slate-50
+                   disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+            :disabled="ruleModalSaving"
+            @click="closeRuleModal"
+          >
+            Fechar
+          </button>
+        </div>
+
+        <div class="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-4">
+          <div>
+            <label class="text-xs font-medium text-slate-700 dark:text-slate-300">Target</label>
+            <select
+              v-model="ruleForm.targetId"
+              class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
+                     dark:border-slate-800 dark:bg-slate-900"
+            >
+              <option value="">-- selecione --</option>
+              <option v-for="t in targets" :key="t.id" :value="t.id">
+                {{ t.displayName }} ({{ t.targetKey }})
+              </option>
+            </select>
+            <div class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+              value_type: {{ ruleFormTarget?.valueType || "-" }}
+            </div>
+          </div>
+
+          <div>
+            <label class="text-xs font-medium text-slate-700 dark:text-slate-300">Escopo</label>
+            <select
+              v-model="ruleForm.scope"
+              class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
+                     dark:border-slate-800 dark:bg-slate-900"
+            >
+              <option value="customer">Customer</option>
+              <option value="user">Usuario</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="text-xs font-medium text-slate-700 dark:text-slate-300">Entidade</label>
+            <select
+              v-if="ruleForm.scope === 'customer'"
+              v-model="ruleForm.customerId"
+              class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
+                     dark:border-slate-800 dark:bg-slate-900"
+            >
+              <option value="">-- selecione --</option>
+              <option v-for="c in customers" :key="c.id" :value="c.id">
+                {{ c.code }} - {{ c.name }}
+              </option>
+            </select>
+            <select
+              v-else
+              v-model="ruleForm.userId"
+              class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
+                     dark:border-slate-800 dark:bg-slate-900"
+            >
+              <option value="">-- selecione --</option>
+              <option v-for="u in activeUsers" :key="u.id" :value="u.id">
+                {{ u.display_name || u.email || u.id }}
+              </option>
+            </select>
+          </div>
+
+          <div>
+            <label class="text-xs font-medium text-slate-700 dark:text-slate-300">Operacao</label>
+            <select
+              v-model="ruleForm.op"
+              class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
+                     dark:border-slate-800 dark:bg-slate-900"
+            >
+              <option value="include">include</option>
+              <option value="exclude">exclude</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="mt-3">
+          <label class="text-xs font-medium text-slate-700 dark:text-slate-300">Valores</label>
+          <textarea
+            v-model="ruleForm.values"
+            rows="3"
+            class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
+                   dark:border-slate-800 dark:bg-slate-900"
+            :placeholder="ruleValuesPlaceholder"
+          />
+          <div class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+            Separe por virgula, ponto e virgula ou quebra de linha.
+          </div>
+        </div>
+
+        <div v-if="ruleModalError" class="mt-2 text-xs text-rose-600 dark:text-rose-300">
+          {{ ruleModalError }}
+        </div>
+
+        <div v-if="usersError" class="mt-2 text-xs text-amber-600 dark:text-amber-300">
+          Falha ao carregar usuarios: {{ usersError }}
+        </div>
+
+        <div class="mt-4 flex items-center justify-end gap-2">
+          <button
+            type="button"
+            class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs hover:bg-slate-50
+                   disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+            :disabled="ruleModalSaving"
+            @click="closeRuleModal"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            class="rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800
+                   disabled:opacity-60 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
+            :disabled="ruleModalSaving || !canSaveRule"
+            @click="saveRuleModal"
+          >
+            {{ ruleModalSaving ? "Salvando..." : "Salvar regra" }}
+          </button>
+        </div>
+      </div>
+    </div>
 
     <section
       class="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm
@@ -153,7 +423,7 @@
             class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700
                    dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-200"
           >
-            Selecione um report com dataset para cadastrar targets.
+            Selecione um dataset para cadastrar targets.
           </div>
 
           <div v-else>
@@ -192,75 +462,77 @@
               Carregando targets...
             </div>
 
-            <div v-if="!loadingTargets" class="mt-3 overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-800">
-              <table class="w-full table-fixed text-left text-sm">
-                <thead class="bg-slate-50 text-xs text-slate-600 dark:bg-slate-950/40 dark:text-slate-300">
-                  <tr>
-                    <th class="w-40 px-4 py-3">target_key</th>
-                    <th class="px-4 py-3">Display</th>
-                    <th class="w-40 px-4 py-3">Fact</th>
-                    <th class="w-24 px-4 py-3">Type</th>
-                    <th class="w-24 px-4 py-3">Status</th>
-                    <th class="w-40 px-4 py-3 text-right"></th>
-                  </tr>
-                </thead>
-                <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
-                  <tr v-for="t in targets" :key="t.id" class="hover:bg-slate-50/60 dark:hover:bg-slate-950/30">
-                    <td class="px-4 py-3 font-mono text-xs text-slate-900 dark:text-slate-100">
-                      <div class="truncate">{{ t.targetKey }}</div>
-                    </td>
-                    <td class="px-4 py-3 text-slate-900 dark:text-slate-100">
-                      <div class="truncate">{{ t.displayName }}</div>
-                    </td>
-                    <td class="px-4 py-3 text-xs text-slate-700 dark:text-slate-200">
-                      <div class="truncate">{{ t.factTable }}.{{ t.factColumn }}</div>
-                    </td>
-                    <td class="px-4 py-3">
-                      <span class="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] text-slate-700 dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-200">
-                        {{ t.valueType }}
-                      </span>
-                    </td>
-                    <td class="px-4 py-3">
-                      <span
-                        class="inline-flex items-center rounded-full border px-2 py-1 text-[11px]"
-                        :class="t.status === 'active'
-                          ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/40 dark:text-emerald-200'
-                          : 'border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-200'"
-                      >
-                        {{ t.status }}
-                      </span>
-                    </td>
-                    <td class="px-4 py-3">
-                      <div class="flex items-center justify-end gap-2">
-                        <button
-                          type="button"
-                          class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs hover:bg-slate-50
-                                 disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
-                          :disabled="targetBusy.isBusy(t.id)"
-                          @click="openTargetEdit(t)"
+            <div v-if="!loadingTargets" class="mt-3">
+              <div class="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-800">
+                <table class="w-full table-fixed text-left text-sm">
+                  <thead class="bg-slate-50 text-xs text-slate-600 dark:bg-slate-950/40 dark:text-slate-300">
+                    <tr>
+                      <th class="w-40 px-4 py-3">target_key</th>
+                      <th class="px-4 py-3">Display</th>
+                      <th class="w-40 px-4 py-3">Fact</th>
+                      <th class="w-24 px-4 py-3">Type</th>
+                      <th class="w-24 px-4 py-3">Status</th>
+                      <th class="w-40 px-4 py-3 text-right"></th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
+                    <tr v-for="t in targets" :key="t.id" class="hover:bg-slate-50/60 dark:hover:bg-slate-950/30">
+                      <td class="px-4 py-3 font-mono text-xs text-slate-900 dark:text-slate-100">
+                        <div class="truncate">{{ t.targetKey }}</div>
+                      </td>
+                      <td class="px-4 py-3 text-slate-900 dark:text-slate-100">
+                        <div class="truncate">{{ t.displayName }}</div>
+                      </td>
+                      <td class="px-4 py-3 text-xs text-slate-700 dark:text-slate-200">
+                        <div class="truncate">{{ t.factTable }}.{{ t.factColumn }}</div>
+                      </td>
+                      <td class="px-4 py-3">
+                        <span class="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] text-slate-700 dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-200">
+                          {{ t.valueType }}
+                        </span>
+                      </td>
+                      <td class="px-4 py-3">
+                        <span
+                          class="inline-flex items-center rounded-full border px-2 py-1 text-[11px]"
+                          :class="t.status === 'active'
+                            ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/40 dark:text-emerald-200'
+                            : 'border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-200'"
                         >
-                          Editar
-                        </button>
-                        <button
-                          type="button"
-                          class="rounded-xl border border-rose-200 bg-rose-600 px-3 py-2 text-xs font-semibold text-white hover:bg-rose-500
-                                 disabled:opacity-60 dark:border-rose-900/40 dark:bg-rose-700 dark:hover:bg-rose-600"
-                          :disabled="targetBusy.isBusy(t.id)"
-                          @click="removeTarget(t)"
-                        >
-                          {{ targetBusy.isBusy(t.id) ? "..." : "Excluir" }}
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
+                          {{ t.status }}
+                        </span>
+                      </td>
+                      <td class="px-4 py-3">
+                        <div class="flex items-center justify-end gap-2">
+                          <button
+                            type="button"
+                            class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs hover:bg-slate-50
+                                   disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+                            :disabled="targetBusy.isBusy(t.id)"
+                            @click="openTargetEdit(t)"
+                          >
+                            Editar
+                          </button>
+                          <button
+                            type="button"
+                            class="rounded-xl border border-rose-200 bg-rose-600 px-3 py-2 text-xs font-semibold text-white hover:bg-rose-500
+                                   disabled:opacity-60 dark:border-rose-900/40 dark:bg-rose-700 dark:hover:bg-rose-600"
+                            :disabled="targetBusy.isBusy(t.id)"
+                            @click="removeTarget(t)"
+                          >
+                            {{ targetBusy.isBusy(t.id) ? "..." : "Excluir" }}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
 
-                  <tr v-if="!targets.length">
-                    <td colspan="6" class="px-4 py-6 text-center text-xs text-slate-500 dark:text-slate-400">
-                      Nenhum target cadastrado.
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+                    <tr v-if="!targets.length">
+                      <td colspan="6" class="px-4 py-6 text-center text-xs text-slate-500 dark:text-slate-400">
+                        Nenhum target cadastrado.
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         </div>
@@ -272,7 +544,7 @@
             class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700
                    dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-200"
           >
-            Selecione um report com dataset para cadastrar regras.
+            Selecione um dataset para cadastrar regras.
           </div>
 
           <div
@@ -284,7 +556,7 @@
           </div>
 
           <div v-else>
-            <div class="grid grid-cols-1 gap-3 lg:grid-cols-3">
+            <div class="grid grid-cols-1 gap-3 lg:grid-cols-4">
               <div>
                 <label class="text-xs font-medium text-slate-700 dark:text-slate-300">Target</label>
                 <select
@@ -302,20 +574,57 @@
               </div>
 
               <div>
-                <label class="text-xs font-medium text-slate-700 dark:text-slate-300">Filtro de customer</label>
+                <label class="text-xs font-medium text-slate-700 dark:text-slate-300">Filtro</label>
                 <select
+                  v-model="rulesFilterScope"
+                  class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
+                         dark:border-slate-800 dark:bg-slate-900"
+                >
+                  <option value="all">-- todos --</option>
+                  <option value="customer">Customer</option>
+                  <option value="user">Usuario</option>
+                </select>
+              </div>
+
+              <div>
+                <label class="text-xs font-medium text-slate-700 dark:text-slate-300">Entidade</label>
+                <select
+                  v-if="rulesFilterScope === 'customer'"
                   v-model="rulesFilterCustomerId"
                   class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
                          dark:border-slate-800 dark:bg-slate-900"
                 >
-                  <option value="">-- todos --</option>
+                  <option value="">-- todas --</option>
                   <option v-for="c in customers" :key="c.id" :value="c.id">
                     {{ c.code }} - {{ c.name }}
                   </option>
                 </select>
+                <select
+                  v-else-if="rulesFilterScope === 'user'"
+                  v-model="rulesFilterUserId"
+                  class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
+                         dark:border-slate-800 dark:bg-slate-900"
+                >
+                  <option value="">-- todos --</option>
+                  <option v-for="u in activeUsers" :key="u.id" :value="u.id">
+                    {{ u.display_name || u.email || u.id }}
+                  </option>
+                </select>
+                <div v-else class="mt-3 text-[11px] text-slate-500 dark:text-slate-400">
+                  Selecione um filtro.
+                </div>
               </div>
 
-              <div class="flex items-end">
+              <div class="flex flex-col gap-2">
+                <button
+                  type="button"
+                  class="w-full rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800
+                         disabled:opacity-60 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
+                  :disabled="ruleModalSaving"
+                  @click="openRuleCreate"
+                >
+                  + Nova regra
+                </button>
                 <button
                   type="button"
                   class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs hover:bg-slate-50
@@ -327,21 +636,6 @@
                 </button>
               </div>
             </div>
-            <div class="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <div class="text-[11px] text-slate-500 dark:text-slate-400">
-                Cadastre regras para o target selecionado.
-              </div>
-              <button
-                type="button"
-                class="rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800
-                       disabled:opacity-60 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
-                :disabled="!targets.length"
-                @click="openRuleCreate"
-              >
-                + Nova regra
-              </button>
-            </div>
-
             <div v-if="rulesError" class="mt-3 text-xs text-rose-600 dark:text-rose-300">
               {{ rulesError }}
             </div>
@@ -358,7 +652,8 @@
               <table class="w-full table-fixed text-left text-sm">
                 <thead class="bg-slate-50 text-xs text-slate-600 dark:bg-slate-950/40 dark:text-slate-300">
                   <tr>
-                    <th class="w-60 px-4 py-3">Customer</th>
+                    <th class="w-28 px-4 py-3">Escopo</th>
+                    <th class="w-60 px-4 py-3">Entidade</th>
                     <th class="w-24 px-4 py-3">Op</th>
                     <th class="px-4 py-3">Valor</th>
                     <th class="w-32 px-4 py-3">Criado</th>
@@ -368,8 +663,11 @@
                 <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
                   <tr v-for="r in rules" :key="r.id" class="hover:bg-slate-50/60 dark:hover:bg-slate-950/30">
                     <td class="px-4 py-3 text-xs text-slate-700 dark:text-slate-200">
-                      <div class="truncate">{{ customerLabel(r.customerId) }}</div>
-                      <div class="font-mono text-[10px] text-slate-400 dark:text-slate-500">{{ r.customerId }}</div>
+                      {{ r.customerId ? "customer" : "user" }}
+                    </td>
+                    <td class="px-4 py-3 text-xs text-slate-700 dark:text-slate-200">
+                      <div class="truncate">{{ ruleOwnerLabel(r) }}</div>
+                      <div class="font-mono text-[10px] text-slate-400 dark:text-slate-500">{{ ruleOwnerId(r) }}</div>
                     </td>
                     <td class="px-4 py-3">
                       <span
@@ -403,16 +701,16 @@
                   </tr>
 
                   <tr v-if="!rules.length">
-                    <td colspan="5" class="px-4 py-6 text-center text-xs text-slate-500 dark:text-slate-400">
+                    <td colspan="6" class="px-4 py-6 text-center text-xs text-slate-500 dark:text-slate-400">
                       Nenhuma regra encontrada.
                     </td>
                   </tr>
                 </tbody>
               </table>
+              </div>
             </div>
-          </div>
         </div>
-
+        
         <!-- TAB: GUIDE -->
         <div v-else-if="activeTab === 'guide'">
           <div
@@ -420,7 +718,7 @@
             class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700
                    dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-200"
           >
-            Selecione um report com dataset para gerar o guia PBIX.
+            Selecione um dataset para gerar o guia PBIX.
           </div>
 
           <div
@@ -492,7 +790,7 @@
             class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700
                    dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-200"
           >
-            Selecione um report com dataset para exportar snapshot.
+            Selecione um dataset para exportar snapshot.
           </div>
 
           <div v-else class="space-y-3">
@@ -687,261 +985,13 @@
       </div>
     </div>
 
-    <!-- MODAL create rule -->
-    <div v-if="ruleModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
-      <div class="w-full max-w-xl rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-800 dark:bg-slate-900">
-        <div class="flex items-start justify-between gap-3">
-          <div class="min-w-0">
-            <div class="text-sm font-semibold text-slate-900 dark:text-slate-100">Nova regra</div>
-            <div class="mt-1 text-xs text-slate-600 dark:text-slate-300">
-              Defina include/exclude para um customer no target escolhido.
-            </div>
-          </div>
-
-          <button
-            type="button"
-            class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs hover:bg-slate-50
-                   dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
-            @click="closeRuleModal"
-          >
-            Fechar
-          </button>
-        </div>
-
-        <div class="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
-          <div>
-            <label class="text-xs font-medium text-slate-700 dark:text-slate-300">Target</label>
-            <select
-              v-model="ruleForm.targetId"
-              class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
-                     dark:border-slate-800 dark:bg-slate-900"
-            >
-              <option value="">-- selecione --</option>
-              <option v-for="t in targets" :key="t.id" :value="t.id">
-                {{ t.displayName }} ({{ t.targetKey }})
-              </option>
-            </select>
-            <div class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
-              value_type: {{ ruleFormTarget?.valueType || "-" }}
-            </div>
-          </div>
-
-          <div>
-            <label class="text-xs font-medium text-slate-700 dark:text-slate-300">Customer</label>
-            <select
-              v-model="ruleForm.customerId"
-              class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
-                     dark:border-slate-800 dark:bg-slate-900"
-            >
-              <option value="">-- selecione --</option>
-              <option v-for="c in customers" :key="c.id" :value="c.id">
-                {{ c.code }} - {{ c.name }}
-              </option>
-            </select>
-          </div>
-        </div>
-
-        <div class="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
-          <div>
-            <label class="text-xs font-medium text-slate-700 dark:text-slate-300">Operacao</label>
-            <select
-              v-model="ruleForm.op"
-              class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
-                     dark:border-slate-800 dark:bg-slate-900"
-            >
-              <option value="include">include</option>
-              <option value="exclude">exclude</option>
-            </select>
-          </div>
-          <div></div>
-        </div>
-
-        <div class="mt-3">
-          <label class="text-xs font-medium text-slate-700 dark:text-slate-300">Valores</label>
-          <textarea
-            v-model="ruleForm.values"
-            rows="4"
-            class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
-                   dark:border-slate-800 dark:bg-slate-900"
-            :placeholder="ruleValuesPlaceholder"
-          />
-          <div class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
-            Separe por virgula, ponto e virgula ou quebra de linha.
-          </div>
-        </div>
-
-        <div v-if="ruleModalError" class="mt-2 text-xs text-rose-600 dark:text-rose-300">
-          {{ ruleModalError }}
-        </div>
-
-        <div class="mt-4 flex items-center justify-end gap-2">
-          <button
-            type="button"
-            class="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm hover:bg-slate-50
-                   disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
-            :disabled="ruleModalSaving"
-            @click="closeRuleModal"
-          >
-            Cancelar
-          </button>
-
-          <button
-            type="button"
-            class="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800
-                   disabled:opacity-60 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
-            :disabled="ruleModalSaving || !canSaveRule"
-            @click="saveRuleModal"
-          >
-            {{ ruleModalSaving ? "Salvando..." : "Salvar regra" }}
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- MODAL create/edit target -->
-    <div v-if="targetModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
-      <div class="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-800 dark:bg-slate-900">
-        <div class="flex items-start justify-between gap-3">
-          <div class="min-w-0">
-            <div class="text-sm font-semibold text-slate-900 dark:text-slate-100">
-              {{ targetEditing ? "Editar target" : "Novo target" }}
-            </div>
-            <div class="mt-1 text-xs text-slate-600 dark:text-slate-300">
-              {{ targetEditing ? "Atualize os campos do target." : "Cadastre uma coluna elegivel para RLS." }}
-            </div>
-          </div>
-
-          <button
-            type="button"
-            class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs hover:bg-slate-50
-                   disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
-            :disabled="savingTarget"
-            @click="closeTargetModal"
-          >
-            Fechar
-          </button>
-        </div>
-
-        <div class="mt-4 grid grid-cols-1 gap-3">
-          <div>
-            <label class="text-xs font-medium text-slate-700 dark:text-slate-300">Display name</label>
-            <input
-              v-model="targetForm.displayName"
-              class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
-                     dark:border-slate-800 dark:bg-slate-900"
-              :disabled="savingTarget"
-              placeholder="ex: Instituicao Financeira"
-              @blur="fillTargetKeyFromName"
-            />
-          </div>
-
-          <div>
-            <label class="text-xs font-medium text-slate-700 dark:text-slate-300">target_key</label>
-            <input
-              v-model="targetForm.targetKey"
-              class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
-                     dark:border-slate-800 dark:bg-slate-900"
-              :disabled="savingTarget"
-              placeholder="ex: instituicao_financeira"
-            />
-          </div>
-
-          <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div>
-              <label class="text-xs font-medium text-slate-700 dark:text-slate-300">Fact table</label>
-              <input
-                v-model="targetForm.factTable"
-                class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
-                       dark:border-slate-800 dark:bg-slate-900"
-                :disabled="savingTarget"
-                placeholder="ex: LoteFormacao_2"
-              />
-            </div>
-            <div>
-              <label class="text-xs font-medium text-slate-700 dark:text-slate-300">Fact column</label>
-              <input
-                v-model="targetForm.factColumn"
-                class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
-                       dark:border-slate-800 dark:bg-slate-900"
-                :disabled="savingTarget"
-                placeholder="ex: Instituicao Financeira"
-              />
-            </div>
-          </div>
-
-          <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <div>
-              <label class="text-xs font-medium text-slate-700 dark:text-slate-300">Value type</label>
-              <select
-                v-model="targetForm.valueType"
-                class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
-                       dark:border-slate-800 dark:bg-slate-900"
-                :disabled="savingTarget"
-              >
-                <option value="text">text</option>
-                <option value="int">int</option>
-                <option value="uuid">uuid</option>
-              </select>
-            </div>
-
-            <div>
-              <label class="text-xs font-medium text-slate-700 dark:text-slate-300">Default behavior</label>
-              <select
-                v-model="targetForm.defaultBehavior"
-                class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
-                       dark:border-slate-800 dark:bg-slate-900"
-                :disabled="savingTarget"
-              >
-                <option value="allow">allow</option>
-                <option value="deny">deny</option>
-              </select>
-            </div>
-
-            <div>
-              <label class="text-xs font-medium text-slate-700 dark:text-slate-300">Status</label>
-              <select
-                v-model="targetForm.status"
-                class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
-                       dark:border-slate-800 dark:bg-slate-900"
-                :disabled="savingTarget"
-              >
-                <option value="draft">draft</option>
-                <option value="active">active</option>
-              </select>
-            </div>
-          </div>
-        </div>
-
-        <div class="mt-4 flex items-center justify-end gap-2">
-          <button
-            type="button"
-            class="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm hover:bg-slate-50
-                   disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
-            :disabled="savingTarget"
-            @click="closeTargetModal"
-          >
-            Cancelar
-          </button>
-
-          <button
-            type="button"
-            class="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800
-                   disabled:opacity-60 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
-            :disabled="savingTarget || !canSaveTarget"
-            @click="saveTarget"
-          >
-            {{ savingTarget ? "Salvando..." : "Salvar" }}
-          </button>
-        </div>
-      </div>
-    </div>
   </section>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from "vue";
-import type { CustomerCatalog, CustomerRow } from "@/features/admin/api";
-import { getPowerBiCatalog } from "@/features/admin/api";
+import type { ActiveUserRow, CustomerRow, RlsDatasetSummary } from "@/features/admin/api";
+import { listActiveUsers } from "@/features/admin/api";
 import {
   type CreateRulePayload,
   type CreateTargetPayload,
@@ -958,6 +1008,7 @@ import {
   deleteRlsTarget,
   getRlsSnapshot,
   getRlsSnapshotCsv,
+  listRlsDatasets,
   listRlsRules,
   listRlsTargets,
   refreshRlsDataset,
@@ -976,6 +1027,8 @@ const { confirm } = useConfirm();
 const { push } = useToast();
 
 const activeTab = ref<"targets" | "rules" | "guide" | "snapshot">("targets");
+const targetModalOpen = ref(false);
+const ruleModalOpen = ref(false);
 
 // =====================
 // Guide modal
@@ -1037,71 +1090,65 @@ async function copyGuideDax() {
 }
 
 // =====================
-// Catalog selection
+// Dataset selection
 // =====================
-const customerId = ref<string>("");
-const catalog = ref<CustomerCatalog | null>(null);
-const loadingCatalog = ref(false);
-const catalogError = ref("");
-const workspaceRefId = ref<string>("");
-const reportRefId = ref<string>("");
-
-let catalogSeq = 0;
+const datasets = ref<RlsDatasetSummary[]>([]);
+const datasetId = ref<string>("");
+const loadingDatasets = ref(false);
+const datasetsError = ref("");
 
 const customers = computed(() => props.customers ?? []);
 
-const selectedWorkspace = computed(() =>
-  catalog.value?.workspaces.find((w) => w.workspaceRefId === workspaceRefId.value) ?? null
-);
+const activeUsers = ref<ActiveUserRow[]>([]);
+const loadingUsers = ref(false);
+const usersError = ref("");
 
-const availableReports = computed(() => selectedWorkspace.value?.reports ?? []);
-
-const selectedReport = computed(() =>
-  availableReports.value.find((r) => r.reportRefId === reportRefId.value) ?? null
-);
-
-const datasetId = computed(() => selectedReport.value?.datasetId ?? "");
-
-async function loadCatalog() {
-  if (!customerId.value) {
-    catalog.value = null;
-    return;
-  }
-
-  const seq = ++catalogSeq;
-  loadingCatalog.value = true;
-  catalogError.value = "";
+async function loadActiveUsers() {
+  if (loadingUsers.value) return;
+  loadingUsers.value = true;
+  usersError.value = "";
 
   try {
-    const res = await getPowerBiCatalog(customerId.value);
-    if (seq !== catalogSeq) return;
-
-    catalog.value = res;
-
-    const wsExists = res.workspaces.some((w) => w.workspaceRefId === workspaceRefId.value);
-    if (!wsExists) {
-      workspaceRefId.value = "";
-      reportRefId.value = "";
-      return;
-    }
-
-    const reportExists = res.workspaces
-      .find((w) => w.workspaceRefId === workspaceRefId.value)
-      ?.reports.some((r) => r.reportRefId === reportRefId.value);
-
-    if (!reportExists) reportRefId.value = "";
+    const res = await listActiveUsers("", 1, 100);
+    activeUsers.value = res.rows.map((row: any) => ({
+      ...row,
+      display_name: row.display_name ?? row.displayName ?? null,
+    }));
   } catch (e: any) {
     const ne = normalizeApiError(e);
-    catalogError.value = ne.message;
+    usersError.value = ne.message;
+  } finally {
+    loadingUsers.value = false;
+  }
+}
+
+const selectedDataset = computed(() =>
+  datasets.value.find((d) => d.datasetId === datasetId.value) ?? null
+);
+
+async function loadDatasets() {
+  if (loadingDatasets.value) return;
+  loadingDatasets.value = true;
+  datasetsError.value = "";
+
+  try {
+    const res = await listRlsDatasets();
+    datasets.value = res.items;
+    if (!datasetId.value || !res.items.some((d) => d.datasetId === datasetId.value)) {
+      datasetId.value = res.items[0]?.datasetId ?? "";
+    }
+  } catch (e: any) {
+    const ne = normalizeApiError(e);
+    datasetsError.value = ne.message;
     push({
       kind: "error",
-      title: "Falha ao carregar catalogo",
+      title: "Falha ao carregar datasets",
       message: ne.message,
       details: ne.details,
       timeoutMs: 9000,
     });
   } finally {
-    if (seq === catalogSeq) loadingCatalog.value = false;
+    loadingDatasets.value = false;
   }
 }
 
@@ -1113,7 +1160,6 @@ const loadingTargets = ref(false);
 const targetsError = ref("");
 const targetBusy = useBusyMap();
 
-const targetModalOpen = ref(false);
 const targetEditing = ref<RlsTarget | null>(null);
 const savingTarget = ref(false);
 
@@ -1230,22 +1276,22 @@ async function saveTarget() {
     status: targetForm.status,
   };
 
-  try {
-    if (!targetEditing.value) {
-      const created = await createRlsTarget(datasetId.value, payload);
-      targets.value = [...targets.value, created];
-      push({ kind: "success", title: "Target criado", message: `${created.targetKey}` });
-      targetModalOpen.value = false;
-      return;
-    }
+    try {
+      if (!targetEditing.value) {
+        const created = await createRlsTarget(datasetId.value, payload);
+        targets.value = [...targets.value, created];
+        push({ kind: "success", title: "Target criado", message: `${created.targetKey}` });
+        targetModalOpen.value = false;
+        return;
+      }
 
-    const updated = await updateRlsTarget(targetEditing.value.id, payload);
-    targets.value = targets.value.map((t) => (t.id === updated.id ? updated : t));
-    push({ kind: "success", title: "Target atualizado", message: `${updated.targetKey}` });
-    targetModalOpen.value = false;
-  } catch (e: any) {
-    const ne = normalizeApiError(e);
-    targetsError.value = ne.message;
+      const updated = await updateRlsTarget(targetEditing.value.id, payload);
+      targets.value = targets.value.map((t) => (t.id === updated.id ? updated : t));
+      push({ kind: "success", title: "Target atualizado", message: `${updated.targetKey}` });
+      targetModalOpen.value = false;
+    } catch (e: any) {
+      const ne = normalizeApiError(e);
+      targetsError.value = ne.message;
     push({
       kind: "error",
       title: "Falha ao salvar target",
@@ -1298,19 +1344,24 @@ const loadingRules = ref(false);
 const rulesError = ref("");
 const ruleBusy = useBusyMap();
 
+const rulesFilterScope = ref<"all" | "customer" | "user">("all");
 const rulesFilterCustomerId = ref<string>("");
+const rulesFilterUserId = ref<string>("");
 
-const ruleModalOpen = ref(false);
 const ruleModalSaving = ref(false);
 const ruleModalError = ref("");
 const ruleForm = reactive<{
   targetId: string;
+  scope: "customer" | "user";
   customerId: string;
+  userId: string;
   op: RlsRuleOp;
   values: string;
 }>({
   targetId: "",
+  scope: "customer",
   customerId: "",
+  userId: "",
   op: "include",
   values: "",
 });
@@ -1325,7 +1376,8 @@ const canSaveRule = computed(() => {
   return (
     !!datasetId.value &&
     !!ruleForm.targetId &&
-    !!ruleForm.customerId &&
+    ((ruleForm.scope === "customer" && !!ruleForm.customerId) ||
+      (ruleForm.scope === "user" && !!ruleForm.userId)) &&
     ruleForm.values.trim().length > 0
   );
 });
@@ -1394,7 +1446,13 @@ async function loadRules() {
   rulesError.value = "";
 
   try {
-    const res = await listRlsRules(selectedTargetId.value, rulesFilterCustomerId.value || undefined);
+    const opts =
+      rulesFilterScope.value === "customer"
+        ? { customerId: rulesFilterCustomerId.value || undefined }
+        : rulesFilterScope.value === "user"
+          ? { userId: rulesFilterUserId.value || undefined }
+          : undefined;
+    const res = await listRlsRules(selectedTargetId.value, opts);
     rules.value = res.items;
   } catch (e: any) {
     const ne = normalizeApiError(e);
@@ -1414,7 +1472,9 @@ async function loadRules() {
 function openRuleCreate() {
   ruleModalError.value = "";
   ruleForm.targetId = selectedTargetId.value || targets.value[0]?.id || "";
+  ruleForm.scope = "customer";
   ruleForm.customerId = "";
+  ruleForm.userId = "";
   ruleForm.op = "include";
   ruleForm.values = "";
   ruleModalOpen.value = true;
@@ -1439,23 +1499,37 @@ async function saveRuleModal() {
     }
 
     const items: CreateRulePayload[] = [];
+    const ruleScope = ruleForm.scope;
+    const ownerId = ruleScope === "customer" ? ruleForm.customerId : ruleForm.userId;
 
     for (const value of values) {
       if (ruleFormTarget.value.valueType === "text") {
-        items.push({ customerId: ruleForm.customerId, op: ruleForm.op, valueText: value });
+        items.push({
+          ...(ruleScope === "customer" ? { customerId: ownerId } : { userId: ownerId }),
+          op: ruleForm.op,
+          valueText: value,
+        });
       } else if (ruleFormTarget.value.valueType === "int") {
         const n = Number(value);
         if (!Number.isFinite(n) || !Number.isInteger(n)) {
           ruleModalError.value = `Valor invalido para int: ${value}`;
           return;
         }
-        items.push({ customerId: ruleForm.customerId, op: ruleForm.op, valueInt: n });
+        items.push({
+          ...(ruleScope === "customer" ? { customerId: ownerId } : { userId: ownerId }),
+          op: ruleForm.op,
+          valueInt: n,
+        });
       } else {
         if (!UUID_RE.test(value)) {
           ruleModalError.value = `Valor invalido para uuid: ${value}`;
           return;
         }
-        items.push({ customerId: ruleForm.customerId, op: ruleForm.op, valueUuid: value });
+        items.push({
+          ...(ruleScope === "customer" ? { customerId: ownerId } : { userId: ownerId }),
+          op: ruleForm.op,
+          valueUuid: value,
+        });
       }
     }
 
@@ -1496,13 +1570,13 @@ async function removeRule(r: RlsRule) {
   });
   if (!ok) return;
 
-    await ruleBusy.run(r.id, async () => {
-      try {
-        await deleteRlsRule(r.id);
-        rules.value = rules.value.filter((x) => x.id !== r.id);
-        push({ kind: "success", title: "Regra removida" });
-        void triggerDatasetRefresh("regra removida");
-      } catch (e: any) {
+  await ruleBusy.run(r.id, async () => {
+    try {
+      await deleteRlsRule(r.id);
+      rules.value = rules.value.filter((x) => x.id !== r.id);
+      push({ kind: "success", title: "Regra removida" });
+      void triggerDatasetRefresh("regra removida");
+    } catch (e: any) {
       const ne = normalizeApiError(e);
       push({
         kind: "error",
@@ -1522,10 +1596,26 @@ function formatRuleValue(r: RlsRule) {
   return "";
 }
 
-function customerLabel(id: string) {
+function customerLabel(id?: string | null) {
+  if (!id) return "Sem customer";
   const c = customers.value.find((x) => x.id === id);
   if (!c) return id;
   return `${c.code} - ${c.name}`;
+}
+
+function userLabel(id?: string | null) {
+  if (!id) return "Sem usuario";
+  const u = activeUsers.value.find((x) => x.id === id);
+  if (!u) return id;
+  return u.display_name || u.email || u.id;
+}
+
+function ruleOwnerLabel(r: RlsRule) {
+  return r.customerId ? customerLabel(r.customerId) : userLabel(r.userId);
+}
+
+function ruleOwnerId(r: RlsRule) {
+  return r.customerId ?? r.userId ?? "-";
 }
 
 function fmtDate(iso: string) {
@@ -1624,6 +1714,22 @@ function buildGuideSteps(t: RlsTarget): GuideStep[] {
         : "Defina value_text como Text.";
   return [
     {
+      key: "shortcut",
+      title: "Atalho: tabelas prontas (opcional)",
+      subtitle: "Use Sec_*/Dim_* ja filtradas",
+      bullets: [
+        `A API cria a view Sec_${t.targetKey} automaticamente ao salvar o target.`,
+        `Se o banco ja fornece Sec_${t.targetKey} e Dim_${t.targetKey}, pule as etapas 1-3.`,
+        "No Navigator, selecione diretamente as tabelas prontas.",
+        "Confirme tipos: customer_id/user_id como Text e value_* conforme value_type.",
+        "Se estiver tudo ok, avance direto para relacionamentos e role.",
+      ],
+      tips: [
+        "Esse caminho elimina o filtro manual por target_key no Power Query.",
+      ],
+      screenshotHint: "Navigator mostrando Sec_ e Dim_ prontos.",
+    },
+    {
       key: "import",
       title: "Importar sec_rls_base (Postgres)",
       subtitle: "Conector PostgreSQL + Navigator",
@@ -1649,8 +1755,8 @@ function buildGuideSteps(t: RlsTarget): GuideStep[] {
       subtitle: "Power Query Editor",
       bullets: [
         "Renomeie a query para sec_rls_base (se vier com prefixo de schema).",
-        "Confirme as colunas: customer_id, target_key, op e colunas de valor.",
-        "Defina customer_id como Text (compatibilidade com CUSTOMDATA()).",
+        "Confirme as colunas: customer_id, user_id, target_key, op e colunas de valor.",
+        "Defina customer_id e user_id como Text (compatibilidade com CUSTOMDATA()/USERNAME()).",
         "Se customer_id vier como Guid, altere para Text.",
         "Defina target_key e op como Text.",
         "Use Transform -> Data Type para ajustar os tipos.",
@@ -1658,7 +1764,7 @@ function buildGuideSteps(t: RlsTarget): GuideStep[] {
         "Se houver normalizacao na Dim, aplique o mesmo na coluna de valor.",
       ],
       tips: [
-        "Evite deixar customer_id como Guid para nao quebrar a comparacao com CUSTOMDATA().",
+        "Evite deixar customer_id/user_id como Guid para nao quebrar a comparacao com CUSTOMDATA()/USERNAME().",
       ],
       links: [
         { label: "Power Query overview", href: "https://learn.microsoft.com/power-bi/transform-model/desktop-query-overview" },
@@ -1673,7 +1779,7 @@ function buildGuideSteps(t: RlsTarget): GuideStep[] {
         "Clique com o botao direito em sec_rls_base -> Reference (nao Duplicate).",
         `Renomeie para Sec_${t.targetKey}.`,
         `Filtre target_key = "${t.targetKey}".`,
-        `Mantenha apenas customer_id, op e ${valueCol}.`,
+        `Mantenha apenas customer_id, user_id, op e ${valueCol}.`,
         "Use Choose Columns para remover colunas nao usadas.",
         `Aplique Trim/Clean/Upper em ${valueCol} se fizer o mesmo na Dim.`,
       ],
@@ -1741,7 +1847,8 @@ function buildGuideSteps(t: RlsTarget): GuideStep[] {
         "Cole o DAX no filtro da tabela.",
       ],
       tips: [
-        "CUSTOMDATA() vem do embed token; garanta customer_id como Text.",
+        "CUSTOMDATA() vem do embed token; USERNAME() vem da effective identity.",
+        "Garanta customer_id e user_id como Text.",
         "Se default for deny, sem include a visibilidade sera negada.",
       ],
       links: [
@@ -1781,15 +1888,21 @@ function daxForTarget(t: RlsTarget) {
   const valueCol = valueColumnForTarget(t);
   const defaultAllow = t.defaultBehavior === "deny" ? "FALSE()" : "TRUE()";
   return [
+    "VAR user = USERNAME()",
     "VAR customer = CUSTOMDATA()",
+    `VAR userInc =`,
+    `    CALCULATETABLE(VALUES(${sec}[${valueCol}]), ${sec}[user_id] = user, ${sec}[op] = "include")`,
+    "VAR userExc =",
+    `    CALCULATETABLE(VALUES(${sec}[${valueCol}]), ${sec}[user_id] = user, ${sec}[op] = "exclude")`,
+    "VAR hasUser = COUNTROWS(userInc) + COUNTROWS(userExc) > 0",
     `VAR inc =`,
     `    CALCULATETABLE(VALUES(${sec}[${valueCol}]), ${sec}[customer_id] = customer, ${sec}[op] = "include")`,
     "VAR exc =",
     `    CALCULATETABLE(VALUES(${sec}[${valueCol}]), ${sec}[customer_id] = customer, ${sec}[op] = "exclude")`,
     "VAR hasInc = COUNTROWS(inc) > 0",
     `VAR defaultAllow = ${defaultAllow}`,
-    `VAR isInc = IF(hasInc, ${dim}[Value] IN inc, defaultAllow)`,
-    `VAR isExc = ${dim}[Value] IN exc`,
+    `VAR isInc = IF(hasUser, ${dim}[Value] IN userInc, IF(hasInc, ${dim}[Value] IN inc, defaultAllow))`,
+    `VAR isExc = IF(hasUser, ${dim}[Value] IN userExc, ${dim}[Value] IN exc)`,
     "RETURN isInc && NOT isExc",
   ].join("\n");
 }
@@ -1797,52 +1910,19 @@ function daxForTarget(t: RlsTarget) {
 // =====================
 // Watchers
 // =====================
-watch(customerId, async () => {
-  catalog.value = null;
-  workspaceRefId.value = "";
-  reportRefId.value = "";
-  targets.value = [];
-  rules.value = [];
-  selectedTargetId.value = "";
-  rulesFilterCustomerId.value = "";
-  ruleForm.targetId = "";
-  ruleForm.customerId = "";
-  ruleForm.op = "include";
-  ruleForm.values = "";
-  ruleModalOpen.value = false;
-  ruleModalError.value = "";
-  snapshot.value = null;
-  snapshotError.value = "";
-
-  if (customerId.value) {
-    await loadCatalog();
-  }
-});
-
-watch(workspaceRefId, () => {
-  reportRefId.value = "";
-  targets.value = [];
-  rules.value = [];
-  selectedTargetId.value = "";
-  ruleForm.targetId = "";
-  ruleForm.customerId = "";
-  ruleForm.op = "include";
-  ruleForm.values = "";
-  ruleModalOpen.value = false;
-  ruleModalError.value = "";
-  snapshot.value = null;
-  snapshotError.value = "";
-});
-
 watch(datasetId, async (next) => {
   targets.value = [];
   rules.value = [];
   selectedTargetId.value = "";
+  rulesFilterScope.value = "all";
+  rulesFilterCustomerId.value = "";
+  rulesFilterUserId.value = "";
   ruleForm.targetId = "";
+  ruleForm.scope = "customer";
   ruleForm.customerId = "";
+  ruleForm.userId = "";
   ruleForm.op = "include";
   ruleForm.values = "";
-  ruleModalOpen.value = false;
   ruleModalError.value = "";
   snapshot.value = null;
   snapshotError.value = "";
@@ -1856,9 +1936,15 @@ watch(datasetId, async (next) => {
 });
 
 watch(activeTab, async (next) => {
-  if (next !== "snapshot") return;
-  if (!datasetId.value || snapshot.value || snapshotLoading.value) return;
-  await loadSnapshot();
+  if (next === "snapshot") {
+    if (!datasetId.value || snapshot.value || snapshotLoading.value) return;
+    await loadSnapshot();
+  }
+  if (next === "rules") {
+    if (!activeUsers.value.length && !loadingUsers.value) {
+      await loadActiveUsers();
+    }
+  }
 });
 
 watch(targets, () => {
@@ -1872,13 +1958,34 @@ watch(selectedTargetId, async (next) => {
   await loadRules();
 });
 
+watch(rulesFilterScope, async () => {
+  if (!selectedTargetId.value) return;
+  await loadRules();
+});
+
 watch(rulesFilterCustomerId, async () => {
   if (!selectedTargetId.value) return;
   await loadRules();
 });
 
+watch(rulesFilterUserId, async () => {
+  if (!selectedTargetId.value) return;
+  await loadRules();
+});
+
+watch(
+  () => ruleForm.scope,
+  (next) => {
+    if (next === "customer") {
+      ruleForm.userId = "";
+    } else {
+      ruleForm.customerId = "";
+    }
+  },
+);
+
 async function refresh() {
-  await loadCatalog();
+  await loadDatasets();
   if (datasetId.value) await loadTargets();
   if (selectedTargetId.value) await loadRules();
 }
@@ -1886,7 +1993,8 @@ async function refresh() {
 defineExpose({ refresh });
 
 onMounted(async () => {
-  if (customerId.value) await loadCatalog();
+  await loadDatasets();
+  await loadActiveUsers();
 });
 </script>
 

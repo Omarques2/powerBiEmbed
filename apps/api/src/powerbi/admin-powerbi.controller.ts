@@ -42,4 +42,9 @@ export class AdminPowerBiController {
   async catalog(@Query() query: AdminPowerBiCatalogQueryDto) {
     return this.sync.getCustomerCatalog(query.customerId);
   }
+
+  @Get('catalog/global')
+  async globalCatalog() {
+    return this.sync.getGlobalCatalog();
+  }
 }

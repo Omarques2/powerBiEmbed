@@ -18,9 +18,12 @@ export type SeedData = {
   report: { id: string; reportId: string };
   rlsTarget: { id: string; targetKey: string };
   rlsRule: { id: string };
+  rlsUserRule: { id: string };
 };
 
 export async function truncateAll(prisma: PrismaService) {
+  await prisma.$executeRawUnsafe('DROP VIEW IF EXISTS "sec_rls_base"');
+  await prisma.$executeRawUnsafe('DROP TABLE IF EXISTS "sec_rls_base"');
   const sql = `
     TRUNCATE TABLE
       "audit_log",
@@ -28,8 +31,8 @@ export async function truncateAll(prisma: PrismaService) {
       "app_roles",
       "applications",
       "user_customer_memberships",
-      "bi_report_permissions",
-      "bi_workspace_permissions",
+      "bi_customer_report_permissions",
+      "bi_customer_workspaces",
       "bi_reports",
       "bi_workspaces",
       "rls_rule",
@@ -154,12 +157,27 @@ export async function seedTestData(prisma: PrismaService): Promise<SeedData> {
 
   const workspace = await prisma.biWorkspace.create({
     data: {
-      customerId: customerA.id,
       workspaceId,
       workspaceName: `Workspace ${runId}`,
       isActive: true,
     },
     select: { id: true, workspaceId: true },
+  });
+
+  await prisma.biCustomerWorkspace.create({
+    data: {
+      customerId: customerA.id,
+      workspaceRefId: workspace.id,
+      isActive: true,
+    },
+  });
+
+  await prisma.biCustomerWorkspace.create({
+    data: {
+      customerId: customerB.id,
+      workspaceRefId: workspace.id,
+      isActive: false,
+    },
   });
 
   const report = await prisma.biReport.create({
@@ -173,19 +191,19 @@ export async function seedTestData(prisma: PrismaService): Promise<SeedData> {
     select: { id: true, reportId: true },
   });
 
-  await prisma.biWorkspacePermission.create({
+  await prisma.biCustomerReportPermission.create({
     data: {
-      userId: activeUser.id,
-      workspaceRefId: workspace.id,
+      customerId: customerA.id,
+      reportRefId: report.id,
       canView: true,
     },
   });
 
-  await prisma.biReportPermission.create({
+  await prisma.biCustomerReportPermission.create({
     data: {
-      userId: activeUser.id,
+      customerId: customerB.id,
       reportRefId: report.id,
-      canView: true,
+      canView: false,
     },
   });
 
@@ -214,6 +232,16 @@ export async function seedTestData(prisma: PrismaService): Promise<SeedData> {
     select: { id: true },
   });
 
+  const rlsUserRule = await prisma.rlsRule.create({
+    data: {
+      targetId: rlsTarget.id,
+      userId: activeUser.id,
+      op: 'include',
+      valueText: 'user-example',
+    },
+    select: { id: true },
+  });
+
   return {
     runId,
     datasetId,
@@ -231,5 +259,6 @@ export async function seedTestData(prisma: PrismaService): Promise<SeedData> {
     report,
     rlsTarget,
     rlsRule,
+    rlsUserRule,
   };
 }

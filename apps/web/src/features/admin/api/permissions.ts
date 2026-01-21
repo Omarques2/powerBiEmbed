@@ -35,18 +35,25 @@ export async function getUserPermissions(userId: string, customerId?: string) {
 
 export async function setWorkspacePermission(
   userId: string,
+  customerId: string,
   workspaceRefId: string,
   canView: boolean,
   grantReports = true,
 ) {
   const res = await http.put(`/admin/users/${userId}/workspaces/${workspaceRefId}`, {
+    customerId,
     canView,
     grantReports,
   });
   return unwrapData(res.data as ApiEnvelope<{ ok: boolean; reportsAffected?: number }>);
 }
 
-export async function setReportPermission(userId: string, reportRefId: string, canView: boolean) {
-  const res = await http.put(`/admin/users/${userId}/reports/${reportRefId}`, { canView });
+export async function setReportPermission(
+  userId: string,
+  customerId: string,
+  reportRefId: string,
+  canView: boolean,
+) {
+  const res = await http.put(`/admin/users/${userId}/reports/${reportRefId}`, { customerId, canView });
   return unwrapData(res.data as ApiEnvelope<{ ok: boolean }>);
 }

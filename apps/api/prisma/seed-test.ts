@@ -45,12 +45,19 @@ async function main() {
 
   const workspace = await prisma.biWorkspace.create({
     data: {
-      customerId: customer.id,
       workspaceId,
       workspaceName: `Seed Workspace ${runId}`,
       isActive: true,
     },
     select: { id: true },
+  });
+
+  await prisma.biCustomerWorkspace.create({
+    data: {
+      customerId: customer.id,
+      workspaceRefId: workspace.id,
+      isActive: true,
+    },
   });
 
   const report = await prisma.biReport.create({
@@ -64,17 +71,9 @@ async function main() {
     select: { id: true },
   });
 
-  await prisma.biWorkspacePermission.create({
+  await prisma.biCustomerReportPermission.create({
     data: {
-      userId: user.id,
-      workspaceRefId: workspace.id,
-      canView: true,
-    },
-  });
-
-  await prisma.biReportPermission.create({
-    data: {
-      userId: user.id,
+      customerId: customer.id,
       reportRefId: report.id,
       canView: true,
     },

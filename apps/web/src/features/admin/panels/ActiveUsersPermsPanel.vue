@@ -418,7 +418,14 @@ async function toggleWorkspace(wsRefId: string) {
   }
 
   try {
-    await setWorkspacePermission(selected.value.id, wsRefId, nextCanView, shouldGrantReports);
+    if (!permsCustomerId.value) throw new Error("customerId is required");
+    await setWorkspacePermission(
+      selected.value.id,
+      permsCustomerId.value,
+      wsRefId,
+      nextCanView,
+      shouldGrantReports,
+    );
 
     push({
       kind: "success",
@@ -457,7 +464,8 @@ async function toggleReport(wsRefId: string, reportRefId: string) {
   r.canView = nextCanView;
 
   try {
-    await setReportPermission(selected.value.id, reportRefId, nextCanView);
+    if (!permsCustomerId.value) throw new Error("customerId is required");
+    await setReportPermission(selected.value.id, permsCustomerId.value, reportRefId, nextCanView);
 
     push({
       kind: "success",

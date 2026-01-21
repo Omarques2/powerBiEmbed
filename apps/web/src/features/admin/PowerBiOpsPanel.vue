@@ -261,7 +261,7 @@
                     class="rounded-xl border border-rose-200 bg-rose-600 px-3 py-2 text-[11px] font-semibold text-white hover:bg-rose-500
                           disabled:opacity-60 dark:border-rose-900/40 dark:bg-rose-700 dark:hover:bg-rose-600"
                     :disabled="!w.isActive || busyUnlink.isBusy(w.workspaceRefId)"
-                    title="Desvincular (desativa workspace/reports e revoga permissões)"
+                    title="Desvincular (revoga acesso do customer ao workspace/report)"
                     @click.stop="unlinkWorkspace(w.workspaceRefId)"
                   >
                     {{ busyUnlink.isBusy(w.workspaceRefId) ? "..." : "Desvincular" }}
@@ -275,27 +275,38 @@
                   <div class="flex items-center justify-between">
                     <div class="font-semibold">Reports</div>
                     <div class="text-slate-500 dark:text-slate-400">
-                      mostrando {{ Math.min((w.reports?.length ?? 0), 8) }} de {{ w.reports?.length ?? 0 }}
+                      {{ w.reports?.length ?? 0 }} total
+                    </div>
+                  </div>
+                  <div class="mt-2 space-y-2">
+                    <div
+                      v-for="r in (w.reports ?? [])"
+                      :key="r.reportRefId"
+                      class="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2
+                             dark:border-slate-800 dark:bg-slate-950"
+                    >
+                      <div class="min-w-0">
+                        <div class="truncate text-xs font-medium text-slate-900 dark:text-slate-100">
+                          {{ r.name }}
+                          <span v-if="!r.isActive" class="ml-1 text-rose-600 dark:text-rose-300">(inativo)</span>
+                          <span v-else-if="!r.canView" class="ml-1 text-amber-600 dark:text-amber-300">(sem acesso)</span>
+                        </div>
+                        <div class="truncate text-[11px] text-slate-500 dark:text-slate-400">{{ r.reportId }}</div>
+                      </div>
+
+                      <PermSwitch
+                        :model-value="r.canView"
+                        :loading="busyReportPerm.isBusy(r.reportRefId)"
+                        :disabled="!customerId || (!w.isActive && !r.canView)"
+                        on-label="ON"
+                        off-label="OFF"
+                        @toggle="toggleReportAccess(w.workspaceRefId, r.reportRefId)"
+                      />
                     </div>
                   </div>
 
-                  <ul class="mt-2 space-y-1">
-                    <li
-                      v-for="r in (w.reports ?? []).slice(0, 8)"
-                      :key="r.reportRefId"
-                      class="truncate"
-                    >
-                      • {{ r.name }}
-                      <span v-if="!r.isActive" class="ml-1 text-rose-600 dark:text-rose-300">(inativo)</span>
-                    </li>
-                  </ul>
-
                   <div v-if="(w.reports?.length ?? 0) === 0" class="mt-1 text-slate-500 dark:text-slate-400">
                     Nenhum report.
-                  </div>
-
-                  <div v-else-if="(w.reports?.length ?? 0) > 8" class="mt-2 text-slate-500 dark:text-slate-400">
-                    +{{ (w.reports.length - 8) }}…
                   </div>
                 </div>
               </div>
@@ -330,9 +341,11 @@ import {
   getPowerBiCatalog,
   listRemoteReports,
   listRemoteWorkspaces,
+  setCustomerReportPermission,
   syncPowerBiCatalog,
   unlinkCustomerWorkspace,
 } from "@/features/admin/api";
+import { PermSwitch } from "@/ui/toggles";
 import { useConfirm } from "@/ui/confirm/useConfirm";
 import { useToast } from "@/ui/toast/useToast";
 import { useBusyMap } from "@/ui/ops/useBusyMap";
@@ -446,6 +459,7 @@ const loadingCatalog = ref(false);
 const catalogError = ref("");
 
 const busyUnlink = useBusyMap();
+const busyReportPerm = useBusyMap();
 
 // Controle para não sobrescrever seleção manual constantemente
 const autoAppliedForCustomerId = ref<string>("");
@@ -598,7 +612,7 @@ async function unlinkWorkspace(workspaceRefId: string) {
     title: "Desvincular workspace?",
     message:
       `Você está prestes a desvincular "${label}". ` +
-      "Isso desativa workspace/reports no catálogo e revoga permissões associadas. Esta ação é destrutiva.",
+      "Isso revoga o acesso do customer ao workspace e aos reports. Esta ação é destrutiva.",
     confirmText: "Desvincular",
     cancelText: "Cancelar",
     danger: true,
@@ -630,7 +644,7 @@ async function unlinkWorkspace(workspaceRefId: string) {
           return {
             ...w,
             isActive: false,
-            reports: (w.reports ?? []).map((r) => ({ ...r, isActive: false })),
+            reports: (w.reports ?? []).map((r) => ({ ...r, canView: false })),
           };
         });
         catalog.value = next;
@@ -670,6 +684,62 @@ async function unlinkWorkspace(workspaceRefId: string) {
   // Recarrega catálogo (sem sobrescrever seleção manual geral),
   // mas agora a seleção já está "limpa" do workspace removido.
   await loadCatalog({ applyAutoSelection: false });
+}
+
+
+async function toggleReportAccess(workspaceRefId: string, reportRefId: string) {
+  if (!customerId.value || !catalog.value) return;
+
+  const ws = catalog.value.workspaces.find((x) => x.workspaceRefId === workspaceRefId);
+  const report = ws?.reports?.find((x) => x.reportRefId === reportRefId);
+  if (!ws || !report) return;
+
+  const nextCanView = !report.canView;
+
+  await mutate<
+    { catalogSnap: CustomerCatalog | null; activeIdsSnap: string[] },
+    any
+  >({
+    key: reportRefId,
+    busy: busyReportPerm,
+
+    optimistic: () => {
+      const snap = {
+        catalogSnap: clone(catalog.value),
+        activeIdsSnap: [...activeWorkspaceIdsForCustomer.value],
+      };
+
+      if (catalog.value) {
+        const next = clone(catalog.value);
+        next.workspaces = (next.workspaces ?? []).map((w) => {
+          if (w.workspaceRefId !== workspaceRefId) return w;
+          return {
+            ...w,
+            isActive: nextCanView ? true : w.isActive,
+            reports: (w.reports ?? []).map((r) =>
+              r.reportRefId === reportRefId ? { ...r, canView: nextCanView } : r,
+            ),
+          };
+        });
+        catalog.value = next;
+        activeWorkspaceIdsForCustomer.value = computeActiveWorkspaceIds(next);
+      }
+
+      return snap;
+    },
+
+    request: async () => setCustomerReportPermission(customerId.value, reportRefId, nextCanView),
+
+    rollback: (snap) => {
+      catalog.value = snap.catalogSnap;
+      activeWorkspaceIdsForCustomer.value = snap.activeIdsSnap;
+    },
+
+    toast: {
+      success: { title: "Report atualizado", message: `${report.name}: ${nextCanView ? "ON" : "OFF"}` },
+      error: { title: "Falha ao atualizar report" },
+    },
+  });
 }
 
 onMounted(async () => {

@@ -28,6 +28,9 @@ describe('buildSnapshotCsv', () => {
           customerId: 'customer-1',
           customerCode: 'ACME, Inc',
           customerName: 'Cliente "VIP"',
+          userId: null,
+          userEmail: null,
+          userDisplayName: null,
           op: 'include',
           valueText: 'A,B',
           valueInt: null,
@@ -42,6 +45,7 @@ describe('buildSnapshotCsv', () => {
 
     expect(header).toContain('dataset_id');
     expect(header).toContain('target_key');
+    expect(header).toContain('user_id');
     expect(row).toContain('"ACME, Inc"');
     expect(row).toContain('"Cliente ""VIP"""');
     expect(row).toContain('"A,B"');

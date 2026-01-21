@@ -12,6 +12,7 @@ describe('Full API (e2e)', () => {
   let seed: Awaited<ReturnType<typeof seedTestData>>;
   let newTargetId: string | null = null;
   let newRuleId: string | null = null;
+  let newUserRuleId: string | null = null;
   let createdCustomerId: string | null = null;
 
   const powerBiStub = {
@@ -91,6 +92,9 @@ describe('Full API (e2e)', () => {
   afterAll(async () => {
     if (newRuleId) {
       await prisma.rlsRule.deleteMany({ where: { id: newRuleId } });
+    }
+    if (newUserRuleId) {
+      await prisma.rlsRule.deleteMany({ where: { id: newUserRuleId } });
     }
     if (newTargetId) {
       await prisma.rlsTarget.deleteMany({ where: { id: newTargetId } });
@@ -269,11 +273,18 @@ describe('Full API (e2e)', () => {
 
     const unlink = await request(app.getHttpServer())
       .post(
-        `/admin/customers/${seed.customerA.id}/workspaces/${seed.workspace.id}/unlink`,
+        `/admin/customers/${seed.customerB.id}/workspaces/${seed.workspace.id}/unlink`,
       )
       .set('x-test-user', 'admin');
     expect(unlink.status).toBe(201);
     expect(unlink.body.data.ok).toBe(true);
+
+    const reportPerm = await request(app.getHttpServer())
+      .put(`/admin/customers/${seed.customerB.id}/reports/${seed.report.id}`)
+      .set('x-test-user', 'admin')
+      .send({ canView: true });
+    expect(reportPerm.status).toBe(200);
+    expect(reportPerm.body.data.ok).toBe(true);
   });
 
   it('serves permissions endpoints', async () => {
@@ -286,14 +297,18 @@ describe('Full API (e2e)', () => {
     const wsPerm = await request(app.getHttpServer())
       .put(`/admin/users/${seed.activeUser.id}/workspaces/${seed.workspace.id}`)
       .set('x-test-user', 'admin')
-      .send({ canView: true, grantReports: true });
+      .send({
+        customerId: seed.customerA.id,
+        canView: true,
+        grantReports: true,
+      });
     expect(wsPerm.status).toBe(200);
     expect(wsPerm.body.data.ok).toBe(true);
 
     const reportPerm = await request(app.getHttpServer())
       .put(`/admin/users/${seed.activeUser.id}/reports/${seed.report.id}`)
       .set('x-test-user', 'admin')
-      .send({ canView: true });
+      .send({ customerId: seed.customerA.id, canView: true });
     expect(reportPerm.status).toBe(200);
     expect(reportPerm.body.data.ok).toBe(true);
   });
@@ -368,6 +383,12 @@ describe('Full API (e2e)', () => {
       .query({ customerId: seed.customerA.id });
     expect(catalog.status).toBe(200);
     expect(catalog.body.data.customer.id).toBe(seed.customerA.id);
+
+    const globalCatalog = await request(app.getHttpServer())
+      .get('/admin/powerbi/catalog/global')
+      .set('x-test-user', 'admin');
+    expect(globalCatalog.status).toBe(200);
+    expect(Array.isArray(globalCatalog.body.data.workspaces)).toBe(true);
   });
 
   it('serves user Power BI endpoints', async () => {
@@ -404,6 +425,14 @@ describe('Full API (e2e)', () => {
   });
 
   it('covers admin RLS endpoints', async () => {
+    const datasets = await request(app.getHttpServer())
+      .get('/admin/rls/datasets')
+      .set('x-test-user', 'admin');
+    expect(datasets.status).toBe(200);
+    expect(
+      datasets.body.data.items.some((d: any) => d.datasetId === seed.datasetId),
+    ).toBe(true);
+
     const list = await request(app.getHttpServer())
       .get(`/admin/rls/datasets/${seed.datasetId}/targets`)
       .set('x-test-user', 'admin');
@@ -451,6 +480,21 @@ describe('Full API (e2e)', () => {
     expect(createdRules.status).toBe(201);
     newRuleId = createdRules.body.data.created[0].id;
 
+    const createdUserRules = await request(app.getHttpServer())
+      .post(`/admin/rls/targets/${newTargetId}/rules`)
+      .set('x-test-user', 'admin')
+      .send({
+        items: [
+          {
+            userId: seed.activeUser.id,
+            op: 'include',
+            valueText: 'user-example',
+          },
+        ],
+      });
+    expect(createdUserRules.status).toBe(201);
+    newUserRuleId = createdUserRules.body.data.created[0].id;
+
     const refresh = await request(app.getHttpServer())
       .post(`/admin/rls/datasets/${seed.datasetId}/refresh`)
       .set('x-test-user', 'admin');
@@ -481,6 +525,13 @@ describe('Full API (e2e)', () => {
       .delete(`/admin/rls/rules/${newRuleId}`)
       .set('x-test-user', 'admin');
     expect(delRule.status).toBe(200);
+    newRuleId = null;
+
+    const delUserRule = await request(app.getHttpServer())
+      .delete(`/admin/rls/rules/${newUserRuleId}`)
+      .set('x-test-user', 'admin');
+    expect(delUserRule.status).toBe(200);
+    newUserRuleId = null;
 
     const delTarget = await request(app.getHttpServer())
       .delete(`/admin/rls/targets/${newTargetId}`)
