@@ -1696,13 +1696,6 @@ async function exportSnapshot(format: "json" | "csv") {
 }
 
 function buildGuideSteps(t: RlsTarget): GuideStep[] {
-  const valueCol = valueColumnForTarget(t);
-  const valueTypeHint =
-    t.valueType === "int"
-      ? "Defina value_int como Whole Number."
-      : t.valueType === "uuid"
-        ? "Defina value_uuid como Text."
-        : "Defina value_text como Text.";
   return [
     {
       key: "connect",
