@@ -42,3 +42,5 @@ Replace value_text with value_int and ensure the dimension column is numeric.
 ## Operational notes
 - RLS only restricts Viewer in workspace.
 - RLS applies at dataset level (affects all reports on that dataset).
+- Embed com RLS exige effective identity; se houver multiplas fontes, todas devem estar em Import e suportar effective identity.
+- Se falhar, reduzir para uma unica fonte suportada para isolar o problema.

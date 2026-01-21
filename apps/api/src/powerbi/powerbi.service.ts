@@ -68,11 +68,34 @@ type PbiGenerateTokenResponse = {
 
 type PbiRefreshResponse = Record<string, unknown>;
 
-function describeAxiosError(err: unknown): { status?: number; data?: unknown } {
+function describeAxiosError(err: unknown): {
+  status?: number;
+  data?: unknown;
+  message?: string;
+} {
   if (axios.isAxiosError(err)) {
-    return { status: err.response?.status, data: err.response?.data };
+    return {
+      status: err.response?.status,
+      data: err.response?.data,
+      message: err.message,
+    };
   }
-  return {};
+  const message = err instanceof Error ? err.message : String(err);
+  return { message };
+}
+
+function getPbiErrorMessage(data: unknown, fallback?: string): string {
+  if (typeof data === 'string') return data;
+  if (data && typeof data === 'object') {
+    const obj = data as { error?: { message?: string }; message?: string };
+    return obj.error?.message ?? obj.message ?? JSON.stringify(data);
+  }
+  return fallback ?? 'unknown';
+}
+
+function isEffectiveIdentityUnsupported(data: unknown, fallback?: string): boolean {
+  const text = getPbiErrorMessage(data, fallback).toLowerCase();
+  return text.includes('effective identity is not supported');
 }
 
 @Injectable()
@@ -89,6 +112,9 @@ export class PowerBiService {
   }
   private get clientSecret() {
     return this.config.get<string>('PBI_CLIENT_SECRET');
+  }
+  private get allowEmbedWithoutRls() {
+    return this.config.get<boolean>('PBI_ALLOW_EMBED_WITHOUT_RLS') ?? false;
   }
 
   // 1) Obter token do Entra (client credentials)
@@ -365,11 +391,13 @@ export class PowerBiService {
 
     // 2.2 Gerar embed token
     // POST /GenerateToken
-    const tokenPayload: PbiGenerateTokenRequest = {
+    const basePayload: PbiGenerateTokenRequest = {
       reports: [{ id: reportId }],
       datasets: [{ id: datasetId }],
       targetWorkspaces: [{ id: workspaceId }],
     };
+
+    const tokenPayload: PbiGenerateTokenRequest = { ...basePayload };
 
     if (opts?.username) {
       let includeIdentity = opts.forceIdentity === true;
@@ -408,10 +436,49 @@ export class PowerBiService {
         tokenPayload,
       );
     } catch (err: unknown) {
-      const { status, data } = describeAxiosError(err);
-      throw new InternalServerErrorException(
-        `Falha ao gerar embed token: ${status ?? 'unknown'} ${JSON.stringify(data ?? {})}`,
-      );
+      const { status, data, message } = describeAxiosError(err);
+      const detail = getPbiErrorMessage(data, message);
+      const unsupported =
+        tokenPayload.identities &&
+        isEffectiveIdentityUnsupported(data, message);
+
+      if (unsupported) {
+        if (!this.allowEmbedWithoutRls) {
+          throw new InternalServerErrorException({
+            code: 'PBI_RLS_UNSUPPORTED',
+            message:
+              'O dataset nao suporta effective identity para embed token com RLS.',
+            details: { status: status ?? 'unknown', error: detail },
+          });
+        }
+
+        try {
+          tokenRes = await this.pbiPost<PbiGenerateTokenResponse>(
+            `/GenerateToken`,
+            basePayload,
+          );
+        } catch (fallbackErr: unknown) {
+          const fallbackInfo = describeAxiosError(fallbackErr);
+          const fallbackDetail = getPbiErrorMessage(
+            fallbackInfo.data,
+            fallbackInfo.message,
+          );
+          throw new InternalServerErrorException({
+            code: 'PBI_EMBED_TOKEN_FAILED',
+            message: 'Falha ao gerar embed token sem RLS.',
+            details: {
+              status: fallbackInfo.status ?? 'unknown',
+              error: fallbackDetail,
+            },
+          });
+        }
+      } else {
+        throw new InternalServerErrorException({
+          code: 'PBI_EMBED_TOKEN_FAILED',
+          message: 'Falha ao gerar embed token.',
+          details: { status: status ?? 'unknown', error: detail },
+        });
+      }
     }
 
     const embedToken = tokenRes?.token;

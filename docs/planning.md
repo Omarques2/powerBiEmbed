@@ -156,28 +156,6 @@ Objetivo: cobertura da UI base (Shadcn) e menu mobile.
 Card P2 — API | Modularizar AdminUsersService por dominio  
 Objetivo: separar por dominios (customers, memberships, audit, security, perms).
 
-## Roadmap por fases
-Fase 1: EPIC-01 P0 (TLS + hardening bootstrap) + EPIC-02 P0 (DTO/envelope/logs).  
-Fase 2: EPIC-02 P1 env schema + EPIC-07 P1 healthcheck.  
-Fase 3: EPIC-03 P1 casing/migracao/reset (promover se snake_case dominar).  
-Fase 4: EPIC-04 P0 mobile-first core + EPIC-05 Shadcn (se ja iniciado).  
-Fase 5: EPIC-06 P1 CI PR -> CD main P1 (gates: CI verde + /health + migrate deploy).  
-Fase 6: EPIC-07 P2 testes (isolamento + bateria negativa); EPIC-08 P2 modularizacao.  
-Fase 7: EPIC-05 refactor completo do front-end com Shadcn (pos-producao).
-
-## Checklist de readiness de producao
-- TLS DB valido; flag dev documentada.
-- Env schema valida tudo; .env.example completo; secrets nao logados.
-- CORS por lista; Helmet ativo (CSP opcional); rate limit calibrado; trust proxy verificado.
-- ValidationPipe global; DTOs; envelope { data, meta?, error{code,message,details?} }.
-- CorrelationId em responses e logs; logs com method/path/status/latency; sem body por padrao.
-- Prisma camelCase com @map/@@map; scripts db:reset, db:migrate:deploy, db:seed:test.
-- Healthcheck /health e readiness /ready disponiveis e usados em CD.
-- CI PR verde; CD main automatizado com migrations e rollback.
-- UI mobile-first validada em 390/768/1280; drawer/menu padrao; tabelas/modais responsivos.
-
-## Referencia de CD (Azure)
-Para configuracao e manutencao de CD, veja `docs/cd-azure.md`.
 ### EPIC-10: Controle de acesso granular por report e RLS reutilizavel (API/WEB)
 Card P1 - API/WEB | Acesso por report (nao apenas por workspace)  
 Contexto: hoje o acesso e dado pela workspace inteira; clientes precisam limitar reports especificos.  
@@ -202,6 +180,28 @@ Estrategia:
 Aceite:
 - Regras globais reutilizaveis por workspace/report.
 - Vinculo por customer e opcionalmente por usuario.
+Nota operacional:
+- Embed com RLS exige effective identity; se houver multiplas fontes, todas devem estar em Import e suportar effective identity.
+
+### EPIC-11: Documentacao e onboarding (PBIX)
+Card P1 - DOC | Atualizar Guia PBIX (nomes de tabelas)  
+Contexto: nomes das tabelas mudaram apos ajustes de schema.  
+Objetivo: alinhar o tutorial PBIX aos nomes reais no modelo.  
+Escopo: docs/tutorial PBIX.  
+Aceite:
+- Passos atualizados com nomes corretos.
+- Sem divergencias entre guia e schema atual.
+
+Card P1 - DOC | Simplificar etapas iniciais do guia PBIX (tabelas prontas)  
+Contexto: as 3 primeiras etapas do guia podem ser puladas se entregarmos tabelas filtradas com os nomes finais.  
+Objetivo: reduzir trabalho manual no Power BI, padronizando entrada com tabelas ja filtradas e nomeadas.  
+Escopo: docs/tutorial PBIX + definicao de fontes/tabelas.  
+Estrategia:
+- Definir para cada regra uma tabela filtrada com nome final esperado pelo guia.
+- Atualizar guia para pular etapas 1-3 quando essas tabelas estiverem disponiveis.
+Aceite:
+- Guia mostra caminho alternativo sem as 3 etapas iniciais.
+- Tabelas filtradas e nomeadas de acordo com o passo 3 do guia.
 
 
 ## Roadmap por fases

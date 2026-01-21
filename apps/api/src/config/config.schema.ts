@@ -38,6 +38,7 @@ const envSchema = z
     PBI_TENANT_ID: z.string().min(1, 'PBI_TENANT_ID is required'),
     PBI_CLIENT_ID: z.string().min(1, 'PBI_CLIENT_ID is required'),
     PBI_CLIENT_SECRET: z.string().min(1, 'PBI_CLIENT_SECRET is required'),
+    PBI_ALLOW_EMBED_WITHOUT_RLS: booleanSchema.default(false),
 
     BOOTSTRAP_TOKEN: z.string().optional(),
 
