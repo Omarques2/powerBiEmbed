@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from "vue-router";
 import { getActiveAccount, initAuthOnce } from "../auth/auth";
 import { getMeCached } from "../auth/me";
+import { resetRouteLoading, startRouteLoading, stopRouteLoading } from "../ui/loading/routeLoading";
 
 import LoginView from "../views/LoginView.vue";
 import CallbackView from "../views/CallbackView.vue";
@@ -22,7 +23,28 @@ const router = createRouter({
   ],
 });
 
-router.beforeEach(async (to) => {
+const AUTH_ROUTES = new Set(["/login", "/auth/callback", "/pending"]);
+
+function isAuthRoute(path: string) {
+  return AUTH_ROUTES.has(path);
+}
+
+router.beforeEach(async (to, from) => {
+  const isAuthTarget = isAuthRoute(to.path);
+  const isAuthSource = isAuthRoute(from.path);
+
+  if (isAuthTarget || isAuthSource) {
+    resetRouteLoading();
+  } else if (
+    to.fullPath !== from.fullPath &&
+    ((from.path === "/app" && to.path === "/admin") ||
+      (from.path === "/admin" && to.path === "/app"))
+  ) {
+    startRouteLoading();
+  } else {
+    resetRouteLoading();
+  }
+
   // Sempre garanta MSAL inicializado antes de qualquer decisão
   await initAuthOnce();
   const acc = getActiveAccount();
@@ -61,5 +83,14 @@ router.beforeEach(async (to) => {
 
   return true;
 });
+
+router.afterEach(() => {
+  stopRouteLoading();
+});
+
+router.onError(() => {
+  resetRouteLoading();
+});
+
 
 export default router;

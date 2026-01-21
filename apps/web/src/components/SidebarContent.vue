@@ -428,7 +428,6 @@ onBeforeUnmount(() => window.removeEventListener("click", onGlobalClick));
 
 async function handleSelectWorkspace(w: Workspace) {
   await props.selectWorkspace(w);
-  if (props.mode === "mobile") emit("close");
 }
 
 async function handleOpenReport(r: Report) {

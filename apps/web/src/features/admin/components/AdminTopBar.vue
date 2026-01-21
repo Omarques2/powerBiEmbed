@@ -111,6 +111,6 @@ defineEmits<{
   (e: "search"): void;
 }>();
 
-const displayTitle = computed(() => props.title ?? props.section ?? "");
-const displaySubtitle = computed(() => props.subtitle ?? "");
+const displayTitle = computed(() => props.title?.trim() || props.section?.trim() || "");
+const displaySubtitle = computed(() => props.subtitle?.trim() || "");
 </script>

@@ -91,18 +91,39 @@ Criterio promocao: se endpoints admin retornam snake_case, priorizar antes do ty
 Dependencias: EPIC-02 envelope.
 
 ### EPIC-04: Mobile-first 100% + responsividade (WEB)
-Card P0 — WEB | Corrigir overflow da topbar do Shell (mobile)  
+Card P0 - WEB | Corrigir overflow da topbar do Shell (mobile)  
 Objetivo: sem overflow em 390px; touch targets >=44px; desktop ok.
 
-Card P1 — WEB | Padrao Drawer/Menu mobile (dep BaseDrawer)  
+Card P0 - WEB | Ajustes UX de navegacao (loading + topbar + sidebar)  
+Contexto: feedback visual inconsistente e comportamento do sidebar confuso.  
+Objetivo: feedback de loading ao navegar entre Home e Admin, topbar mostrando aba ativa, sidebar nao colapsa antes da selecao de relatorio.  
+Escopo: WEB (Home, Admin, Shell).  
+Aceite:
+- Clique em "Admin" (Home) aciona loading imediato.
+- Clique em "App" (Admin) aciona loading imediato.
+- Topbar exibe "Admin / <Aba>" corretamente.
+- Sidebar so colapsa apos selecionar relatorio.
+
+Card P1 - WEB | Padrao Drawer/Menu mobile (dep EPIC-05 Shadcn)  
 Objetivo: Drawer padronizado reutilizavel (esc/overlay/focus).
 
 Card P1 — WEB | Tabelas Admin responsivas (dep BaseTable)  
 Objetivo: 390px sem corte; 768/1024 legivel.
 
-### EPIC-05: Base UI + Tailwind governance (WEB)
-Card P1 — WEB | Base UI responsiva + tokens Tailwind  
-Objetivo: Button/Card/Modal/Drawer/Table; tokens de radius/shadow/spacing.
+### EPIC-05: Rebuild do front-end com Shadcn (WEB)
+Card P2 - WEB | Refazer UI com componentes Shadcn  
+Contexto: desejo de padronizar UI e acelerar consistencia visual com biblioteca de componentes.  
+Objetivo: migrar telas e UI base para Shadcn mantendo contratos e fluxos.  
+Escopo: WEB (componentes, layout, estilos, composables, testes).  
+Estrategia:
+- Congelar design atual apos producao, evitar rework antes de CD.
+- Criar baseline: config Shadcn, theme tokens e componentes base.
+- Migrar por blocos (Shell, Admin, Panels), com QA visual por tela.
+Criterios de aceite:
+- Paridade funcional com UI atual.
+- Sem regressao de acessibilidade e responsividade.
+- Build e testes web ok.
+Dependencias: EPIC-06 CD main concluido; EPIC-04 concluido ou incorporado na migracao.
 
 ### EPIC-06: CI/CD GitHub Actions (DEVOPS)
 Card P1 — DEVOPS | CI PR monorepo-aware (web+api)  
@@ -112,14 +133,24 @@ Card P1 — DEVOPS | CD main com gates explicitos
 Objetivo: deploy automatizado (Azure Container Apps + Static Web Apps), com gates de CI, /health e migrate deploy em staging.
 
 ### EPIC-07: Testes e qualidade (API/WEB)
-Card P1 — API | Healthcheck/Readiness (gate CD)  
+Card P1 - API | Healthcheck/Readiness (gate CD)  
 Objetivo: /health (liveness) e /ready (DB check).
 
-Card P2 — API | E2E isolado de DB real + alinhamento total  
+Card P2 - API | E2E isolado de DB real + alinhamento total  
 Objetivo: e2e usando DB de teste (TEST_DATABASE_URL) + migrate reset.
 
-Card P2 — WEB | Vitest coverage Base UI + Shell mobile  
-Objetivo: cobertura de Base UI e menu mobile.
+Card P2 - API | Battery de testes negativos e fuzzing leve  
+Objetivo: validar rejeicao de inputs invalidos (tamanho, tipos, caracteres estranhos, SQLi basico) e erro coerente no envelope.  
+Escopo: API (controllers e DTOs criticos).  
+Estrategia:
+- casos de payload invalido por endpoint (tipos, overflow, strings maliciosas).
+- asserts de status + error.code + correlationId.
+Aceite:
+- 100% dos endpoints criticos com casos negativos cobrindo validacao.
+- Nenhum crash 5xx em inputs invalidos.
+
+Card P2 - WEB | Vitest coverage UI base (Shadcn) + Shell mobile  
+Objetivo: cobertura da UI base (Shadcn) e menu mobile.
 
 ### EPIC-08: Modularizacao Admin + performance (API)
 Card P2 — API | Modularizar AdminUsersService por dominio  
@@ -129,10 +160,10 @@ Objetivo: separar por dominios (customers, memberships, audit, security, perms).
 Fase 1: EPIC-01 P0 (TLS + hardening bootstrap) + EPIC-02 P0 (DTO/envelope/logs).  
 Fase 2: EPIC-02 P1 env schema + EPIC-07 P1 healthcheck.  
 Fase 3: EPIC-03 P1 casing/migracao/reset (promover se snake_case dominar).  
-Fase 4: EPIC-04 P0 mobile-first core + EPIC-05 Base UI.  
+Fase 4: EPIC-04 P0 mobile-first core + EPIC-05 Shadcn (se ja iniciado).  
 Fase 5: EPIC-06 P1 CI PR -> CD main P1 (gates: CI verde + /health + migrate deploy).  
-Fase 6: EPIC-07 P2 testes; EPIC-08 P2 modularizacao.  
-Fase 7: EPIC-09 refactor completo do front-end com Shadcn (pos-producao).
+Fase 6: EPIC-07 P2 testes (isolamento + bateria negativa); EPIC-08 P2 modularizacao.  
+Fase 7: EPIC-05 refactor completo do front-end com Shadcn (pos-producao).
 
 ## Checklist de readiness de producao
 - TLS DB valido; flag dev documentada.
@@ -145,20 +176,53 @@ Fase 7: EPIC-09 refactor completo do front-end com Shadcn (pos-producao).
 - CI PR verde; CD main automatizado com migrations e rollback.
 - UI mobile-first validada em 390/768/1280; drawer/menu padrao; tabelas/modais responsivos.
 
-## EPIC-09: Rebuild do front-end com Shadcn (WEB)
-Card P2 — WEB | Refazer UI com componentes Shadcn  
-Contexto: desejo de padronizar UI e acelerar consistencia visual com biblioteca de componentes.  
-Objetivo: migrar telas e UI base para Shadcn mantendo contratos e fluxos.  
-Escopo: WEB (componentes, layout, estilos, composables, testes).  
+## Referencia de CD (Azure)
+Para configuracao e manutencao de CD, veja `docs/cd-azure.md`.
+### EPIC-10: Controle de acesso granular por report e RLS reutilizavel (API/WEB)
+Card P1 - API/WEB | Acesso por report (nao apenas por workspace)  
+Contexto: hoje o acesso e dado pela workspace inteira; clientes precisam limitar reports especificos.  
+Objetivo: permitir selecionar quais reports um customer pode acessar, refletindo no acesso de usuarios vinculados.  
+Escopo: API (permissoes), WEB (UI de configuracao).  
 Estrategia:
-- Congelar design atual apos producao, evitar rework antes de CD.
-- Criar baseline: config Shadcn, theme tokens e componentes base.
-- Migrar por blocos (Shell, Admin, Panels), com QA visual por tela.
-Critérios de aceite:
-- Paridade funcional com UI atual.
-- Sem regressao de acessibilidade e responsividade.
-- Build e testes web ok.
-Dependencias: EPIC-06 CD main concluido; EPIC-04/05 concluido ou incorporado na migracao.
+- Modelo de permissao por report (permitir/negado por customer).
+- UI para marcar reports por customer (lista por workspace).
+- Ajustar resolucao de acesso no Power BI (usuarios herdam do customer).
+Aceite:
+- Customer pode ter acesso parcial aos reports de uma workspace.
+- Usuarios do customer herdam somente os reports marcados.
+
+Card P1 - API/WEB | RLS reutilizavel (target/rule global + vinculo)  
+Contexto: hoje regras precisam ser recriadas por customer mesmo para o mesmo dataset/report.  
+Objetivo: criar targets/rules reutilizaveis, vinculados a workspace/report e aplicaveis por customer/usuario.  
+Escopo: API (modelagem + endpoints), WEB (UI de associacao).  
+Estrategia:
+- Definir targets/rules globais e mapear para workspace/report.
+- Permitir aplicar regras por customer e opcionalmente por usuario.
+- Manter comportamento atual como fallback.
+Aceite:
+- Regras globais reutilizaveis por workspace/report.
+- Vinculo por customer e opcionalmente por usuario.
+
+
+## Roadmap por fases
+Fase 1: EPIC-01 P0 (TLS + hardening bootstrap) + EPIC-02 P0 (DTO/envelope/logs).  
+Fase 2: EPIC-02 P1 env schema + EPIC-07 P1 healthcheck.  
+Fase 3: EPIC-03 P1 casing/migracao/reset (promover se snake_case dominar).  
+Fase 4: EPIC-04 P0 mobile-first core + EPIC-05 Shadcn (se ja iniciado).  
+Fase 5: EPIC-06 P1 CI PR -> CD main P1 (gates: CI verde + /health + migrate deploy).  
+Fase 6: EPIC-07 P2 testes (isolamento + bateria negativa); EPIC-08 P2 modularizacao.  
+Fase 7: EPIC-05 refactor completo do front-end com Shadcn (pos-producao).
+
+## Checklist de readiness de producao
+- TLS DB valido; flag dev documentada.
+- Env schema valida tudo; .env.example completo; secrets nao logados.
+- CORS por lista; Helmet ativo (CSP opcional); rate limit calibrado; trust proxy verificado.
+- ValidationPipe global; DTOs; envelope { data, meta?, error{code,message,details?} }.
+- CorrelationId em responses e logs; logs com method/path/status/latency; sem body por padrao.
+- Prisma camelCase com @map/@@map; scripts db:reset, db:migrate:deploy, db:seed:test.
+- Healthcheck /health e readiness /ready disponiveis e usados em CD.
+- CI PR verde; CD main automatizado com migrations e rollback.
+- UI mobile-first validada em 390/768/1280; drawer/menu padrao; tabelas/modais responsivos.
 
 ## Referencia de CD (Azure)
 Para configuracao e manutencao de CD, veja `docs/cd-azure.md`.

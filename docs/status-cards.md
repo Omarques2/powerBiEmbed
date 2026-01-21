@@ -17,15 +17,16 @@ Legenda:
 - [x] P1 Env schema validation (fail-fast)
 
 ## EPIC-03 - Casing TS/DB + Prisma mapping + migracoes/reset (API/DB)
-- [ ] P1 CamelCase TS + @map/@@map + reset unico
+- [x] P1 CamelCase TS + @map/@@map + reset unico
 
 ## EPIC-04 - Mobile-first 100% + responsividade (WEB)
-- [ ] P0 Corrigir overflow Shell (mobile)
+- [x] P0 Corrigir overflow Shell (mobile)
+- [x] P0 Ajustes UX de navegacao (loading + topbar + sidebar)
 - [ ] P1 Padrao Drawer/Menu mobile (dep BaseDrawer)
 - [ ] P1 Tabelas Admin responsivas (dep BaseTable)
 
-## EPIC-05 - Base UI + Tailwind governance (WEB)
-- [ ] P1 Base UI responsiva + tokens Tailwind
+## EPIC-05 - Rebuild do front-end com Shadcn (WEB)
+- [ ] P2 Refazer UI com componentes Shadcn
 
 ## EPIC-06 - CI/CD GitHub Actions (DEVOPS)
 - [x] P1 CI PR monorepo-aware (lint/type/test/build web+api + cache + paths-filter)
@@ -34,32 +35,12 @@ Legenda:
 ## EPIC-07 - Testes e qualidade (API/WEB)
 - [x] P1 Healthcheck/Readiness (gate CD)
 - [ ] P2 E2E isolado de DB real + alinhamento total
-- [ ] P2 Vitest coverage WEB (Base UI + Shell mobile)
+- [ ] P2 Vitest coverage WEB (UI base Shadcn + Shell mobile)
+- [ ] P2 Battery de testes negativos e fuzzing leve (API)
 
 ## EPIC-08 - Modularizacao Admin + performance (API)
 - [ ] P2 Modularizar AdminUsersService por dominio
 
-## EPIC-09 - Rebuild do front-end com Shadcn (WEB)
-- [ ] P2 Refazer UI com componentes Shadcn
-
----
-
-## Kanban (alto nivel)
-
-### Backlog
-- EPIC-03 P1 Casing TS/DB + Prisma mapping + migracoes/reset
-- EPIC-04 P0/P1 Mobile-first + Drawer/Menu + Tabelas responsivas
-- EPIC-05 P1 Base UI + tokens Tailwind
-- EPIC-07 P2 E2E isolado de DB real + alinhamento total
-- EPIC-07 P2 Vitest coverage WEB (Base UI + Shell mobile)
-- EPIC-08 P2 Modularizacao AdminUsersService
-- EPIC-09 P2 Rebuild do front-end com Shadcn
-
-### Em andamento
-- EPIC-04 P0/P1 Mobile-first + Drawer/Menu + Tabelas responsivas (sugerido iniciar pelo P0)
-
-### Feito
-- EPIC-01 P0/P1 Hardening completo
-- EPIC-02 P0/P1 Contratos + env schema
-- EPIC-06 P1 CI PR monorepo-aware
-- EPIC-07 P1 Healthcheck/Readiness
+## EPIC-10 - Controle granular de reports + RLS reutilizavel (API/WEB)
+- [ ] P1 Acesso por report (nao apenas por workspace)
+- [ ] P1 RLS reutilizavel (targets/rules globais + vinculos)
