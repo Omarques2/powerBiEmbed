@@ -169,7 +169,7 @@ Estrategia:
 Aceite:
 - Customer pode ter acesso parcial aos reports de uma workspace.
 - Usuarios do customer herdam somente os reports marcados.
-Status atual: pendente.
+Status atual: concluido.
 
 Card P1 - API/WEB | RLS reutilizavel (target/rule global + vinculo)  
 Contexto: hoje regras precisam ser recriadas por customer mesmo para o mesmo dataset/report.  
@@ -210,6 +210,60 @@ Aceite:
 Referencia:
 - `docs/pbix-guide.md`
 Status atual: concluido.
+
+### EPIC-12: Permissoes de Abas (Pages) + Exportacao PDF por pagina (API/WEB)
+Card P1 - API/WEB | Sincronizar paginas dos reports  
+Contexto: hoje nao existe fonte de verdade de paginas por report.  
+Objetivo: listar paginas via API do Power BI e salvar no banco.  
+Escopo: API (job/endpoint admin) + DB (tabela de paginas).  
+Estrategia:
+- Endpoint/admin job "Sincronizar paginas" por report/workspace.
+- Persistir pageName + displayName + reportRefId.
+Aceite:
+- Paginas sincronizadas e reutilizaveis no admin.
+
+Card P1 - WEB | Grupos de permissoes por report (paginas)  
+Contexto: admins precisam definir conjuntos reutilizaveis de paginas.  
+Objetivo: criar grupos (ex: A.1/A.2/A.3) com lista de paginas.  
+Escopo: WEB (UI) + API (CRUD grupos).  
+Estrategia:
+- UI com lista de paginas (toggle) e salvamento do grupo.
+- Preview por pagina com embed e `pageName` (page nav oculto).
+Aceite:
+- Grupo salvo e reutilizavel em clientes/usuarios.
+- Preview abre pagina correta sem navegação nativa.
+
+Card P1 - WEB/API | Vincular grupos/paginas a customers e usuarios  
+Contexto: acesso deve ser por customer/usuario, com excecoes ad hoc.  
+Objetivo: permitir vincular 1+ grupos e paginas isoladas.  
+Escopo: WEB + API.  
+Estrategia:
+- UI de vinculo por customer/usuario.
+- Backend resolve whitelist final (grupos + ad hoc).
+Aceite:
+- Permissoes por pagina aplicadas para customer/usuario.
+
+Card P1 - API/WEB | Embed com navegacao controlada pelo app  
+Contexto: tabs nativas permitem acesso indevido.  
+Objetivo: esconder pageNavigation e navegar via menu custom.  
+Escopo: WEB + API (whitelist).  
+Estrategia:
+- `settings.panes.pageNavigation.visible = false`.
+- Menu proprio no frontend; `page.setActive()`.
+- Opcional: interceptar `pageChanged` e reverter se nao permitido.
+Aceite:
+- Usuario ve apenas paginas permitidas.
+
+Card P1 - API | Exportacao PDF com whitelist no backend  
+Contexto: export precisa respeitar permissao por pagina.  
+Objetivo: exportar apenas paginas permitidas com Effective Identity.  
+Escopo: API (export job) + UI (gatilho).  
+Estrategia:
+- Backend resolve paginas permitidas por customer/usuario.
+- Usar `powerBIReportConfiguration.pages` no ExportToFile.
+- Frontend pode pedir "pagina atual" ou "todas permitidas".
+Aceite:
+- PDF inclui somente paginas permitidas.
 
 ## Mini-roteiro (Opcao 3 + EPIC-11)
 1. UX dataset-first (WEB):

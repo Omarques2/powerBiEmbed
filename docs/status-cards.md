@@ -42,7 +42,7 @@ Legenda:
 - [ ] P2 Modularizar AdminUsersService por dominio
 
 ## EPIC-10 - Controle granular de reports + RLS reutilizavel (API/WEB)
-- [ ] P1 Acesso por report (nao apenas por workspace)
+- [x] P1 Acesso por report (nao apenas por workspace)
 - [x] P1 RLS reutilizavel (targets/regras por dataset)
   - Opcao 3 dataset-first implementada (sem vinculos).
   - Nota operacional: RLS embed confirmado com todas as fontes em Import (Postgres + Lakehouse).
@@ -50,3 +50,10 @@ Legenda:
 ## EPIC-11 - Documentacao e onboarding (PBIX)
 - [x] P1 Atualizar Guia PBIX (nomes de tabelas)
 - [x] P1 Simplificar etapas iniciais do guia PBIX (tabelas prontas)
+
+## EPIC-12 - Permissoes de Abas (Pages) + Exportacao PDF (API/WEB)
+- [ ] P1 Sincronizar paginas dos reports (API/DB)
+- [ ] P1 Grupos de permissoes por report (UI + API)
+- [ ] P1 Vincular grupos/paginas a customers e usuarios
+- [ ] P1 Embed com navegacao controlada pelo app
+- [ ] P1 Exportacao PDF com whitelist no backend
