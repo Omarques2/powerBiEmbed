@@ -1,4 +1,8 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -192,11 +196,127 @@ export class BiAuthzService {
     };
   }
 
+  async listAllowedPages(
+    userId: string,
+    workspaceId: string,
+    reportId: string,
+  ) {
+    const access = await this.resolveReportAccess(
+      userId,
+      workspaceId,
+      reportId,
+    );
+    return this.resolveAllowedPagesForAccess({
+      userId,
+      customerId: access.customerId,
+      reportRefId: access.reportRefId,
+    });
+  }
+
   async assertCanViewReport(
     userId: string,
     workspaceId: string,
     reportId: string,
   ) {
     await this.resolveReportAccess(userId, workspaceId, reportId);
+  }
+
+  async resolveAllowedPagesForAccess(input: {
+    userId: string;
+    customerId: string;
+    reportRefId: string;
+  }) {
+    const pages = await this.prisma.biReportPage.findMany({
+      where: { reportRefId: input.reportRefId, isActive: true },
+      orderBy: [{ pageOrder: 'asc' }, { createdAt: 'asc' }],
+      select: {
+        id: true,
+        pageName: true,
+        displayName: true,
+        pageOrder: true,
+      },
+    });
+
+    if (!pages.length) {
+      throw new NotFoundException('Pages not synced for report');
+    }
+
+    const [customerGroups, userGroups, customerAllow, userAllow] =
+      await Promise.all([
+        this.prisma.biPageGroup.findMany({
+          where: {
+            reportRefId: input.reportRefId,
+            isActive: true,
+            customerLinks: {
+              some: { customerId: input.customerId, isActive: true },
+            },
+          },
+          select: { pages: { select: { pageId: true } } },
+        }),
+        this.prisma.biPageGroup.findMany({
+          where: {
+            reportRefId: input.reportRefId,
+            isActive: true,
+            userLinks: { some: { userId: input.userId, isActive: true } },
+          },
+          select: { pages: { select: { pageId: true } } },
+        }),
+        this.prisma.biCustomerPageAllowlist.findMany({
+          where: {
+            customerId: input.customerId,
+            page: { reportRefId: input.reportRefId, isActive: true },
+          },
+          select: { pageId: true },
+        }),
+        this.prisma.biUserPageAllowlist.findMany({
+          where: {
+            userId: input.userId,
+            page: { reportRefId: input.reportRefId, isActive: true },
+          },
+          select: { pageId: true },
+        }),
+      ]);
+
+    const customerGroupIds = customerGroups.flatMap((g) =>
+      g.pages.map((p) => p.pageId),
+    );
+    const userGroupIds = userGroups.flatMap((g) =>
+      g.pages.map((p) => p.pageId),
+    );
+    const customerAllowIds = customerAllow.map((p) => p.pageId);
+    const userAllowIds = userAllow.map((p) => p.pageId);
+
+    const userHasAssignments = userGroupIds.length + userAllowIds.length > 0;
+    const groupPageIds = userHasAssignments ? userGroupIds : customerGroupIds;
+    const allowIds = userHasAssignments ? userAllowIds : customerAllowIds;
+
+    const hasRestrictions = groupPageIds.length + allowIds.length > 0;
+
+    if (!hasRestrictions) {
+      return {
+        customerId: input.customerId,
+        reportRefId: input.reportRefId,
+        pages: pages.map((p) => ({
+          pageName: p.pageName,
+          displayName: p.displayName ?? p.pageName,
+        })),
+      };
+    }
+
+    const allowed = new Set([...groupPageIds, ...allowIds]);
+    const filtered = pages.filter((p) => allowed.has(p.id));
+
+    if (!filtered.length) {
+      throw new ForbiddenException('No access to report pages');
+    }
+
+    return {
+      customerId: input.customerId,
+      reportRefId: input.reportRefId,
+      pages: filtered.map((p) => ({
+        pageName: p.pageName,
+        displayName: p.displayName ?? p.pageName,
+      })),
+    };
   }
 }

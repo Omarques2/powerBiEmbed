@@ -236,6 +236,107 @@ v-if="errPerms" class="mt-3 rounded-xl border border-rose-200 bg-rose-50 p-2 tex
               </div>
             </div>
 
+            <div class="rounded-xl border border-slate-200 p-3 text-xs dark:border-slate-800">
+              <div class="flex items-center justify-between gap-2">
+                <div class="font-semibold text-slate-900 dark:text-slate-100">Páginas por report</div>
+                <button
+                  type="button"
+                  class="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] hover:bg-slate-50
+                         disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+                  :disabled="!pageReportRefId || loadingPageAccess"
+                  @click="loadUserPageAccess"
+                >
+                  {{ loadingPageAccess ? "..." : "Atualizar" }}
+                </button>
+              </div>
+
+              <div class="mt-2">
+                <label class="text-[11px] font-medium text-slate-700 dark:text-slate-300">Report</label>
+                <select
+                  v-model="pageReportRefId"
+                  class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
+                         dark:border-slate-800 dark:bg-slate-950"
+                >
+                  <option value="">-- selecione --</option>
+                  <option v-for="opt in userReportOptions" :key="opt.reportRefId" :value="opt.reportRefId">
+                    {{ opt.label }}
+                  </option>
+                </select>
+              </div>
+
+              <div v-if="pageAccessError" class="mt-2 text-[11px] text-rose-600 dark:text-rose-300">
+                {{ pageAccessError }}
+              </div>
+
+              <div v-if="!pageReportRefId" class="mt-2 text-[11px] text-slate-500 dark:text-slate-400">
+                Selecione um report para ajustar páginas.
+              </div>
+
+              <div v-else-if="loadingPageAccess" class="mt-2 text-[11px] text-slate-500 dark:text-slate-400">
+                Carregando páginas...
+              </div>
+
+              <div v-else-if="pageAccess" class="mt-3 space-y-3">
+                <div>
+                  <div class="text-[11px] font-semibold text-slate-700 dark:text-slate-300">Grupos</div>
+                  <div class="mt-2 space-y-2">
+                    <div
+                      v-for="g in pageAccess.groups"
+                      :key="g.id"
+                      class="flex items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2
+                             dark:border-slate-800 dark:bg-slate-950"
+                    >
+                      <div class="min-w-0">
+                        <div class="truncate text-xs font-medium text-slate-900 dark:text-slate-100">{{ g.name }}</div>
+                        <div class="text-[11px] text-slate-500 dark:text-slate-400">
+                          {{ g.pageIds.length }} páginas
+                        </div>
+                      </div>
+                      <PermSwitch
+                        :model-value="!!g.assigned"
+                        :loading="!!pageGroupBusy[g.id]"
+                        on-label="ON"
+                        off-label="OFF"
+                        @toggle="toggleUserGroup(g)"
+                      />
+                    </div>
+                    <div v-if="pageAccess.groups.length === 0" class="text-[11px] text-slate-500 dark:text-slate-400">
+                      Nenhum grupo cadastrado.
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <div class="text-[11px] font-semibold text-slate-700 dark:text-slate-300">Páginas permitidas</div>
+                  <div class="mt-2 space-y-2">
+                    <div
+                      v-for="p in pageAccess.pages"
+                      :key="p.id"
+                      class="flex items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2
+                             dark:border-slate-800 dark:bg-slate-950"
+                    >
+                      <div class="min-w-0">
+                        <div class="truncate text-xs font-medium text-slate-900 dark:text-slate-100">
+                          {{ p.displayName || p.pageName }}
+                        </div>
+                        <div class="text-[11px] text-slate-500 dark:text-slate-400">{{ p.pageName }}</div>
+                      </div>
+                      <PermSwitch
+                        :model-value="!!p.canView"
+                        :loading="!!pageAllowBusy[p.id]"
+                        on-label="ON"
+                        off-label="OFF"
+                        @toggle="toggleUserPageAllow(p)"
+                      />
+                    </div>
+                    <div v-if="pageAccess.pages.length === 0" class="text-[11px] text-slate-500 dark:text-slate-400">
+                      Nenhuma página sincronizada.
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <div v-if="permMsg" class="text-xs text-slate-600 dark:text-slate-300">{{ permMsg }}</div>
           </div>
         </div>
@@ -249,7 +350,7 @@ v-if="errPerms" class="mt-3 rounded-xl border border-rose-200 bg-rose-50 p-2 tex
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from "vue";
+import { computed, onMounted, reactive, ref, watch } from "vue";
 import { useToast } from "@/ui/toast/useToast";
 import { PermSwitch } from "@/ui/toggles";
 import { normalizeApiError } from "@/ui/ops";
@@ -263,6 +364,13 @@ import {
   type ActiveUserRow,
   type UserPermissionsResponse,
 } from "@/features/admin/api";
+import {
+  getUserPageAccess,
+  setUserPageAllow,
+  setUserPageGroup,
+  type PageGroup,
+  type ReportPage,
+} from "@/features/admin/api/powerbi";
 
 const { push } = useToast();
 
@@ -297,6 +405,14 @@ const rBusy = reactive<Record<string, boolean>>({});
 // expand/collapse
 const expanded = reactive<Record<string, boolean>>({});
 
+// pages
+const pageReportRefId = ref<string>("");
+const pageAccess = ref<{ pages: ReportPage[]; groups: PageGroup[] } | null>(null);
+const loadingPageAccess = ref(false);
+const pageAccessError = ref("");
+const pageGroupBusy = reactive<Record<string, boolean>>({});
+const pageAllowBusy = reactive<Record<string, boolean>>({});
+
 function fmtDate(iso: string) {
   try {
     return new Date(iso).toLocaleString();
@@ -327,6 +443,9 @@ function selectUser(u: ActiveUserRow) {
   permMsg.value = "";
   // reseta expand map por usuário (evita “lixo” de estado)
   for (const k of Object.keys(expanded)) delete expanded[k];
+  pageAccess.value = null;
+  pageReportRefId.value = "";
+  pageAccessError.value = "";
   loadPerms();
 }
 
@@ -357,11 +476,104 @@ async function loadPerms() {
     if (!permsCustomerId.value) {
       permsCustomerId.value = pickDefaultCustomerId();
     }
+
+    syncPageReportSelection();
   } catch (e: any) {
     errPerms.value = e?.message ?? "Falha ao carregar permissões";
     push({ kind: "error", title: "Falha ao carregar permissões", message: errPerms.value });
   } finally {
     loadingPerms.value = false;
+  }
+}
+
+const userReportOptions = computed(() => {
+  if (!perms.value) return [];
+  return perms.value.workspaces.flatMap((w) =>
+    w.reports
+      .filter((r) => r.canView)
+      .map((r) => ({
+        reportRefId: r.reportRefId,
+        label: `${w.name} / ${r.name}`,
+      })),
+  );
+});
+
+function syncPageReportSelection() {
+  const options = userReportOptions.value;
+  if (!options.length) {
+    pageReportRefId.value = "";
+    pageAccess.value = null;
+    return;
+  }
+  if (!options.some((o) => o.reportRefId === pageReportRefId.value)) {
+    pageReportRefId.value = options[0]?.reportRefId ?? "";
+  }
+}
+
+watch(pageReportRefId, async () => {
+  if (!pageReportRefId.value || !selected.value) {
+    pageAccess.value = null;
+    return;
+  }
+  await loadUserPageAccess();
+});
+
+watch(userReportOptions, () => {
+  syncPageReportSelection();
+});
+
+async function loadUserPageAccess() {
+  if (!selected.value || !pageReportRefId.value) return;
+  loadingPageAccess.value = true;
+  pageAccessError.value = "";
+  try {
+    pageAccess.value = await getUserPageAccess(selected.value.id, pageReportRefId.value);
+  } catch (e: any) {
+    const ne = normalizeApiError(e);
+    pageAccessError.value = ne.message;
+    push({
+      kind: "error",
+      title: "Falha ao carregar páginas",
+      message: ne.message,
+      details: ne.details,
+      timeoutMs: 9000,
+    });
+  } finally {
+    loadingPageAccess.value = false;
+  }
+}
+
+async function toggleUserGroup(group: PageGroup) {
+  if (!selected.value) return;
+  const next = !group.assigned;
+  pageGroupBusy[group.id] = true;
+  const prev = group.assigned;
+  group.assigned = next;
+  try {
+    await setUserPageGroup(selected.value.id, group.id, next);
+  } catch (e: any) {
+    group.assigned = prev;
+    const ne = normalizeApiError(e);
+    push({ kind: "error", title: "Falha ao aplicar grupo", message: ne.message });
+  } finally {
+    pageGroupBusy[group.id] = false;
+  }
+}
+
+async function toggleUserPageAllow(page: ReportPage) {
+  if (!selected.value) return;
+  const next = !page.canView;
+  pageAllowBusy[page.id] = true;
+  const prev = page.canView;
+  page.canView = next;
+  try {
+    await setUserPageAllow(selected.value.id, page.id, next);
+  } catch (e: any) {
+    page.canView = prev;
+    const ne = normalizeApiError(e);
+    push({ kind: "error", title: "Falha ao atualizar página", message: ne.message });
+  } finally {
+    pageAllowBusy[page.id] = false;
   }
 }
 

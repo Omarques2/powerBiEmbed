@@ -76,3 +76,14 @@ export class AdminPowerBiCatalogQueryDto {
   @IsUUID()
   customerId!: string;
 }
+
+export class AdminPowerBiPreviewQueryDto {
+  @IsOptional()
+  @IsUUID()
+  customerId?: string;
+
+  @IsOptional()
+  @Transform(toBoolean)
+  @IsBoolean()
+  forceIdentity?: boolean;
+}

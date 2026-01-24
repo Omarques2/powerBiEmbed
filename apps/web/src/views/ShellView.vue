@@ -157,7 +157,6 @@
         <div class="flex-1 min-h-0 overflow-hidden bg-slate-50 dark:bg-slate-950 p-2 sm:p-3 lg:p-4">
           <div class="h-full w-full overflow-hidden flex items-center justify-center">
             <div
-              ref="stageEl"
               class="print-bi-area relative w-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm
                      dark:border-slate-800 dark:bg-slate-900
                      aspect-video
@@ -165,56 +164,91 @@
                      sm:max-h-[calc(100dvh-var(--topbar-h)-1.5rem)]
                      lg:aspect-auto lg:h-full lg:max-h-full"
             >
-              <div ref="containerEl" class="absolute inset-0" />
+              <div class="flex h-full flex-col">
+                <div ref="stageEl" class="relative flex-1 overflow-hidden">
+                  <div ref="containerEl" class="absolute inset-0" />
 
-              <div v-if="!selectedReport" class="absolute inset-0 grid place-items-center p-6">
-                <div class="w-[min(760px,94%)]">
-                  <div class="mb-4">
-                    <div class="text-sm font-medium text-slate-700 dark:text-slate-200">
-                      Selecione um relatório
-                    </div>
-                    <div class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                      Escolha um workspace e um report no menu lateral para renderizar o Power BI.
-                    </div>
-                  </div>
+                  <div v-if="!selectedReport" class="absolute inset-0 grid place-items-center p-6">
+                    <div class="w-[min(760px,94%)]">
+                      <div class="mb-4">
+                        <div class="text-sm font-medium text-slate-700 dark:text-slate-200">
+                          Selecione um relatório
+                        </div>
+                        <div class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                          Escolha um workspace e um report no menu lateral para renderizar o Power BI.
+                        </div>
+                      </div>
 
-                  <ReportSkeletonCard>
-                    <template #footer>
-                      Dica: use “Recarregar workspaces” se não aparecer nada.
-                    </template>
-                  </ReportSkeletonCard>
-                </div>
-              </div>
-
-              <div
-                v-if="selectedReport && loadingEmbed"
-                class="absolute inset-0 z-10 grid place-items-center bg-white/70 dark:bg-slate-950/60 backdrop-blur-sm"
-              >
-                <div class="w-[min(760px,94%)]">
-                  <div class="mb-4 flex items-center gap-3">
-                    <div
-                      class="h-5 w-5 animate-spin rounded-full border-2 border-slate-300 border-t-slate-900
-                             dark:border-slate-700 dark:border-t-slate-200"
-                    />
-                    <div class="text-sm font-medium text-slate-700 dark:text-slate-200">
-                      Carregando relatório…
+                      <ReportSkeletonCard>
+                        <template #footer>
+                          Dica: use “Recarregar workspaces” se não aparecer nada.
+                        </template>
+                      </ReportSkeletonCard>
                     </div>
                   </div>
 
-                  <ReportSkeletonCard>
-                    <template #footer>
-                      Gerando embed token e inicializando o Power BI…
-                    </template>
-                  </ReportSkeletonCard>
-                </div>
-              </div>
+                  <div
+                    v-if="selectedReport && loadingEmbed"
+                    class="absolute inset-0 z-10 grid place-items-center bg-white/70 dark:bg-slate-950/60 backdrop-blur-sm"
+                  >
+                    <div class="w-[min(760px,94%)]">
+                      <div class="mb-4 flex items-center gap-3">
+                        <div
+                          class="h-5 w-5 animate-spin rounded-full border-2 border-slate-300 border-t-slate-900
+                                 dark:border-slate-700 dark:border-t-slate-200"
+                        />
+                        <div class="text-sm font-medium text-slate-700 dark:text-slate-200">
+                          Carregando relatório…
+                        </div>
+                      </div>
 
-              <div
-                v-if="embedError && selectedReport"
-                class="absolute bottom-3 left-3 right-3 z-20 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 shadow
-                       dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-200"
-              >
-                {{ embedError }}
+                      <ReportSkeletonCard>
+                        <template #footer>
+                          Gerando embed token e inicializando o Power BI…
+                        </template>
+                      </ReportSkeletonCard>
+                    </div>
+                  </div>
+
+                  <div
+                    v-if="embedError && selectedReport"
+                    class="absolute bottom-3 left-3 right-3 z-20 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 shadow
+                           dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-200"
+                  >
+                    {{ embedError }}
+                  </div>
+
+                  <div
+                    v-if="allowedPagesError && selectedReport"
+                    class="absolute bottom-16 left-3 right-3 z-20 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 shadow
+                           dark:border-amber-900/40 dark:bg-amber-950/40 dark:text-amber-200"
+                  >
+                    {{ allowedPagesError }}
+                  </div>
+                </div>
+
+                <div
+                  v-if="selectedReport && allowedPages.length"
+                  class="shrink-0 border-t border-slate-200 bg-white/90 px-2 py-1 text-[11px] text-slate-700
+                         dark:border-slate-800 dark:bg-slate-900/90 dark:text-slate-200"
+                >
+                  <div class="flex items-center gap-1 overflow-x-auto">
+                    <button
+                      v-for="p in allowedPages"
+                      :key="p.pageName"
+                      type="button"
+                      class="shrink-0 whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium transition
+                             border border-transparent hover:bg-slate-100 hover:border-slate-200
+                             dark:hover:bg-slate-800 dark:hover:border-slate-700"
+                      :class="activePageName === p.pageName
+                        ? 'bg-slate-900 text-white border-slate-900 dark:bg-slate-100 dark:text-slate-900 dark:border-slate-100'
+                        : 'bg-transparent'"
+                      @click="setActivePage(p.pageName)"
+                    >
+                      {{ p.displayName || p.pageName }}
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -311,6 +345,7 @@ type EmbedConfigResponse = {
   embedToken: string;
   expiresOn?: string;
 };
+type AllowedPage = { pageName: string; displayName: string };
 type MeResponse = {
   email: string | null;
   displayName: string | null;
@@ -341,6 +376,10 @@ const loadingEmbed = ref(false);
 const listError = ref("");
 const embedError = ref("");
 const embedErrorLocked = ref(false);
+const loadingPages = ref(false);
+const allowedPages = ref<AllowedPage[]>([]);
+const allowedPagesError = ref("");
+const activePageName = ref<string | null>(null);
 
 const stageEl = ref<HTMLDivElement | null>(null);
 const containerEl = ref<HTMLDivElement | null>(null);
@@ -393,6 +432,7 @@ const exportScopeOptions = [
 let powerbiService: pbi.service.Service | null = null;
 let resizeObs: ResizeObserver | null = null;
 let embeddedReport: pbi.Report | null = null;
+let guardRedirecting = false;
 
 function createPowerBiService() {
   return new pbi.service.Service(
@@ -411,6 +451,9 @@ function resetEmbed() {
   embeddedReport = null;
   embedError.value = "";
   embedErrorLocked.value = false;
+  allowedPages.value = [];
+  allowedPagesError.value = "";
+  activePageName.value = null;
 }
 
 function openExportModal() {
@@ -699,12 +742,15 @@ async function exportReport() {
     }
 
     const exportActivePage = exportScope.value === "active";
-    if (exportActivePage && ready && embeddedReport?.getActivePage) {
-      try {
-        const page = await embeddedReport.getActivePage();
-        pageName = page?.name;
-      } catch {
-        pageName = undefined;
+    if (exportActivePage) {
+      pageName = activePageName.value ?? undefined;
+      if (!pageName && ready && embeddedReport?.getActivePage) {
+        try {
+          const page = await embeddedReport.getActivePage();
+          pageName = page?.name;
+        } catch {
+          pageName = undefined;
+        }
       }
     }
 
@@ -864,6 +910,26 @@ async function openReport(r: Report) {
     const workspaceId = r.workspaceId ?? selectedWorkspaceId.value;
     if (!workspaceId) throw new Error("Workspace não selecionado.");
 
+    loadingPages.value = true;
+    allowedPagesError.value = "";
+    try {
+      const pagesRes = await http.get("/powerbi/pages", {
+        params: { workspaceId, reportId: r.id },
+      });
+      const pagesData = unwrapData(pagesRes.data as ApiEnvelope<{ pages: AllowedPage[] }>);
+      allowedPages.value = pagesData.pages ?? [];
+      activePageName.value = allowedPages.value[0]?.pageName ?? null;
+      if (!allowedPages.value.length) {
+        throw new Error("Nenhuma página permitida para este report.");
+      }
+    } catch (e: any) {
+      const message = await extractErrorMessage(e);
+      allowedPagesError.value = message;
+      throw new Error(message);
+    } finally {
+      loadingPages.value = false;
+    }
+
     const cfgRes = await http.get("/powerbi/embed-config", {
       params: { workspaceId, reportId: r.id },
     });
@@ -876,8 +942,9 @@ async function openReport(r: Report) {
       accessToken: cfg.embedToken,
       embedUrl: cfg.embedUrl,
       id: cfg.reportId,
+      pageName: activePageName.value ?? undefined,
       settings: {
-        panes: { filters: { visible: false }, pageNavigation: { visible: true } },
+        panes: { filters: { visible: false }, pageNavigation: { visible: false } },
       },
     };
 
@@ -904,6 +971,26 @@ async function openReport(r: Report) {
       window.setTimeout(() => resizeEmbedded(), 0);
     });
 
+    report.off("pageChanged");
+    report.on("pageChanged", async (event: any) => {
+      const pageName = event?.detail?.newPage?.name ?? event?.detail?.newPage?.pageName;
+      if (!pageName) return;
+      if (allowedPages.value.some((p) => p.pageName === pageName)) {
+        activePageName.value = pageName;
+        return;
+      }
+      if (guardRedirecting) return;
+      const fallback = allowedPages.value[0]?.pageName;
+      if (!fallback || !embeddedReport) return;
+      guardRedirecting = true;
+      try {
+        await embeddedReport.setPage(fallback);
+        activePageName.value = fallback;
+      } finally {
+        guardRedirecting = false;
+      }
+    });
+
     report.on("error", (event: any) => {
       const detail = event?.detail ?? event;
       console.error("Power BI error:", detail);
@@ -919,6 +1006,21 @@ async function openReport(r: Report) {
     embedError.value = `Falha ao embutir report: ${message}`;
     loadingEmbed.value = false;
     reportReady.value = false;
+  }
+}
+
+async function setActivePage(pageName: string) {
+  if (!embeddedReport || !pageName) return;
+  if (!allowedPages.value.some((p) => p.pageName === pageName)) return;
+  if (guardRedirecting) return;
+  guardRedirecting = true;
+  try {
+    await embeddedReport.setPage(pageName);
+    activePageName.value = pageName;
+  } catch {
+    // ignore set page failures
+  } finally {
+    guardRedirecting = false;
   }
 }
 

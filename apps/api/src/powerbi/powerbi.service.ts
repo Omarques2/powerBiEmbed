@@ -49,6 +49,11 @@ type PbiReport = {
   embedUrl?: string;
 };
 
+type PbiPage = {
+  name?: string;
+  displayName?: string;
+};
+
 type PbiDatasetInfo = {
   isEffectiveIdentityRequired?: boolean;
   isEffectiveIdentityRolesRequired?: boolean;
@@ -366,6 +371,16 @@ export class PowerBiService {
     }));
   }
 
+  async listReportPages(workspaceId: string, reportId: string) {
+    const res = await this.pbiGet<PbiListResponse<PbiPage>>(
+      `/groups/${workspaceId}/reports/${reportId}/pages`,
+    );
+    return res.value.map((p) => ({
+      name: p.name ?? '',
+      displayName: p.displayName ?? null,
+    }));
+  }
+
   // 2) Gerar embed config para um report (workspace + report)
   async getEmbedConfig(
     workspaceId: string,
@@ -514,6 +529,7 @@ export class PowerBiService {
       forceIdentity?: boolean;
       format?: ExportFormat;
       pageName?: string;
+      pageNames?: string[];
       skipStamp?: boolean;
       relaxedPdfCheck?: boolean;
     },
@@ -544,7 +560,13 @@ export class PowerBiService {
       opts,
     );
 
-    if (identity || opts?.bookmarkState || opts?.pageName) {
+    const pages = opts?.pageNames?.length
+      ? opts.pageNames
+      : opts?.pageName
+        ? [opts.pageName]
+        : null;
+
+    if (identity || opts?.bookmarkState || pages) {
       payload.powerBIReportConfiguration = {};
       if (identity) {
         payload.powerBIReportConfiguration.identities = [identity];
@@ -554,10 +576,10 @@ export class PowerBiService {
           state: opts.bookmarkState,
         };
       }
-      if (opts?.pageName) {
-        payload.powerBIReportConfiguration.pages = [
-          { pageName: opts.pageName },
-        ];
+      if (pages) {
+        payload.powerBIReportConfiguration.pages = pages.map((pageName) => ({
+          pageName,
+        }));
       }
     }
 

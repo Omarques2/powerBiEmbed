@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Body,
   Controller,
+  ForbiddenException,
   Get,
   HttpCode,
   Post,
@@ -50,6 +51,22 @@ export class PowerBiController {
     if (!req.user) throw new BadRequestException('Missing user claims');
     const user = await this.usersService.upsertFromClaims(req.user);
     return this.biAuthz.listAllowedReports(user.id, query.workspaceId);
+  }
+
+  @UseGuards(AuthGuard, ActiveUserGuard)
+  @Get('pages')
+  async getPages(
+    @Req() req: AuthedRequest,
+    @Query() query: EmbedConfigQueryDto,
+  ) {
+    if (!req.user) throw new BadRequestException('Missing user claims');
+    const user = await this.usersService.upsertFromClaims(req.user);
+    const result = await this.biAuthz.listAllowedPages(
+      user.id,
+      query.workspaceId,
+      query.reportId,
+    );
+    return { pages: result.pages };
   }
 
   @UseGuards(AuthGuard, ActiveUserGuard)
@@ -102,8 +119,19 @@ export class PowerBiController {
       workspaceId,
       reportId,
     );
+    const pages = await this.biAuthz.resolveAllowedPagesForAccess({
+      userId: user.id,
+      customerId: access.customerId,
+      reportRefId: access.reportRefId,
+    });
     const customerId = access.customerId;
     const username = user.id;
+    const allowedPageNames = pages.pages.map((p) => p.pageName);
+    const requestedPage = body?.pageName?.trim() || null;
+
+    if (requestedPage && !allowedPageNames.includes(requestedPage)) {
+      throw new ForbiddenException('No access to report page');
+    }
 
     const result = await this.svc.exportReportFile(workspaceId, reportId, {
       username,
@@ -111,7 +139,7 @@ export class PowerBiController {
       customData: customerId,
       bookmarkState: body?.bookmarkState,
       format: format,
-      pageName: body?.pageName,
+      pageNames: requestedPage ? [requestedPage] : allowedPageNames,
       skipStamp: body?.skipStamp,
       relaxedPdfCheck: body?.relaxedPdfCheck,
       forceIdentity: body?.forceIdentity,

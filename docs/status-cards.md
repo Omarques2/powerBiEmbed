@@ -52,8 +52,8 @@ Legenda:
 - [x] P1 Simplificar etapas iniciais do guia PBIX (tabelas prontas)
 
 ## EPIC-12 - Permissoes de Abas (Pages) + Exportacao PDF (API/WEB)
-- [ ] P1 Sincronizar paginas dos reports (API/DB)
-- [ ] P1 Grupos de permissoes por report (UI + API)
-- [ ] P1 Vincular grupos/paginas a customers e usuarios
-- [ ] P1 Embed com navegacao controlada pelo app
-- [ ] P1 Exportacao PDF com whitelist no backend
+- [x] P1 Sincronizar paginas dos reports (API/DB)
+- [x] P1 Grupos de permissoes por report (UI + API)
+- [x] P1 Vincular grupos/paginas a customers e usuarios
+- [x] P1 Embed com navegacao controlada pelo app
+- [x] P1 Exportacao PDF com whitelist no backend

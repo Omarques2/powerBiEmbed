@@ -389,6 +389,13 @@ describe('Full API (e2e)', () => {
       .set('x-test-user', 'admin');
     expect(globalCatalog.status).toBe(200);
     expect(Array.isArray(globalCatalog.body.data.workspaces)).toBe(true);
+
+    const preview = await request(app.getHttpServer())
+      .get(`/admin/powerbi/reports/${seed.report.id}/preview`)
+      .set('x-test-user', 'admin')
+      .query({ customerId: seed.customerA.id });
+    expect(preview.status).toBe(200);
+    expect(preview.body.data.embedToken).toBeTruthy();
   });
 
   it('serves user Power BI endpoints', async () => {
@@ -412,6 +419,18 @@ describe('Full API (e2e)', () => {
     expect(embed.status).toBe(200);
     expect(embed.body.data.embedToken).toBeTruthy();
 
+    const pages = await request(app.getHttpServer())
+      .get('/powerbi/pages')
+      .set('x-test-user', 'active')
+      .query({ workspaceId: seed.workspaceId, reportId: seed.reportId });
+    expect(pages.status).toBe(200);
+    expect(pages.body.data.pages.length).toBe(3);
+    expect(
+      pages.body.data.pages.some(
+        (p: any) => p.pageName === seed.pageD.pageName,
+      ),
+    ).toBe(false);
+
     const exportPdf = await request(app.getHttpServer())
       .post('/powerbi/export/pdf')
       .set('x-test-user', 'active')
@@ -422,6 +441,17 @@ describe('Full API (e2e)', () => {
       });
     expect(exportPdf.status).toBe(200);
     expect(exportPdf.headers['content-type']).toContain('application/pdf');
+
+    const exportDenied = await request(app.getHttpServer())
+      .post('/powerbi/export/pdf')
+      .set('x-test-user', 'active')
+      .send({
+        workspaceId: seed.workspaceId,
+        reportId: seed.reportId,
+        format: 'PDF',
+        pageName: seed.pageD.pageName,
+      });
+    expect(exportDenied.status).toBe(403);
   });
 
   it('covers admin RLS endpoints', async () => {

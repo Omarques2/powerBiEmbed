@@ -16,6 +16,11 @@ export type SeedData = {
   customerB: { id: string; code: string };
   workspace: { id: string; workspaceId: string };
   report: { id: string; reportId: string };
+  pageA: { id: string; pageName: string };
+  pageB: { id: string; pageName: string };
+  pageC: { id: string; pageName: string };
+  pageD: { id: string; pageName: string };
+  pageGroup: { id: string; name: string };
   rlsTarget: { id: string; targetKey: string };
   rlsRule: { id: string };
   rlsUserRule: { id: string };
@@ -32,6 +37,13 @@ export async function truncateAll(prisma: PrismaService) {
       "applications",
       "user_customer_memberships",
       "bi_customer_report_permissions",
+      "bi_user_page_allowlist",
+      "bi_customer_page_allowlist",
+      "bi_user_page_groups",
+      "bi_customer_page_groups",
+      "bi_page_group_pages",
+      "bi_page_groups",
+      "bi_report_pages",
       "bi_customer_workspaces",
       "bi_reports",
       "bi_workspaces",
@@ -191,6 +203,82 @@ export async function seedTestData(prisma: PrismaService): Promise<SeedData> {
     select: { id: true, reportId: true },
   });
 
+  const pageA = await prisma.biReportPage.create({
+    data: {
+      reportRefId: report.id,
+      pageName: `ReportSectionA_${runId}`,
+      displayName: `Resumo ${runId}`,
+      pageOrder: 0,
+      isActive: true,
+    },
+    select: { id: true, pageName: true },
+  });
+
+  const pageB = await prisma.biReportPage.create({
+    data: {
+      reportRefId: report.id,
+      pageName: `ReportSectionB_${runId}`,
+      displayName: `Detalhes ${runId}`,
+      pageOrder: 1,
+      isActive: true,
+    },
+    select: { id: true, pageName: true },
+  });
+
+  const pageC = await prisma.biReportPage.create({
+    data: {
+      reportRefId: report.id,
+      pageName: `ReportSectionC_${runId}`,
+      displayName: `Extra ${runId}`,
+      pageOrder: 2,
+      isActive: true,
+    },
+    select: { id: true, pageName: true },
+  });
+
+  const pageD = await prisma.biReportPage.create({
+    data: {
+      reportRefId: report.id,
+      pageName: `ReportSectionD_${runId}`,
+      displayName: `Restrito ${runId}`,
+      pageOrder: 3,
+      isActive: true,
+    },
+    select: { id: true, pageName: true },
+  });
+
+  const pageGroup = await prisma.biPageGroup.create({
+    data: {
+      reportRefId: report.id,
+      name: `Grupo A ${runId}`,
+      isActive: true,
+    },
+    select: { id: true, name: true },
+  });
+
+  await prisma.biPageGroupPage.createMany({
+    data: [
+      { groupId: pageGroup.id, pageId: pageA.id },
+      { groupId: pageGroup.id, pageId: pageB.id },
+    ],
+  });
+
+  await prisma.biCustomerPageGroup.create({
+    data: { customerId: customerA.id, groupId: pageGroup.id, isActive: true },
+  });
+
+  await prisma.biUserPageGroup.create({
+    data: { userId: activeUser.id, groupId: pageGroup.id, isActive: true },
+  });
+
+  await prisma.biUserPageAllowlist.create({
+    data: { userId: activeUser.id, pageId: pageC.id },
+  });
+
+  await prisma.biCustomerPageAllowlist.create({
+    data: { customerId: customerA.id, pageId: pageD.id },
+  });
+
   await prisma.biCustomerReportPermission.create({
     data: {
       customerId: customerA.id,
@@ -257,6 +345,11 @@ export async function seedTestData(prisma: PrismaService): Promise<SeedData> {
     customerB,
     workspace,
     report,
+    pageA,
+    pageB,
+    pageC,
+    pageD,
+    pageGroup,
     rlsTarget,
     rlsRule,
     rlsUserRule,

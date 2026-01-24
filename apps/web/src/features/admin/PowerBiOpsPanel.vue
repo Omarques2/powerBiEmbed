@@ -332,15 +332,382 @@
       </div>
     </section>
   </div>
+
+  <section
+    class="mt-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm
+           dark:border-slate-800 dark:bg-slate-900"
+  >
+    <div class="flex items-start justify-between gap-3">
+      <div class="min-w-0">
+        <div class="text-sm font-semibold text-slate-900 dark:text-slate-100">Permissões de páginas</div>
+        <div class="mt-1 text-xs text-slate-600 dark:text-slate-300">
+          Crie grupos reutilizáveis e aplique permissões por customer. Use o preview para validar a página.
+        </div>
+      </div>
+
+      <button
+        type="button"
+        class="shrink-0 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs hover:bg-slate-50
+               disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+        :disabled="!pageReportRefId || loadingPageConfig"
+        @click="loadPageConfig"
+      >
+        {{ loadingPageConfig ? "Atualizando..." : "Atualizar" }}
+      </button>
+    </div>
+
+    <div
+      v-if="pageError"
+      class="mt-3 rounded-xl border border-rose-200 bg-rose-50 p-2 text-xs text-rose-700
+             dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-200"
+    >
+      {{ pageError }}
+    </div>
+
+    <div class="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <div class="space-y-4">
+        <div class="rounded-xl border border-slate-200 p-3 text-xs dark:border-slate-800">
+          <div class="grid grid-cols-1 gap-2">
+            <label class="text-xs font-medium text-slate-700 dark:text-slate-300">Report (catálogo)</label>
+            <select
+              v-model="pageReportRefId"
+              class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
+                     dark:border-slate-800 dark:bg-slate-900"
+            >
+              <option value="">-- selecione --</option>
+              <option v-for="r in pageReportOptions" :key="r.reportRefId" :value="r.reportRefId">
+                {{ r.label }}
+              </option>
+            </select>
+            <div class="text-[11px] text-slate-500 dark:text-slate-400">
+              Selecione um report do catálogo do customer. O sync grava as páginas no banco.
+            </div>
+          </div>
+
+          <div class="mt-3 flex flex-wrap items-center gap-2 text-[11px] text-slate-600 dark:text-slate-300">
+            <button
+              type="button"
+              class="rounded-lg border border-slate-200 bg-white px-2 py-1 hover:bg-slate-50
+                     disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+              :disabled="!pageReportRefId || syncingPages"
+              @click="syncPages"
+            >
+              {{ syncingPages ? "Sincronizando..." : "Sync páginas" }}
+            </button>
+            <span v-if="pageMetaLabel">{{ pageMetaLabel }}</span>
+          </div>
+        </div>
+
+        <div class="rounded-xl border border-slate-200 p-3 text-xs dark:border-slate-800">
+          <div class="flex items-center justify-between gap-2">
+            <div class="font-semibold text-slate-900 dark:text-slate-100">Grupos por report</div>
+            <button
+              type="button"
+              class="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] hover:bg-slate-50
+                     disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+              :disabled="!pageReportRefId || pageModalSaving"
+              @click="openGroupModal()"
+            >
+              Novo grupo
+            </button>
+          </div>
+
+          <div v-if="!pageReportRefId" class="mt-2 text-[11px] text-slate-500 dark:text-slate-400">
+            Selecione um report para listar grupos.
+          </div>
+
+          <div
+            v-else
+            class="mt-3 space-y-2"
+          >
+            <div
+              v-for="g in pageGroups"
+              :key="g.id"
+              class="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2
+                     dark:border-slate-800 dark:bg-slate-950"
+            >
+              <div class="min-w-0">
+                <div class="truncate text-xs font-semibold text-slate-900 dark:text-slate-100">
+                  {{ g.name }}
+                </div>
+                <div class="text-[11px] text-slate-500 dark:text-slate-400">
+                  {{ g.pageIds.length }} páginas • {{ g.isActive ? "ativo" : "inativo" }}
+                </div>
+              </div>
+
+              <div class="flex shrink-0 items-center gap-2">
+                <PermSwitch
+                  :model-value="g.isActive"
+                  :loading="busyGroupToggle.isBusy(g.id)"
+                  :disabled="pageModalSaving"
+                  on-label="ON"
+                  off-label="OFF"
+                  @toggle="toggleGroupActive(g)"
+                />
+                <button
+                  type="button"
+                  class="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] hover:bg-slate-50
+                         disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+                  :disabled="pageModalSaving"
+                  @click="openGroupModal(g)"
+                >
+                  Editar
+                </button>
+                <button
+                  type="button"
+                  class="rounded-lg border border-rose-200 bg-rose-50 px-2 py-1 text-[11px] text-rose-700 hover:bg-rose-100
+                         disabled:opacity-60 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-200 dark:hover:bg-rose-900/50"
+                  :disabled="busyGroupDelete.isBusy(g.id)"
+                  @click="deleteGroup(g)"
+                >
+                  {{ busyGroupDelete.isBusy(g.id) ? "..." : "Excluir" }}
+                </button>
+              </div>
+            </div>
+
+            <div v-if="pageGroups.length === 0" class="text-[11px] text-slate-500 dark:text-slate-400">
+              Nenhum grupo cadastrado.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="space-y-4">
+        <div class="rounded-xl border border-slate-200 p-3 text-xs dark:border-slate-800">
+          <div class="font-semibold text-slate-900 dark:text-slate-100">Customer (contexto)</div>
+          <div class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+            {{ customerLabel }}
+          </div>
+        </div>
+
+        <div class="rounded-xl border border-slate-200 p-3 text-xs dark:border-slate-800">
+          <div class="font-semibold text-slate-900 dark:text-slate-100">Grupos atribuídos</div>
+          <div v-if="!customerId" class="mt-2 text-[11px] text-slate-500 dark:text-slate-400">
+            Selecione um customer para atribuir grupos.
+          </div>
+          <div v-else class="mt-2 space-y-2">
+            <div
+              v-for="g in pageGroupsWithAccess"
+              :key="g.id"
+              class="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2
+                     dark:border-slate-800 dark:bg-slate-950"
+            >
+              <div class="min-w-0">
+                <div class="truncate text-xs font-semibold text-slate-900 dark:text-slate-100">
+                  {{ g.name }}
+                </div>
+                <div class="text-[11px] text-slate-500 dark:text-slate-400">
+                  {{ g.pageIds.length }} páginas
+                </div>
+              </div>
+              <PermSwitch
+                :model-value="!!g.assigned"
+                :loading="busyGroupAssign.isBusy(g.id)"
+                :disabled="!customerId"
+                on-label="ON"
+                off-label="OFF"
+                @toggle="toggleGroupAssign(g)"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div class="rounded-xl border border-slate-200 p-3 text-xs dark:border-slate-800">
+          <div class="flex items-center justify-between gap-2">
+            <div class="font-semibold text-slate-900 dark:text-slate-100">Páginas individuais</div>
+          </div>
+          <div v-if="!customerId" class="mt-2 text-[11px] text-slate-500 dark:text-slate-400">
+            Selecione um customer para permitir páginas específicas.
+          </div>
+          <div v-else class="mt-3 space-y-2">
+            <div
+              v-for="p in pageAccessPages"
+              :key="p.id"
+              class="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2
+                     dark:border-slate-800 dark:bg-slate-950"
+            >
+              <div class="min-w-0">
+                <div class="truncate text-xs font-medium text-slate-900 dark:text-slate-100">
+                  {{ p.displayName || p.pageName }}
+                </div>
+                <div class="text-[11px] text-slate-500 dark:text-slate-400">{{ p.pageName }}</div>
+              </div>
+              <div class="flex shrink-0 items-center gap-2">
+                <button
+                  type="button"
+                  class="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] hover:bg-slate-50
+                         disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+                  :disabled="!customerId || previewLoading"
+                  @click="openPreview(p)"
+                >
+                  Preview
+                </button>
+                <PermSwitch
+                  :model-value="!!p.canView"
+                  :loading="busyPageAllow.isBusy(p.id)"
+                  :disabled="!customerId"
+                  on-label="ON"
+                  off-label="OFF"
+                  @toggle="togglePageAllow(p)"
+                />
+              </div>
+            </div>
+
+            <div v-if="pageAccessPages.length === 0" class="text-[11px] text-slate-500 dark:text-slate-400">
+              Nenhuma página sincronizada.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div
+    v-if="groupModalOpen"
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+    @click.self="closeGroupModal"
+  >
+    <div
+      class="w-full max-w-xl rounded-2xl border border-slate-200 bg-white p-5 shadow-xl
+             dark:border-slate-800 dark:bg-slate-900"
+    >
+      <div class="flex items-center justify-between gap-3">
+        <div class="text-base font-semibold text-slate-900 dark:text-slate-100">
+          {{ groupModalMode === "edit" ? "Editar grupo" : "Novo grupo" }}
+        </div>
+        <button
+          class="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 hover:bg-slate-50
+                 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+          :disabled="pageModalSaving"
+          @click="closeGroupModal"
+        >
+          Fechar
+        </button>
+      </div>
+
+      <div class="mt-4 space-y-3">
+        <div>
+          <label class="text-xs font-medium text-slate-700 dark:text-slate-300">Nome do grupo</label>
+          <input
+            v-model="groupModalName"
+            class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
+                   dark:border-slate-800 dark:bg-slate-900"
+            placeholder="Ex: A.1 - Páginas essenciais"
+          />
+        </div>
+
+        <div>
+          <div class="text-xs font-medium text-slate-700 dark:text-slate-300">Páginas do grupo</div>
+          <div
+            class="mt-2 max-h-[260px] space-y-2 overflow-auto rounded-xl border border-slate-200 bg-slate-50 p-2
+                   dark:border-slate-800 dark:bg-slate-950/40"
+          >
+            <label
+              v-for="p in pagePages"
+              :key="p.id"
+              class="flex items-center gap-2 text-xs text-slate-700 dark:text-slate-200"
+            >
+              <input v-model="groupModalPageIds" type="checkbox" :value="p.id" />
+              <span class="truncate">{{ p.displayName || p.pageName }}</span>
+            </label>
+            <div v-if="pagePages.length === 0" class="text-[11px] text-slate-500 dark:text-slate-400">
+              Nenhuma página sincronizada.
+            </div>
+          </div>
+        </div>
+
+        <div
+          v-if="groupModalError"
+          class="text-xs text-rose-600 dark:text-rose-300"
+        >
+          {{ groupModalError }}
+        </div>
+      </div>
+
+      <div class="mt-5 flex justify-end gap-2">
+        <button
+          class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 hover:bg-slate-50
+                 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+          :disabled="pageModalSaving"
+          @click="closeGroupModal"
+        >
+          Cancelar
+        </button>
+        <button
+          class="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800
+                 disabled:opacity-60 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
+          :disabled="pageModalSaving || !groupModalName.trim() || !pageReportRefId"
+          @click="saveGroupModal"
+        >
+          {{ pageModalSaving ? "Salvando..." : "Salvar" }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div
+    v-if="previewOpen"
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+    @click.self="closePreview"
+  >
+    <div
+      class="w-full max-w-5xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl
+             dark:border-slate-800 dark:bg-slate-900"
+    >
+      <div class="flex items-center justify-between gap-3 border-b border-slate-200 p-4 dark:border-slate-800">
+        <div class="min-w-0">
+          <div class="text-sm font-semibold text-slate-900 dark:text-slate-100">Pré-visualizar página</div>
+          <div class="mt-1 truncate text-xs text-slate-500 dark:text-slate-400">
+            {{ previewPage?.displayName || previewPage?.pageName || "Página" }}
+          </div>
+        </div>
+        <button
+          class="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 hover:bg-slate-50
+                 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+          @click="closePreview"
+        >
+          Fechar
+        </button>
+      </div>
+      <div class="relative h-[70vh] bg-slate-950">
+        <div ref="previewContainerEl" class="absolute inset-0" />
+        <div
+          v-if="previewLoading"
+          class="absolute inset-0 grid place-items-center bg-black/40 text-sm text-white"
+        >
+          Carregando preview...
+        </div>
+        <div
+          v-if="previewError"
+          class="absolute bottom-3 left-3 right-3 rounded-xl border border-rose-200 bg-rose-50 p-2 text-xs text-rose-700
+                 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-200"
+        >
+          {{ previewError }}
+        </div>
+      </div>
+    </div>
+  </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref, watch } from "vue";
+import { computed, nextTick, onMounted, reactive, ref, toRefs, watch } from "vue";
+import * as pbi from "powerbi-client";
 import type { CustomerCatalog, CustomerRow } from "@/features/admin/api";
 import {
   getPowerBiCatalog,
+  getAdminReportPreview,
   listRemoteReports,
   listRemoteWorkspaces,
+  syncReportPages,
+  listReportPages,
+  listPageGroups,
+  createPageGroup,
+  updatePageGroup,
+  setPageGroupPages,
+  deletePageGroup,
+  getCustomerPageAccess,
+  setCustomerPageGroup,
+  setCustomerPageAllow,
   setCustomerReportPermission,
   syncPowerBiCatalog,
   unlinkCustomerWorkspace,
@@ -352,9 +719,10 @@ import { useBusyMap } from "@/ui/ops/useBusyMap";
 import { useOptimisticMutation } from "@/ui/ops/useOptimisticMutation";
 import { normalizeApiError } from "@/ui/ops/normalizeApiError";
 
-defineProps<{
+const props = defineProps<{
   customers: CustomerRow[];
 }>();
+const { customers } = toRefs(props);
 
 const { confirm } = useConfirm();
 const { push } = useToast();
@@ -460,6 +828,10 @@ const catalogError = ref("");
 
 const busyUnlink = useBusyMap();
 const busyReportPerm = useBusyMap();
+const busyGroupToggle = useBusyMap();
+const busyGroupDelete = useBusyMap();
+const busyGroupAssign = useBusyMap();
+const busyPageAllow = useBusyMap();
 
 // Controle para não sobrescrever seleção manual constantemente
 const autoAppliedForCustomerId = ref<string>("");
@@ -745,4 +1117,303 @@ async function toggleReportAccess(workspaceRefId: string, reportRefId: string) {
 onMounted(async () => {
   await loadRemoteWorkspaces();
 });
+
+// =====================
+// Pages + Groups (admin)
+// =====================
+const pageReportRefId = ref<string>("");
+const pagePages = ref<Array<{ id: string; pageName: string; displayName: string | null }>>([]);
+const pageGroups = ref<Array<{ id: string; name: string; isActive: boolean; pageIds: string[] }>>([]);
+const pageAccessPages = ref<Array<{ id: string; pageName: string; displayName: string | null; canView?: boolean }>>([]);
+const pageGroupsWithAccess = ref<Array<{ id: string; name: string; isActive: boolean; pageIds: string[]; assigned?: boolean }>>([]);
+const loadingPageConfig = ref(false);
+const pageError = ref("");
+const syncingPages = ref(false);
+
+const groupModalOpen = ref(false);
+const groupModalMode = ref<"create" | "edit">("create");
+const groupModalName = ref("");
+const groupModalPageIds = ref<string[]>([]);
+const groupModalError = ref("");
+const pageModalSaving = ref(false);
+const editingGroupId = ref<string | null>(null);
+
+const previewOpen = ref(false);
+const previewLoading = ref(false);
+const previewError = ref("");
+const previewPage = ref<{ id: string; pageName: string; displayName: string | null } | null>(null);
+const previewContainerEl = ref<HTMLDivElement | null>(null);
+let previewService: pbi.service.Service | null = null;
+
+const pageReportOptions = computed(() => {
+  const ws = catalog.value?.workspaces ?? [];
+  return ws.flatMap((w) =>
+    (w.reports ?? []).map((r) => ({
+      reportRefId: r.reportRefId,
+      label: `${w.name} / ${r.name}`,
+    })),
+  );
+});
+
+const pageMetaLabel = computed(() => {
+  if (!pageReportRefId.value || !pageReportOptions.value.length) return "";
+  const opt = pageReportOptions.value.find((r) => r.reportRefId === pageReportRefId.value);
+  return opt?.label ?? "";
+});
+
+const customerLabel = computed(() => {
+  if (!customerId.value) return "Nenhum customer selecionado";
+  const row = customers.value.find((c) => c.id === customerId.value);
+  if (!row) return `Customer ${customerId.value}`;
+  return `${row.code} — ${row.name} (${row.status})`;
+});
+
+watch(customerId, () => {
+  pageReportRefId.value = "";
+  pagePages.value = [];
+  pageGroups.value = [];
+  pageAccessPages.value = [];
+  pageGroupsWithAccess.value = [];
+  pageError.value = "";
+});
+
+watch(pageReportOptions, () => {
+  if (!pageReportRefId.value && pageReportOptions.value.length > 0) {
+    pageReportRefId.value = pageReportOptions.value[0]?.reportRefId ?? "";
+  }
+});
+
+watch(pageReportRefId, () => {
+  if (pageReportRefId.value) {
+    void loadPageConfig();
+  }
+});
+
+async function loadPageConfig() {
+  if (!pageReportRefId.value) return;
+  loadingPageConfig.value = true;
+  pageError.value = "";
+  try {
+    const [pagesRes, groupsRes] = await Promise.all([
+      listReportPages(pageReportRefId.value),
+      listPageGroups(pageReportRefId.value),
+    ]);
+
+    pagePages.value = pagesRes
+      .filter((p) => p.isActive)
+      .map((p) => ({
+        id: p.id,
+        pageName: p.pageName,
+        displayName: p.displayName,
+      }));
+    pageGroups.value = groupsRes;
+
+    if (customerId.value) {
+      const access = await getCustomerPageAccess(customerId.value, pageReportRefId.value);
+      pageAccessPages.value = access.pages.filter((p) => p.isActive);
+      pageGroupsWithAccess.value = access.groups;
+    } else {
+      pageAccessPages.value = pagePages.value.map((p) => ({ ...p, canView: false }));
+      pageGroupsWithAccess.value = pageGroups.value.map((g) => ({ ...g, assigned: false }));
+    }
+  } catch (e: any) {
+    const ne = normalizeApiError(e);
+    pageError.value = ne.message;
+    push({
+      kind: "error",
+      title: "Falha ao carregar páginas",
+      message: ne.message,
+      details: ne.details,
+      timeoutMs: 9000,
+    });
+  } finally {
+    loadingPageConfig.value = false;
+  }
+}
+
+async function syncPages() {
+  if (!pageReportRefId.value) return;
+  syncingPages.value = true;
+  pageError.value = "";
+  try {
+    await syncReportPages(pageReportRefId.value);
+    await loadPageConfig();
+    push({ kind: "success", title: "Páginas sincronizadas", message: "Lista atualizada." });
+  } catch (e: any) {
+    const ne = normalizeApiError(e);
+    pageError.value = ne.message;
+    push({
+      kind: "error",
+      title: "Falha ao sincronizar páginas",
+      message: ne.message,
+      details: ne.details,
+      timeoutMs: 9000,
+    });
+  } finally {
+    syncingPages.value = false;
+  }
+}
+
+function openGroupModal(group?: { id: string; name: string; pageIds: string[] }) {
+  groupModalMode.value = group ? "edit" : "create";
+  groupModalName.value = group?.name ?? "";
+  groupModalPageIds.value = group?.pageIds ? [...group.pageIds] : [];
+  groupModalError.value = "";
+  editingGroupId.value = group?.id ?? null;
+  groupModalOpen.value = true;
+}
+
+function closeGroupModal() {
+  if (pageModalSaving.value) return;
+  groupModalOpen.value = false;
+}
+
+async function saveGroupModal() {
+  if (!pageReportRefId.value) return;
+  const name = groupModalName.value.trim();
+  if (!name) {
+    groupModalError.value = "Informe um nome para o grupo.";
+    return;
+  }
+
+  pageModalSaving.value = true;
+  groupModalError.value = "";
+  try {
+    if (groupModalMode.value === "create") {
+      await createPageGroup(pageReportRefId.value, {
+        name,
+        pageIds: groupModalPageIds.value,
+      });
+    } else if (editingGroupId.value) {
+      await updatePageGroup(editingGroupId.value, { name });
+      await setPageGroupPages(editingGroupId.value, groupModalPageIds.value);
+    }
+    await loadPageConfig();
+    groupModalOpen.value = false;
+    push({ kind: "success", title: "Grupo salvo", message: name });
+  } catch (e: any) {
+    const ne = normalizeApiError(e);
+    groupModalError.value = ne.message;
+    push({ kind: "error", title: "Falha ao salvar grupo", message: ne.message });
+  } finally {
+    pageModalSaving.value = false;
+  }
+}
+
+async function deleteGroup(group: { id: string; name: string }) {
+  const ok = await confirm({
+    title: "Excluir grupo?",
+    message: `Você está prestes a excluir "${group.name}".`,
+    confirmText: "Excluir",
+    cancelText: "Cancelar",
+    danger: true,
+  });
+  if (!ok) return;
+
+  await mutate({
+    key: group.id,
+    busy: busyGroupDelete,
+    request: async () => deletePageGroup(group.id),
+    toast: {
+      success: { title: "Grupo removido", message: group.name },
+      error: { title: "Falha ao remover grupo" },
+    },
+  });
+  await loadPageConfig();
+}
+
+async function toggleGroupActive(group: { id: string; isActive: boolean }) {
+  await mutate({
+    key: group.id,
+    busy: busyGroupToggle,
+    request: async () => updatePageGroup(group.id, { isActive: !group.isActive }),
+    toast: {
+      success: { title: "Grupo atualizado", message: group.isActive ? "Desativado" : "Ativado" },
+      error: { title: "Falha ao atualizar grupo" },
+    },
+  });
+  await loadPageConfig();
+}
+
+async function toggleGroupAssign(group: { id: string; assigned?: boolean }) {
+  if (!customerId.value) return;
+  await mutate({
+    key: group.id,
+    busy: busyGroupAssign,
+    request: async () => setCustomerPageGroup(customerId.value, group.id, !group.assigned),
+    toast: {
+      success: { title: "Grupo aplicado", message: !group.assigned ? "ON" : "OFF" },
+      error: { title: "Falha ao aplicar grupo" },
+    },
+  });
+  await loadPageConfig();
+}
+
+async function togglePageAllow(page: { id: string; canView?: boolean }) {
+  if (!customerId.value) return;
+  await mutate({
+    key: page.id,
+    busy: busyPageAllow,
+    request: async () => setCustomerPageAllow(customerId.value, page.id, !page.canView),
+    toast: {
+      success: { title: "Página atualizada", message: !page.canView ? "ON" : "OFF" },
+      error: { title: "Falha ao atualizar página" },
+    },
+  });
+  await loadPageConfig();
+}
+
+async function openPreview(page: { id: string; pageName: string; displayName: string | null }) {
+  if (!pageReportRefId.value) return;
+  if (!customerId.value) {
+    push({
+      kind: "info",
+      title: "Selecione um customer",
+      message: "Para pré-visualizar, selecione um customer como contexto.",
+    });
+    return;
+  }
+
+  previewOpen.value = true;
+  previewLoading.value = true;
+  previewError.value = "";
+  previewPage.value = page;
+
+  try {
+    const cfg = await getAdminReportPreview(pageReportRefId.value, { customerId: customerId.value });
+    await nextTick();
+    if (!previewContainerEl.value) throw new Error("Container não encontrado");
+    if (!previewService) {
+      previewService = new pbi.service.Service(
+        pbi.factories.hpmFactory,
+        pbi.factories.wpmpFactory,
+        pbi.factories.routerFactory,
+      );
+    }
+    previewService.reset(previewContainerEl.value);
+    previewService.embed(previewContainerEl.value, {
+      type: "report",
+      tokenType: pbi.models.TokenType.Embed,
+      accessToken: cfg.embedToken,
+      embedUrl: cfg.embedUrl,
+      id: cfg.reportId,
+      pageName: page.pageName,
+      settings: { panes: { pageNavigation: { visible: false }, filters: { visible: false } } },
+    });
+  } catch (e: any) {
+    const ne = normalizeApiError(e);
+    previewError.value = ne.message;
+  } finally {
+    previewLoading.value = false;
+  }
+}
+
+function closePreview() {
+  if (previewService && previewContainerEl.value) {
+    previewService.reset(previewContainerEl.value);
+  }
+  previewOpen.value = false;
+  previewPage.value = null;
+  previewError.value = "";
+}
 </script>
