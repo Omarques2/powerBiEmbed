@@ -47,7 +47,7 @@ export class AdminPowerBiController {
     return this.sync.syncCustomerCatalog({
       customerId: body.customerId,
       workspaceIds: body.workspaceIds,
-      deactivateMissing: body.deactivateMissing ?? false,
+      deactivateMissing: body.deactivateMissing ?? true,
     });
   }
 

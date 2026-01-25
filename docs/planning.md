@@ -265,6 +265,24 @@ Estrategia:
 Aceite:
 - PDF inclui somente paginas permitidas.
 
+### EPIC-13: Reestrutura do painel Admin focado em Customer (WEB + API)
+Card P1 - WEB | Modal de Customer com abas e UX simplificado  
+Contexto: a tela atual e confusa; Power BI Ops precisa ser incorporado no fluxo do customer.  
+Objetivo: centralizar tudo do customer em um modal com abas, eliminando a aba Power BI Ops.  
+Escopo: WEB (Admin/Customers + Power BI Ops embutido).  
+Estrategia:
+- Modal de Novo/Editar Customer com abas: "Resumo", "Relatorios", "Permissoes de paginas".
+- Somente "Resumo" visivel no primeiro save (code + name); abas liberadas apos salvar.
+- Aba "Relatorios": tree view de workspaces + reports com toggles imediatos (persistencia no BD).
+- Aba "Permissoes de paginas": seletor de report, lista de paginas (toggle + selecao), grupos e preview multi-pagina.
+- Ao ativar grupo para customer: limpar allowlist individual e tornar toggles read-only (back-end bloqueia alteracoes individuais).
+Aceite:
+- Power BI Ops removido do menu; tudo acessivel pelo modal de customer.
+- Toggle de workspace/report aplica no BD sem botao de salvar.
+- Paginas individuais ficam read-only quando ha grupo ativo e refletem o acesso efetivo.
+Notas:
+- Permissoes do customer devem refletir nos usuarios, mas a tela de usuarios sera tratada em card separado.
+
 ## Mini-roteiro (Opcao 3 + EPIC-11)
 1. UX dataset-first (WEB):
    - Novo fluxo: Dataset -> Targets -> Regras.

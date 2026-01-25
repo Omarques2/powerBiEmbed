@@ -230,18 +230,26 @@ export class PowerBiPagesService {
       where: { customerId: customerId, page: { reportRefId: reportRefId } },
       select: { pageId: true },
     });
-    const allowSet = new Set(allow.map((p) => p.pageId));
-
     const groupLinks = await this.prisma.biCustomerPageGroup.findMany({
       where: { customerId: customerId, group: { reportRefId: reportRefId } },
       select: { groupId: true, isActive: true },
     });
     const groupById = new Map(groupLinks.map((g) => [g.groupId, g.isActive]));
+    const activeGroupIds = new Set(
+      groupLinks.filter((g) => g.isActive).map((g) => g.groupId),
+    );
+
+    const groupPageIds = groups
+      .filter((g) => activeGroupIds.has(g.id))
+      .flatMap((g) => g.pageIds);
+    const allowSet = new Set(allow.map((p) => p.pageId));
+    const hasGroupAssignments = activeGroupIds.size > 0;
+    const effectiveSet = hasGroupAssignments ? new Set(groupPageIds) : allowSet;
 
     return {
       pages: pages.map((p) => ({
         ...p,
-        canView: allowSet.has(p.id),
+        canView: effectiveSet.has(p.id),
       })),
       groups: groups.map((g) => ({
         ...g,
@@ -258,18 +266,26 @@ export class PowerBiPagesService {
       where: { userId: userId, page: { reportRefId: reportRefId } },
       select: { pageId: true },
     });
-    const allowSet = new Set(allow.map((p) => p.pageId));
-
     const groupLinks = await this.prisma.biUserPageGroup.findMany({
       where: { userId: userId, group: { reportRefId: reportRefId } },
       select: { groupId: true, isActive: true },
     });
     const groupById = new Map(groupLinks.map((g) => [g.groupId, g.isActive]));
+    const activeGroupIds = new Set(
+      groupLinks.filter((g) => g.isActive).map((g) => g.groupId),
+    );
+
+    const groupPageIds = groups
+      .filter((g) => activeGroupIds.has(g.id))
+      .flatMap((g) => g.pageIds);
+    const allowSet = new Set(allow.map((p) => p.pageId));
+    const hasGroupAssignments = activeGroupIds.size > 0;
+    const effectiveSet = hasGroupAssignments ? new Set(groupPageIds) : allowSet;
 
     return {
       pages: pages.map((p) => ({
         ...p,
-        canView: allowSet.has(p.id),
+        canView: effectiveSet.has(p.id),
       })),
       groups: groups.map((g) => ({
         ...g,
@@ -283,12 +299,32 @@ export class PowerBiPagesService {
     groupId: string,
     isActive: boolean,
   ) {
-    await this.prisma.biCustomerPageGroup.upsert({
-      where: { customerId_groupId: { customerId, groupId } },
-      create: { customerId, groupId, isActive },
-      update: { isActive },
+    const group = await this.prisma.biPageGroup.findUnique({
+      where: { id: groupId },
+      select: { reportRefId: true },
     });
-    return { ok: true };
+    if (!group) throw new NotFoundException('Group not found');
+
+    return this.prisma.$transaction(async (tx) => {
+      await tx.biCustomerPageGroup.upsert({
+        where: { customerId_groupId: { customerId, groupId } },
+        create: { customerId, groupId, isActive },
+        update: { isActive },
+      });
+
+      let clearedAllowlist = 0;
+      if (isActive) {
+        const res = await tx.biCustomerPageAllowlist.deleteMany({
+          where: {
+            customerId: customerId,
+            page: { reportRefId: group.reportRefId },
+          },
+        });
+        clearedAllowlist = res.count;
+      }
+
+      return { ok: true, clearedAllowlist };
+    });
   }
 
   async setUserPageGroup(userId: string, groupId: string, isActive: boolean) {
@@ -305,6 +341,26 @@ export class PowerBiPagesService {
     pageId: string,
     canView: boolean,
   ) {
+    const page = await this.prisma.biReportPage.findUnique({
+      where: { id: pageId },
+      select: { reportRefId: true },
+    });
+    if (!page) throw new NotFoundException('Page not found');
+
+    const hasActiveGroups = await this.prisma.biCustomerPageGroup.findFirst({
+      where: {
+        customerId: customerId,
+        isActive: true,
+        group: { reportRefId: page.reportRefId },
+      },
+      select: { id: true },
+    });
+    if (hasActiveGroups) {
+      throw new BadRequestException(
+        'Individual pages are disabled while groups are active',
+      );
+    }
+
     if (canView) {
       await this.prisma.biCustomerPageAllowlist.upsert({
         where: { customerId_pageId: { customerId, pageId } },

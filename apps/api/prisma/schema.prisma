@@ -169,6 +169,7 @@ model BiCustomerReportPermission {
   customerId  String   @map("customer_id") @db.Uuid
   reportRefId String   @map("report_ref_id") @db.Uuid
   canView     Boolean  @default(true) @map("can_view")
+  lastCanView Boolean? @map("last_can_view")
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   customer    Customer @relation(fields: [customerId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   report      BiReport @relation(fields: [reportRefId], references: [id], onDelete: Cascade, onUpdate: NoAction)

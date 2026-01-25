@@ -1105,11 +1105,15 @@ export class AdminUsersService {
       let reportPermsRevoked = 0;
 
       if (repIds.length) {
-        const rpRes = await tx.biCustomerReportPermission.updateMany({
-          where: { customerId: customerId, reportRefId: { in: repIds } },
-          data: { canView: false },
-        });
-        reportPermsRevoked = rpRes.count;
+        reportPermsRevoked = await tx.$executeRaw(
+          Prisma.sql`
+            UPDATE "bi_customer_report_permissions"
+               SET "last_can_view" = "can_view",
+                   "can_view" = false
+             WHERE "customer_id" = ${customerId}
+               AND "report_ref_id" IN (${Prisma.join(repIds)})
+          `,
+        );
       }
 
       const after = {
@@ -1202,8 +1206,9 @@ export class AdminUsersService {
           customerId: customerId,
           reportRefId: reportRefId,
           canView: canView,
+          lastCanView: null,
         },
-        update: { canView: canView },
+        update: { canView: canView, lastCanView: null },
       });
 
       await tx.auditLog.create({
@@ -1233,6 +1238,196 @@ export class AdminUsersService {
 
       return { ok: true, workspaceActivated };
     });
+  }
+
+  async setCustomerWorkspacePermission(
+    customerId: string,
+    workspaceRefId: string,
+    canView: boolean,
+    actorSub: string | null,
+    restoreReports = true,
+  ) {
+    const customer = await this.prisma.customer.findUnique({
+      where: { id: customerId },
+      select: { id: true, code: true, name: true, status: true },
+    });
+    if (!customer) throw new NotFoundException('Customer not found');
+
+    const workspace = await this.prisma.biWorkspace.findUnique({
+      where: { id: workspaceRefId },
+      select: { id: true, workspaceId: true, workspaceName: true },
+    });
+    if (!workspace) throw new NotFoundException('Workspace not found');
+
+    const actorUserId = await this.resolveActorUserId(actorSub);
+
+    return this.prisma.$transaction(async (tx) => {
+      const reports = await tx.biReport.findMany({
+        where: { workspaceRefId: workspaceRefId },
+        select: { id: true, reportId: true, reportName: true },
+      });
+      const reportIds = reports.map((r) => r.id);
+
+      let reportsUpdated = 0;
+      let reportsCreated = 0;
+
+      if (canView) {
+        await tx.biCustomerWorkspace.upsert({
+          where: {
+            customerId_workspaceRefId: {
+              customerId: customerId,
+              workspaceRefId: workspaceRefId,
+            },
+          },
+          create: {
+            customerId: customerId,
+            workspaceRefId: workspaceRefId,
+            isActive: true,
+          },
+          update: { isActive: true },
+        });
+
+        if (reportIds.length) {
+          const existing = await tx.biCustomerReportPermission.findMany({
+            where: { customerId: customerId, reportRefId: { in: reportIds } },
+            select: { reportRefId: true, canView: true, lastCanView: true },
+          });
+          const existingMap = new Map(existing.map((p) => [p.reportRefId, p]));
+
+          for (const perm of existing) {
+            await tx.biCustomerReportPermission.update({
+              where: {
+                customerId_reportRefId: {
+                  customerId: customerId,
+                  reportRefId: perm.reportRefId,
+                },
+              },
+              data: { canView: true, lastCanView: null },
+            });
+            reportsUpdated += 1;
+          }
+
+          const missing = reportIds.filter((id) => !existingMap.has(id));
+          if (missing.length) {
+            const created = await tx.biCustomerReportPermission.createMany({
+              data: missing.map((reportRefId) => ({
+                customerId: customerId,
+                reportRefId,
+                canView: true,
+                lastCanView: null,
+              })),
+              skipDuplicates: true,
+            });
+            reportsCreated = created.count;
+          }
+        }
+      } else {
+        await tx.biCustomerWorkspace.upsert({
+          where: {
+            customerId_workspaceRefId: {
+              customerId: customerId,
+              workspaceRefId: workspaceRefId,
+            },
+          },
+          create: {
+            customerId: customerId,
+            workspaceRefId: workspaceRefId,
+            isActive: false,
+          },
+          update: { isActive: false },
+        });
+
+        if (reportIds.length) {
+          reportsUpdated = await tx.$executeRaw(
+            Prisma.sql`
+              UPDATE "bi_customer_report_permissions"
+                 SET "last_can_view" = "can_view",
+                     "can_view" = false
+               WHERE "customer_id" = ${customerId}
+                 AND "report_ref_id" IN (${Prisma.join(reportIds)})
+            `,
+          );
+        }
+      }
+
+      await tx.auditLog.create({
+        data: {
+          actorUserId: actorUserId,
+          action: 'CUSTOMER_WORKSPACE_PERMISSION_UPDATED',
+          entityType: 'bi_customer_workspaces',
+          entityId: workspaceRefId,
+          beforeData: {
+            customerId,
+            workspaceRefId,
+          },
+          afterData: {
+            customerId,
+            workspaceRefId,
+            canView,
+            restoreReports,
+            reportsUpdated,
+            reportsCreated,
+            customer: {
+              id: customer.id,
+              code: customer.code,
+              name: customer.name,
+            },
+          },
+        },
+      });
+
+      return {
+        ok: true,
+        workspace: { workspaceRefId, canView },
+        reportsUpdated,
+        reportsCreated,
+      };
+    });
+  }
+
+  async getCustomerSummary(customerId: string) {
+    const customer = await this.prisma.customer.findUnique({
+      where: { id: customerId },
+      select: { id: true, code: true, name: true, status: true },
+    });
+    if (!customer) throw new NotFoundException('Customer not found');
+
+    const memberships = await this.prisma.userCustomerMembership.findMany({
+      where: { customerId: customerId, isActive: true },
+      select: { user: { select: { status: true } } },
+    });
+
+    let usersActive = 0;
+    let usersPending = 0;
+    let usersDisabled = 0;
+    for (const row of memberships) {
+      if (row.user.status === 'active') usersActive += 1;
+      if (row.user.status === 'pending') usersPending += 1;
+      if (row.user.status === 'disabled') usersDisabled += 1;
+    }
+
+    const workspacesActive = await this.prisma.biCustomerWorkspace.count({
+      where: { customerId: customerId, isActive: true },
+    });
+    const reportsActive = await this.prisma.biCustomerReportPermission.count({
+      where: { customerId: customerId, canView: true },
+    });
+    const pageGroupsActive = await this.prisma.biCustomerPageGroup.count({
+      where: { customerId: customerId, isActive: true },
+    });
+
+    return {
+      customer,
+      users: {
+        total: memberships.length,
+        active: usersActive,
+        pending: usersPending,
+        disabled: usersDisabled,
+      },
+      workspacesActive,
+      reportsActive,
+      pageGroupsActive,
+    };
   }
 
   // =========================

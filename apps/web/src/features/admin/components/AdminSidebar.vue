@@ -95,7 +95,6 @@ export type AdminTabKey =
   | "customers"
   | "security"
   | "audit"
-  | "powerbi"
   | "rls";
 
 const props = defineProps<{

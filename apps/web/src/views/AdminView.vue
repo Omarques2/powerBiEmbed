@@ -80,13 +80,6 @@
           </div>
 
           <!-- ========================= -->
-          <!-- TAB: POWER BI OPS -->
-          <!-- ========================= -->
-          <div v-else-if="tab === 'powerbi'">
-            <PowerBiOpsPanel :customers="customersActiveFirst" />
-          </div>
-
-          <!-- ========================= -->
           <!-- TAB: RLS -->
           <!-- ========================= -->
           <div v-else-if="tab === 'rls'">
@@ -147,7 +140,6 @@ import {
   listAuditLogs,
 } from "@/features/admin/api";
 
-import PowerBiOpsPanel from "@/features/admin/PowerBiOpsPanel.vue";
 import CustomersPanel from "@/features/admin/CustomersPanel.vue";
 import SecurityPlatformAdminsPanel from "@/features/admin/SecurityPlatformAdminsPanel.vue";
 import RlsPanel from "@/features/admin/RlsPanel.vue";
@@ -167,7 +159,6 @@ const sidebarItems: Array<{ key: AdminTabKey; label: string }> = [
   { key: "overview", label: "Overview" },
   { key: "customers", label: "Customers" },
   { key: "pending", label: "Pending users" },
-  { key: "powerbi", label: "Power BI Ops" },
   { key: "rls", label: "RLS" },
   { key: "security", label: "Security" },
   { key: "active", label: "Active users + perms" },
@@ -205,7 +196,6 @@ const title = computed(() => {
     case "overview": return "Overview";
     case "customers": return "Customers";
     case "pending": return "Usuários pendentes";
-    case "powerbi": return "Power BI Ops";
     case "rls": return "RLS";
     case "security": return "Security";
     case "active": return "Usuários ativos + permissões";
@@ -434,7 +424,6 @@ async function reloadCurrentTab() {
   error.value = "";
   if (tab.value === "pending") return loadPending();
   if (tab.value === "customers") return loadCustomers();
-  if (tab.value === "powerbi") return loadCustomers();
   if (tab.value === "rls") return rlsPanelRef.value?.refresh?.();
   if (tab.value === "audit") return loadAudit(auditPaged.value.page || 1);
 }
@@ -442,7 +431,7 @@ async function reloadCurrentTab() {
 watch(tab, async (t) => {
   error.value = "";
 
-  if ((t === "customers" || t === "powerbi" || t === "rls") && customers.value.length === 0 && !loadingCustomers.value) {
+  if ((t === "customers" || t === "rls") && customers.value.length === 0 && !loadingCustomers.value) {
     await loadCustomers();
   }
 

@@ -2,6 +2,7 @@
 import {
   Body,
   Controller,
+  Get,
   Param,
   ParseUUIDPipe,
   Post,
@@ -16,6 +17,7 @@ import type { AuthedRequest } from '../auth/authed-request.type';
 import {
   CreateCustomerDto,
   UpdateCustomerReportPermissionDto,
+  UpdateCustomerWorkspacePermissionDto,
   UpdateCustomerDto,
   UpdateCustomerStatusDto,
 } from './dto/admin-customers.dto';
@@ -58,6 +60,11 @@ export class AdminCustomersController {
     return this.svc.setCustomerStatus(customerId, body.status, actorSub);
   }
 
+  @Get(':customerId/summary')
+  summary(@Param('customerId', ParseUUIDPipe) customerId: string) {
+    return this.svc.getCustomerSummary(customerId);
+  }
+
   /**
    * Unlink (revogar) um workspace do customer de forma consistente:
    * - bi_customer_workspaces.isActive = false
@@ -91,6 +98,23 @@ export class AdminCustomersController {
       reportRefId,
       body.canView,
       actorSub,
+    );
+  }
+
+  @Put(':customerId/workspaces/:workspaceRefId')
+  setWorkspacePermission(
+    @Req() req: AuthedRequest,
+    @Param('customerId', ParseUUIDPipe) customerId: string,
+    @Param('workspaceRefId', ParseUUIDPipe) workspaceRefId: string,
+    @Body() body: UpdateCustomerWorkspacePermissionDto,
+  ) {
+    const actorSub = req.user?.sub ? String(req.user.sub) : null;
+    return this.svc.setCustomerWorkspacePermission(
+      customerId,
+      workspaceRefId,
+      body.canView,
+      actorSub,
+      body.restoreReports,
     );
   }
 }

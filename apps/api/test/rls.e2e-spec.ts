@@ -42,7 +42,9 @@ describe('Admin RLS (e2e)', () => {
     await app.init();
 
     prisma = app.get(PrismaService);
-    await prisma.$executeRawUnsafe('DROP VIEW IF EXISTS "sec_rls_base"');
+    await prisma.$executeRawUnsafe(
+      'DROP VIEW IF EXISTS "sec_rls_base" CASCADE',
+    );
     await prisma.$executeRawUnsafe('DROP TABLE IF EXISTS "sec_rls_base"');
 
     const customer = await prisma.customer.create({

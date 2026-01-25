@@ -46,3 +46,14 @@ export class UpdateCustomerReportPermissionDto {
   @IsBoolean()
   canView!: boolean;
 }
+
+export class UpdateCustomerWorkspacePermissionDto {
+  @Transform(toBoolean)
+  @IsBoolean()
+  canView!: boolean;
+
+  @IsOptional()
+  @Transform(toBoolean)
+  @IsBoolean()
+  restoreReports?: boolean;
+}

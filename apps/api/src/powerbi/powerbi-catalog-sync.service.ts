@@ -57,69 +57,68 @@ export class PowerBiCatalogSyncService {
       workspaceRefId: string;
     }> = [];
 
-    const hasAnyPermissions =
-      (await this.prisma.biCustomerReportPermission.count({
-        where: { customerId: customerId },
-      })) > 0;
-    const defaultCanView = !hasAnyPermissions;
+    const defaultCanView = false;
 
-    await this.prisma.$transaction(async (tx) => {
-      for (const w of remoteWorkspaces) {
-        const row = await tx.biWorkspace.upsert({
-          where: {
-            workspaceId: w.id,
-          },
-          create: {
-            workspaceId: w.id,
-            workspaceName: w.name ?? undefined,
-            isActive: true,
-          },
-          update: {
-            workspaceName: w.name ?? undefined,
-            isActive: true,
-          },
-          select: { id: true, workspaceId: true },
-        });
+    await this.prisma.$transaction(
+      async (tx) => {
+        for (const w of remoteWorkspaces) {
+          const row = await tx.biWorkspace.upsert({
+            where: {
+              workspaceId: w.id,
+            },
+            create: {
+              workspaceId: w.id,
+              workspaceName: w.name ?? undefined,
+              isActive: true,
+            },
+            update: {
+              workspaceName: w.name ?? undefined,
+              isActive: true,
+            },
+            select: { id: true, workspaceId: true },
+          });
 
-        await tx.biCustomerWorkspace.upsert({
-          where: {
-            customerId_workspaceRefId: {
+          await tx.biCustomerWorkspace.upsert({
+            where: {
+              customerId_workspaceRefId: {
+                customerId: customerId,
+                workspaceRefId: row.id,
+              },
+            },
+            create: {
               customerId: customerId,
               workspaceRefId: row.id,
+              isActive: false,
             },
-          },
-          create: {
-            customerId: customerId,
+            update: {},
+          });
+
+          upsertedWorkspaceRefIds.push({
+            workspaceId: row.workspaceId,
             workspaceRefId: row.id,
-            isActive: true,
-          },
-          update: { isActive: true },
-        });
-
-        upsertedWorkspaceRefIds.push({
-          workspaceId: row.workspaceId,
-          workspaceRefId: row.id,
-        });
-      }
-
-      // Opcional: desativar workspaces que sumiram (somente se NÃO estiver usando filtro)
-      if (input.deactivateMissing && !input.workspaceIds?.length) {
-        const remoteSet = new Set(remoteWorkspaces.map((w) => w.id));
-        const missingWorkspaces = await tx.biWorkspace.findMany({
-          where: { workspaceId: { notIn: Array.from(remoteSet) } },
-          select: { id: true },
-        });
-        if (missingWorkspaces.length) {
-          await tx.biCustomerWorkspace.updateMany({
-            where: {
-              customerId: customerId,
-              workspaceRefId: { in: missingWorkspaces.map((w) => w.id) },
-            },
-            data: { isActive: false },
           });
         }
-      }
-    });
+
+        // Opcional: desativar workspaces que sumiram (somente se NÃO estiver usando filtro)
+        if (input.deactivateMissing && !input.workspaceIds?.length) {
+          const remoteSet = new Set(remoteWorkspaces.map((w) => w.id));
+          const missingWorkspaces = await tx.biWorkspace.findMany({
+            where: { workspaceId: { notIn: Array.from(remoteSet) } },
+            select: { id: true },
+          });
+          if (missingWorkspaces.length) {
+            await tx.biCustomerWorkspace.updateMany({
+              where: {
+                customerId: customerId,
+                workspaceRefId: { in: missingWorkspaces.map((w) => w.id) },
+              },
+              data: { isActive: false },
+            });
+          }
+        }
+      },
+      { timeout: 60000 },
+    );
 
     // 3) Para cada workspace, puxa reports e upsert em bi_reports
     let reportsUpserted = 0;
@@ -146,77 +145,80 @@ export class PowerBiCatalogSyncService {
         );
       }
 
-      await this.prisma.$transaction(async (tx) => {
-        for (const r of remoteReports) {
-          const report = await tx.biReport.upsert({
-            where: {
-              workspaceRefId_reportId: {
+      await this.prisma.$transaction(
+        async (tx) => {
+          for (const r of remoteReports) {
+            const report = await tx.biReport.upsert({
+              where: {
+                workspaceRefId_reportId: {
+                  workspaceRefId: ws.workspaceRefId,
+                  reportId: r.id,
+                },
+              },
+              create: {
                 workspaceRefId: ws.workspaceRefId,
                 reportId: r.id,
+                reportName: r.name ?? undefined,
+                datasetId: r.datasetId ?? undefined,
+                isActive: true,
               },
-            },
-            create: {
-              workspaceRefId: ws.workspaceRefId,
-              reportId: r.id,
-              reportName: r.name ?? undefined,
-              datasetId: r.datasetId ?? undefined,
-              isActive: true,
-            },
-            update: {
-              reportName: r.name ?? undefined,
-              datasetId: r.datasetId ?? undefined,
-              isActive: true,
-            },
-          });
-          reportsUpserted += 1;
+              update: {
+                reportName: r.name ?? undefined,
+                datasetId: r.datasetId ?? undefined,
+                isActive: true,
+              },
+            });
+            reportsUpserted += 1;
 
-          await tx.biCustomerReportPermission.upsert({
-            where: {
-              customerId_reportRefId: {
+            await tx.biCustomerReportPermission.upsert({
+              where: {
+                customerId_reportRefId: {
+                  customerId: customerId,
+                  reportRefId: report.id,
+                },
+              },
+              create: {
                 customerId: customerId,
                 reportRefId: report.id,
+                canView: defaultCanView,
               },
-            },
-            create: {
-              customerId: customerId,
-              reportRefId: report.id,
-              canView: defaultCanView,
-            },
-            update: {},
-          });
-        }
+              update: {},
+            });
+          }
 
-        if (input.deactivateMissing) {
-          const remoteSet = new Set(remoteReports.map((r) => r.id));
-          const res = await tx.biReport.updateMany({
-            where: {
-              workspaceRefId: ws.workspaceRefId,
-              reportId: { notIn: Array.from(remoteSet) },
-            },
-            data: { isActive: false },
-          });
-          reportsDeactivated += res.count;
-
-          if (res.count > 0) {
-            const missing = await tx.biReport.findMany({
+          if (input.deactivateMissing) {
+            const remoteSet = new Set(remoteReports.map((r) => r.id));
+            const res = await tx.biReport.updateMany({
               where: {
                 workspaceRefId: ws.workspaceRefId,
                 reportId: { notIn: Array.from(remoteSet) },
               },
-              select: { id: true },
+              data: { isActive: false },
             });
-            if (missing.length) {
-              await tx.biCustomerReportPermission.updateMany({
+            reportsDeactivated += res.count;
+
+            if (res.count > 0) {
+              const missing = await tx.biReport.findMany({
                 where: {
-                  customerId: customerId,
-                  reportRefId: { in: missing.map((m) => m.id) },
+                  workspaceRefId: ws.workspaceRefId,
+                  reportId: { notIn: Array.from(remoteSet) },
                 },
-                data: { canView: false },
+                select: { id: true },
               });
+              if (missing.length) {
+                await tx.biCustomerReportPermission.updateMany({
+                  where: {
+                    customerId: customerId,
+                    reportRefId: { in: missing.map((m) => m.id) },
+                  },
+                  data: { canView: false },
+                });
+              }
             }
           }
-        }
-      });
+        },
+        { timeout: 60000 },
+      );
     }
 
     return {

@@ -47,3 +47,16 @@ export async function setCustomerStatus(customerId: string, status: "active" | "
     }>,
   );
 }
+
+export type CustomerSummary = {
+  customer: { id: string; code: string; name: string; status: string };
+  users: { total: number; active: number; pending: number; disabled: number };
+  workspacesActive: number;
+  reportsActive: number;
+  pageGroupsActive: number;
+};
+
+export async function getCustomerSummary(customerId: string) {
+  const res = await http.get(`/admin/customers/${customerId}/summary`);
+  return unwrapData(res.data as ApiEnvelope<CustomerSummary>);
+}

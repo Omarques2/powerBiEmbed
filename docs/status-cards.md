@@ -57,3 +57,8 @@ Legenda:
 - [x] P1 Vincular grupos/paginas a customers e usuarios
 - [x] P1 Embed com navegacao controlada pelo app
 - [x] P1 Exportacao PDF com whitelist no backend
+
+## EPIC-13 - Reestrutura do painel Admin focado em Customer (WEB + API)
+- [x] P1 Modal de Customer com abas (Resumo/Relatorios/Permissoes de paginas)
+- [x] P1 Tree view de workspaces + reports com toggles imediatos
+- [x] P1 Permissoes de paginas no modal (grupos + preview multi-pagina)

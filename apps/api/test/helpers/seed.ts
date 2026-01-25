@@ -27,7 +27,7 @@ export type SeedData = {
 };
 
 export async function truncateAll(prisma: PrismaService) {
-  await prisma.$executeRawUnsafe('DROP VIEW IF EXISTS "sec_rls_base"');
+  await prisma.$executeRawUnsafe('DROP VIEW IF EXISTS "sec_rls_base" CASCADE');
   await prisma.$executeRawUnsafe('DROP TABLE IF EXISTS "sec_rls_base"');
   const sql = `
     TRUNCATE TABLE

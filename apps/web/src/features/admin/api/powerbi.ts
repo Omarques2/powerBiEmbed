@@ -125,6 +125,22 @@ export async function setCustomerReportPermission(customerId: string, reportRefI
   return unwrapData(res.data as ApiEnvelope<{ ok: boolean; workspaceActivated?: boolean }>);
 }
 
+export async function setCustomerWorkspacePermission(
+  customerId: string,
+  workspaceRefId: string,
+  payload: { canView: boolean; restoreReports?: boolean },
+) {
+  const res = await http.put(`/admin/customers/${customerId}/workspaces/${workspaceRefId}`, payload);
+  return unwrapData(
+    res.data as ApiEnvelope<{
+      ok: boolean;
+      workspace: { workspaceRefId: string; canView: boolean };
+      reportsUpdated: number;
+      reportsCreated: number;
+    }>,
+  );
+}
+
 export type ReportPage = {
   id: string;
   pageName: string;
