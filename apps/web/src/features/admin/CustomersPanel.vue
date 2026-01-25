@@ -213,10 +213,20 @@
                 >
                   Paginas
                 </button>
+                <button
+                  type="button"
+                  class="rounded-xl px-3 py-2 text-xs font-semibold"
+                  :class="modalTab === 'preview'
+                    ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900'
+                    : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200'"
+                  @click="modalTab = 'preview'"
+                >
+                  Preview
+                </button>
               </div>
             </div>
 
-            <div class="mt-4 min-h-0 flex-1 overflow-y-auto lg:overflow-hidden">
+            <div class="mt-4 min-h-0 flex-1 overflow-y-auto">
               <!-- TAB: SUMMARY -->
               <div v-if="modalTab === 'summary'" class="space-y-4">
               <div class="grid grid-cols-1 gap-4 lg:grid-cols-[2fr_1fr]">
@@ -452,7 +462,7 @@
 
             <!-- TAB: PAGES -->
             <div
-              v-else
+              v-else-if="modalTab === 'pages'"
               class="min-h-0 max-h-[70vh] space-y-4 overflow-y-auto pr-1 pb-2 lg:max-h-none lg:overflow-visible lg:pr-0 lg:pb-0"
             >
               <div class="rounded-2xl border border-slate-200 p-4 dark:border-slate-800">
@@ -655,6 +665,104 @@
                           Nenhuma pagina sincronizada.
                         </div>
                       </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- TAB: PREVIEW -->
+            <div v-else-if="modalTab === 'preview'" class="space-y-4">
+              <div class="rounded-2xl border border-slate-200 p-4 dark:border-slate-800">
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                  <div class="min-w-0">
+                    <div class="text-sm font-semibold text-slate-900 dark:text-slate-100">Preview do customer</div>
+                    <div class="mt-1 text-xs text-slate-600 dark:text-slate-300">
+                      Simulacao da experiencia do customer com paginas permitidas.
+                    </div>
+                  </div>
+                </div>
+
+                <div class="mt-3">
+                  <label class="text-xs font-medium text-slate-700 dark:text-slate-300">Report</label>
+                  <select
+                    v-model="previewReportRefId"
+                    class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
+                           dark:border-slate-800 dark:bg-slate-900"
+                  >
+                    <option value="">-- selecione --</option>
+                    <option v-for="r in pageReportOptions" :key="r.reportRefId" :value="r.reportRefId">
+                      {{ r.label }}
+                    </option>
+                  </select>
+                  <div class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                    O preview usa somente reports ativos para este customer.
+                  </div>
+                </div>
+
+                <div
+                  v-if="previewTabError"
+                  class="mt-3 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700
+                         dark:border-rose-900/40 dark:bg-rose-950/40 dark:text-rose-200"
+                >
+                  {{ previewTabError }}
+                </div>
+
+                <div
+                  v-if="previewTabPages.length"
+                  class="relative z-10 mt-3 rounded-2xl border border-slate-200 bg-white/90 px-2 py-2 text-[11px] text-slate-700
+                         dark:border-slate-800 dark:bg-slate-900/90 dark:text-slate-200"
+                >
+                  <div class="flex items-center gap-1 overflow-x-auto">
+                    <button
+                      v-for="p in previewTabPages"
+                      :key="p.id"
+                      type="button"
+                      class="shrink-0 whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium transition
+                             border border-transparent hover:bg-slate-100 hover:border-slate-200
+                             dark:hover:bg-slate-800 dark:hover:border-slate-700"
+                      :class="previewTabActivePageName === p.pageName
+                        ? 'bg-slate-900 text-white border-slate-900 dark:bg-slate-100 dark:text-slate-900 dark:border-slate-100'
+                        : 'bg-transparent'"
+                      @click="setPreviewTabPage(p.pageName)"
+                    >
+                        {{ p.displayName || p.pageName }}
+                    </button>
+                  </div>
+                </div>
+                
+                <div class="mt-4">
+                  <div class="relative z-0 flex w-full items-center justify-center rounded-2xl border border-slate-200 bg-slate-100 dark:border-slate-800 dark:bg-slate-950">
+                    <div class="relative aspect-video w-full max-w-[1200px] max-h-[48vh] overflow-hidden rounded-xl bg-slate-100 dark:bg-slate-900 md:max-h-[48vh]">
+                      <div ref="previewTabContainerEl" class="absolute inset-0"></div>
+                    </div>
+                    <div
+                      v-if="previewTabLoading"
+                      class="absolute inset-0 grid place-items-center bg-slate-900 text-xs text-slate-500 backdrop-blur-sm
+                             dark:bg-slate-950/70 dark:text-slate-300"
+                    >
+                      Carregando preview...
+                    </div>
+                    <div
+                      v-if="!previewTabLoading && previewReportRefId && previewTabEmpty"
+                      class="absolute inset-0 grid place-items-center"
+                    >
+                      <div class="w-[min(520px,90%)] text-center">
+                        <div class="space-y-3 animate-pulse">
+                          <div class="h-6 rounded bg-slate-200 dark:bg-slate-800"></div>
+                          <div class="h-4 rounded bg-slate-200 dark:bg-slate-800"></div>
+                          <div class="h-4 rounded bg-slate-200 dark:bg-slate-800"></div>
+                        </div>
+                        <div class="mt-3 text-xs text-slate-600 dark:text-slate-300">
+                          Nenhuma pagina permitida para este report.
+                        </div>
+                      </div>
+                    </div>
+                    <div
+                      v-else-if="!previewTabLoading && !previewReportRefId"
+                      class="absolute inset-0 grid place-items-center text-xs text-slate-500 dark:text-slate-400"
+                    >
+                      Selecione um report para visualizar.
                     </div>
                   </div>
                 </div>
@@ -865,9 +973,10 @@ const filtered = computed(() => {
 
 // ---------- modal state ----------
 const modalOpen = ref(false);
-const modalTab = ref<"summary" | "reports" | "pages">("summary");
+const modalTab = ref<"summary" | "reports" | "pages" | "preview">("summary");
 const modalCustomer = ref<CustomerRow | null>(null);
 const modalSaving = ref(false);
+const previewReportRefId = ref("");
 
 const form = reactive({
   code: "",
@@ -885,6 +994,8 @@ function openCreate() {
   form.code = "";
   form.name = "";
   modalTab.value = "summary";
+  previewReportRefId.value = "";
+  resetPreviewTab();
   modalOpen.value = true;
 }
 
@@ -893,6 +1004,8 @@ function openEdit(c: CustomerRow) {
   form.code = c.code ?? "";
   form.name = c.name ?? "";
   modalTab.value = "summary";
+  previewReportRefId.value = "";
+  resetPreviewTab();
   modalOpen.value = true;
   void loadCustomerSummary();
   void loadCatalog();
@@ -901,6 +1014,8 @@ function openEdit(c: CustomerRow) {
 function closeModal() {
   if (modalSaving.value) return;
   modalOpen.value = false;
+  resetPreviewTab();
+  previewReportRefId.value = "";
 }
 
 async function refreshSafe() {
@@ -1249,6 +1364,8 @@ watch(
     pageGroupsWithAccess.value = [];
     selectedPageIds.value = new Set();
     selectedGroupIds.value = new Set();
+    previewReportRefId.value = "";
+    resetPreviewTab();
   },
 );
 
@@ -1266,6 +1383,16 @@ watch(modalTab, (tab) => {
       void syncPagesInternal({ silent: true });
     }
   }
+  if (tab === "preview") {
+    void loadCatalog();
+    void syncCatalog({ silent: true });
+    if (!previewReportRefId.value && pageReportOptions.value.length > 0) {
+      previewReportRefId.value = pageReportOptions.value[0]?.reportRefId ?? "";
+    }
+    if (previewReportRefId.value) {
+      void loadCustomerPreview();
+    }
+  }
 });
 
 watch(pageReportRefId, () => {
@@ -1276,6 +1403,18 @@ watch(pageReportRefId, () => {
   if (pageReportRefId.value) {
     void loadPageConfig();
     void syncPagesInternal({ silent: true });
+  }
+});
+
+watch(pageReportOptions, () => {
+  if (!previewReportRefId.value && pageReportOptions.value.length > 0) {
+    previewReportRefId.value = pageReportOptions.value[0]?.reportRefId ?? "";
+  }
+});
+
+watch(previewReportRefId, () => {
+  if (modalTab.value === "preview" && previewReportRefId.value) {
+    void loadCustomerPreview();
   }
 });
 
@@ -1561,5 +1700,124 @@ function closePreview() {
   previewPages.value = [];
   previewActivePage.value = null;
   previewError.value = "";
+}
+
+// ---------- preview tab ----------
+const previewTabPages = ref<ReportPage[]>([]);
+const previewTabActivePageName = ref<string | null>(null);
+const previewTabLoading = ref(false);
+const previewTabError = ref("");
+const previewTabEmpty = ref(false);
+const previewTabContainerEl = ref<HTMLDivElement | null>(null);
+let previewTabService: pbi.service.Service | null = null;
+let previewTabReport: pbi.Report | null = null;
+let previewTabGuard: ((event: any) => void) | null = null;
+
+function clearPreviewTabEmbed() {
+  if (previewTabService && previewTabContainerEl.value) {
+    previewTabService.reset(previewTabContainerEl.value);
+  }
+  if (previewTabReport && previewTabGuard) {
+    previewTabReport.off("pageChanged");
+  }
+  previewTabReport = null;
+  previewTabGuard = null;
+}
+
+function resetPreviewTab() {
+  clearPreviewTabEmbed();
+  previewTabPages.value = [];
+  previewTabActivePageName.value = null;
+  previewTabError.value = "";
+  previewTabLoading.value = false;
+  previewTabEmpty.value = false;
+}
+
+  async function loadCustomerPreview() {
+    if (!modalCustomer.value || !previewReportRefId.value) return;
+    previewTabLoading.value = true;
+    previewTabError.value = "";
+    previewTabEmpty.value = false;
+    clearPreviewTabEmbed();
+
+    try {
+      let sourcePages: ReportPage[] | null = null;
+      if (pageReportRefId.value === previewReportRefId.value && pageAccessPages.value.length) {
+        sourcePages = pageAccessPages.value;
+      } else {
+        const access = await getCustomerPageAccess(modalCustomer.value.id, previewReportRefId.value);
+        sourcePages = access.pages;
+      }
+
+      const allowed = (sourcePages ?? []).filter((p) => p.canView);
+
+      previewTabPages.value = allowed;
+      previewTabActivePageName.value = allowed[0]?.pageName ?? null;
+
+      if (!previewTabActivePageName.value) {
+      previewTabEmpty.value = true;
+      return;
+    }
+
+    const cfg = await getAdminReportPreview(previewReportRefId.value, { customerId: modalCustomer.value.id });
+    await nextTick();
+    if (!previewTabContainerEl.value) throw new Error("Container nao encontrado");
+    if (!previewTabService) {
+      previewTabService = new pbi.service.Service(
+        pbi.factories.hpmFactory,
+        pbi.factories.wpmpFactory,
+        pbi.factories.routerFactory,
+      );
+    }
+    previewTabService.reset(previewTabContainerEl.value);
+    previewTabReport = previewTabService.embed(previewTabContainerEl.value, {
+      type: "report",
+      tokenType: pbi.models.TokenType.Embed,
+      accessToken: cfg.embedToken,
+      embedUrl: cfg.embedUrl,
+      id: cfg.reportId,
+      pageName: previewTabActivePageName.value ?? undefined,
+      settings: { panes: { pageNavigation: { visible: false }, filters: { visible: false } } },
+    }) as pbi.Report;
+
+    if (previewTabGuard) {
+      previewTabReport.off("pageChanged");
+    }
+    previewTabGuard = async (event: any) => {
+      const pageName = event?.detail?.newPage?.name ?? event?.detail?.newPage?.pageName;
+      if (!pageName) return;
+      if (previewTabPages.value.some((p) => p.pageName === pageName)) {
+        previewTabActivePageName.value = pageName;
+        return;
+      }
+      const fallback = previewTabPages.value[0]?.pageName;
+      if (fallback && previewTabReport) {
+        try {
+          await previewTabReport.setPage(fallback);
+          previewTabActivePageName.value = fallback;
+        } catch {
+          // ignore
+        }
+      }
+    };
+    previewTabReport.on("pageChanged", previewTabGuard);
+  } catch (e: any) {
+    const ne = normalizeApiError(e);
+    previewTabError.value = ne.message;
+  } finally {
+    previewTabLoading.value = false;
+  }
+}
+
+async function setPreviewTabPage(pageName: string) {
+  if (!previewTabPages.value.some((p) => p.pageName === pageName)) return;
+  previewTabActivePageName.value = pageName;
+  if (previewTabReport) {
+    try {
+      await previewTabReport.setPage(pageName);
+    } catch {
+      // ignore
+    }
+  }
 }
 </script>

@@ -103,7 +103,7 @@ export type AdminEmbedConfig = {
 
 export async function getAdminReportPreview(
   reportRefId: string,
-  params?: { customerId?: string; forceIdentity?: boolean },
+  params?: { customerId?: string; userId?: string; forceIdentity?: boolean },
 ) {
   const res = await http.get(`/admin/powerbi/reports/${reportRefId}/preview`, { params });
   return unwrapData(res.data as ApiEnvelope<AdminEmbedConfig>);

@@ -83,6 +83,10 @@ export class AdminPowerBiPreviewQueryDto {
   customerId?: string;
 
   @IsOptional()
+  @IsUUID()
+  userId?: string;
+
+  @IsOptional()
   @Transform(toBoolean)
   @IsBoolean()
   forceIdentity?: boolean;

@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -76,6 +77,10 @@ export class AdminPowerBiController {
 
     if (!report) throw new NotFoundException('Report not found');
 
+    if (query.userId && !query.customerId) {
+      throw new BadRequestException('customerId is required when userId is provided');
+    }
+
     if (query.customerId) {
       const customerExists = await this.prisma.customer.findUnique({
         where: { id: query.customerId },
@@ -84,12 +89,32 @@ export class AdminPowerBiController {
       if (!customerExists) throw new NotFoundException('Customer not found');
     }
 
+    if (query.userId) {
+      const userExists = await this.prisma.user.findUnique({
+        where: { id: query.userId },
+        select: { id: true },
+      });
+      if (!userExists) throw new NotFoundException('User not found');
+
+      const membership = await this.prisma.userCustomerMembership.findFirst({
+        where: {
+          userId: query.userId,
+          customerId: query.customerId,
+          isActive: true,
+        },
+        select: { id: true },
+      });
+      if (!membership) {
+        throw new NotFoundException('Active membership not found');
+      }
+    }
+
     return this.pbi.getEmbedConfig(
       report.workspace.workspaceId,
       report.reportId,
       query.customerId
         ? {
-            username: `preview:${query.customerId}`,
+            username: query.userId ? query.userId : `preview:${query.customerId}`,
             roles: ['CustomerRLS'],
             customData: query.customerId,
             forceIdentity: query.forceIdentity,

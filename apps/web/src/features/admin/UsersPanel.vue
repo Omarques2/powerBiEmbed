@@ -194,15 +194,20 @@
         {{ activeError }}
       </div>
 
-        <div
-          v-if="activeLoading"
-          class="mt-3 text-xs text-slate-500 dark:text-slate-400"
-        >
-          Carregando...
+      <div
+        v-if="activeLoading && !activeUsers.rows.length"
+        class="mt-4 rounded-2xl border border-slate-200 p-4 dark:border-slate-800"
+      >
+        <div class="space-y-2 animate-pulse">
+          <div class="h-10 rounded-xl bg-slate-200 dark:bg-slate-800"></div>
+          <div class="h-10 rounded-xl bg-slate-200 dark:bg-slate-800"></div>
+          <div class="h-10 rounded-xl bg-slate-200 dark:bg-slate-800"></div>
+          <div class="h-10 rounded-xl bg-slate-200 dark:bg-slate-800"></div>
         </div>
+      </div>
 
-      <div class="mt-4 overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800">
-        <table class="w-full table-fixed text-left text-sm">
+      <div v-else class="mt-4 overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-800">
+        <table class="min-w-[640px] w-full table-fixed text-left text-sm">
           <thead class="bg-slate-50 text-xs text-slate-600 dark:bg-slate-950/40 dark:text-slate-300">
             <tr>
               <th class="px-4 py-3">Usuário</th>
@@ -385,13 +390,24 @@
             {{ userModalUser?.email ?? "sem email" }}
           </div>
         </div>
-        <button
-          type="button"
-          class="rounded-lg border border-slate-200 px-2 py-1 text-xs dark:border-slate-800"
-          @click="closeUserModal"
-        >
-          Fechar
-        </button>
+        <div class="flex items-center gap-2">
+          <button
+            type="button"
+            class="rounded-lg border border-slate-200 bg-white px-3 py-1 text-xs hover:bg-slate-50
+                   disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+            :disabled="!userModalUser || !userModalCustomerId"
+            @click="openUserPreview"
+          >
+            Preview
+          </button>
+          <button
+            type="button"
+            class="rounded-lg border border-slate-200 px-2 py-1 text-xs dark:border-slate-800"
+            @click="closeUserModal"
+          >
+            Fechar
+          </button>
+        </div>
       </div>
 
       <div class="max-h-[calc(92vh-92px)] overflow-y-auto">
@@ -660,6 +676,110 @@
     </div>
   </div>
 
+  <!-- User preview modal -->
+  <div v-if="userPreviewOpen" class="fixed inset-0 z-[55] flex items-center justify-center bg-black/40 p-4">
+    <div class="w-full max-w-5xl rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-800 dark:bg-slate-900">
+      <div class="flex items-start justify-between gap-3">
+        <div class="min-w-0">
+          <div class="text-sm font-semibold text-slate-900 dark:text-slate-100">Preview do usuário</div>
+          <div class="mt-1 text-xs text-slate-600 dark:text-slate-300">
+            Simulacao das paginas permitidas para {{ userModalUser?.email ?? "usuário" }}.
+          </div>
+        </div>
+        <button
+          type="button"
+          class="rounded-lg border border-slate-200 px-2 py-1 text-xs dark:border-slate-800"
+          @click="closeUserPreview"
+        >
+          Fechar
+        </button>
+      </div>
+
+      <div class="mt-3">
+        <label class="text-xs font-medium text-slate-700 dark:text-slate-300">Report</label>
+        <select
+          v-model="userPreviewReportRefId"
+          class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
+                 dark:border-slate-800 dark:bg-slate-950"
+        >
+          <option value="">-- selecione --</option>
+          <option v-for="opt in userPreviewReportOptions" :key="opt.reportRefId" :value="opt.reportRefId">
+            {{ opt.label }}
+          </option>
+        </select>
+      </div>
+
+      <div
+        v-if="userPreviewError"
+        class="mt-3 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700
+               dark:border-rose-900/40 dark:bg-rose-950/40 dark:text-rose-200"
+      >
+        {{ userPreviewError }}
+      </div>
+
+      <div
+        v-if="userPreviewPages.length"
+        class="relative z-10 mt-3 rounded-2xl border border-slate-200 bg-white/90 px-2 py-2 text-[11px] text-slate-700
+               dark:border-slate-800 dark:bg-slate-900/90 dark:text-slate-200"
+      >
+        <div class="flex items-center gap-1 overflow-x-auto">
+          <button
+            v-for="p in userPreviewPages"
+            :key="p.id"
+            type="button"
+            class="shrink-0 whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium transition
+                   border border-transparent hover:bg-slate-100 hover:border-slate-200
+                   dark:hover:bg-slate-800 dark:hover:border-slate-700"
+            :class="userPreviewActivePageName === p.pageName
+              ? 'bg-slate-900 text-white border-slate-900 dark:bg-slate-100 dark:text-slate-900 dark:border-slate-100'
+              : 'bg-transparent'"
+            @click="setUserPreviewPage(p.pageName)"
+          >
+            {{ p.displayName || p.pageName }}
+          </button>
+        </div>
+      </div>
+      
+      <div class="mt-4">
+        <div class="relative z-0 flex w-full items-center justify-center rounded-2xl border border-slate-200 bg-slate-100 dark:border-slate-800 dark:bg-slate-950">
+          <div class="relative aspect-video w-full max-w-[1200px] max-h-[70vh] overflow-hidden rounded-xl bg-slate-100 dark:bg-slate-900">
+            <div ref="userPreviewContainerEl" class="absolute inset-0"></div>
+          </div>
+          <div
+            v-if="userPreviewLoading"
+            class="absolute inset-0 grid place-items-center bg-slate-100/80 text-xs text-slate-500 backdrop-blur-sm
+                   dark:bg-slate-950/70 dark:text-slate-300"
+          >
+            Carregando preview...
+          </div>
+          <div
+            v-if="!userPreviewLoading && userPreviewReportRefId && userPreviewEmpty"
+            class="absolute inset-0 grid place-items-center"
+          >
+            <div class="w-[min(520px,90%)] text-center">
+              <div class="space-y-3 animate-pulse">
+                <div class="h-6 rounded bg-slate-200 dark:bg-slate-800"></div>
+                <div class="h-4 rounded bg-slate-200 dark:bg-slate-800"></div>
+                <div class="h-4 rounded bg-slate-200 dark:bg-slate-800"></div>
+              </div>
+              <div class="mt-3 text-xs text-slate-600 dark:text-slate-300">
+                Nenhuma pagina permitida para este report.
+              </div>
+            </div>
+          </div>
+          <div
+            v-else-if="!userPreviewLoading && !userPreviewReportRefId"
+            class="absolute inset-0 grid place-items-center text-xs text-slate-500 dark:text-slate-400"
+          >
+            Selecione um report para visualizar.
+          </div>
+        </div>
+      </div>
+
+
+    </div>
+  </div>
+
   <!-- Membership modal -->
   <div v-if="membershipModalOpen" class="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4">
       <div class="max-h-[90vh] w-full max-w-4xl overflow-auto rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-800 dark:bg-slate-900">
@@ -692,7 +812,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from "vue";
+import { computed, nextTick, onMounted, reactive, ref, watch } from "vue";
+import * as pbi from "powerbi-client";
 import SecurityPlatformAdminsPanel from "@/features/admin/SecurityPlatformAdminsPanel.vue";
 import { useToast } from "@/ui/toast/useToast";
 import { useConfirm } from "@/ui/confirm/useConfirm";
@@ -721,6 +842,7 @@ import {
 import {
   getUserPageAccess,
   getCustomerPageAccess,
+  getAdminReportPreview,
   getPowerBiCatalog,
   setUserPageAllow,
   setUserPageGroup,
@@ -781,6 +903,18 @@ const customerCatalogLoaded = ref(false);
 const customerAllowedWorkspaceIds = ref<string[]>([]);
 const customerAllowedReportIds = ref<string[]>([]);
 
+const userPreviewOpen = ref(false);
+const userPreviewReportRefId = ref("");
+const userPreviewPages = ref<ReportPage[]>([]);
+const userPreviewActivePageName = ref<string | null>(null);
+const userPreviewLoading = ref(false);
+const userPreviewError = ref("");
+const userPreviewEmpty = ref(false);
+const userPreviewContainerEl = ref<HTMLDivElement | null>(null);
+let userPreviewService: pbi.service.Service | null = null;
+let userPreviewReport: pbi.Report | null = null;
+let userPreviewGuard: ((event: any) => void) | null = null;
+
 const showUserPermsSkeleton = computed(
   () => userPermsLoading.value || !userPerms.value || !userModalCustomerId.value,
 );
@@ -794,6 +928,14 @@ const pageAccessLoading = ref(false);
 const pageAccessError = ref("");
 const pageGroupBusy = reactive<Record<string, boolean>>({});
 const pageAllowBusy = reactive<Record<string, boolean>>({});
+
+const userPreviewReportOptions = computed(() => {
+  return visibleWorkspaces.value.flatMap((w) =>
+    w.reports
+      .filter((r) => w.canView && r.canView)
+      .map((r) => ({ reportRefId: r.reportRefId, label: `${w.name} / ${r.name}` })),
+  );
+});
 
 function fmtDate(iso: string) {
   try {
@@ -945,6 +1087,7 @@ async function toggleUserStatus(user: ActiveUserRow) {
 
 async function openUserModal(u: ActiveUserRow) {
   userModalUser.value = u;
+  closeUserPreview();
   userModalOpen.value = true;
   await loadUserPerms();
 }
@@ -960,9 +1103,135 @@ function closeUserModal() {
   customerCatalogLoaded.value = false;
   customerAllowedWorkspaceIds.value = [];
   customerAllowedReportIds.value = [];
+  closeUserPreview();
 }
 
 const userMembershipOptions = computed(() => userPerms.value?.memberships ?? []);
+
+function clearUserPreviewEmbed() {
+  if (userPreviewService && userPreviewContainerEl.value) {
+    userPreviewService.reset(userPreviewContainerEl.value);
+  }
+  if (userPreviewReport && userPreviewGuard) {
+    userPreviewReport.off("pageChanged");
+  }
+  userPreviewReport = null;
+  userPreviewGuard = null;
+}
+
+function resetUserPreview() {
+  clearUserPreviewEmbed();
+  userPreviewPages.value = [];
+  userPreviewActivePageName.value = null;
+  userPreviewError.value = "";
+  userPreviewLoading.value = false;
+  userPreviewEmpty.value = false;
+}
+
+async function openUserPreview() {
+  if (!userModalUser.value || !userModalCustomerId.value) return;
+  if (!userPreviewReportRefId.value && userPreviewReportOptions.value.length > 0) {
+    userPreviewReportRefId.value = userPreviewReportOptions.value[0]?.reportRefId ?? "";
+  }
+  userPreviewOpen.value = true;
+  if (userPreviewReportRefId.value) {
+    await loadUserPreview();
+  }
+}
+
+function closeUserPreview() {
+  userPreviewOpen.value = false;
+  userPreviewReportRefId.value = "";
+  resetUserPreview();
+}
+
+async function loadUserPreview() {
+  if (!userModalUser.value || !userModalCustomerId.value || !userPreviewReportRefId.value) return;
+  userPreviewLoading.value = true;
+  userPreviewError.value = "";
+  userPreviewEmpty.value = false;
+  clearUserPreviewEmbed();
+  try {
+    const access = await getUserPageAccess(userModalUser.value.id, userPreviewReportRefId.value);
+    const allowIds = new Set(access.pages.filter((p) => p.canView).map((p) => p.id));
+    const groupIds = access.groups
+      .filter((g) => g.assigned ?? g.isActive)
+      .flatMap((g) => g.pageIds ?? []);
+    groupIds.forEach((id) => allowIds.add(id));
+
+    const allowed = access.pages.filter((p) => allowIds.has(p.id));
+    userPreviewPages.value = allowed;
+    userPreviewActivePageName.value = allowed[0]?.pageName ?? null;
+
+    if (!userPreviewActivePageName.value) {
+      userPreviewEmpty.value = true;
+      return;
+    }
+
+    const cfg = await getAdminReportPreview(userPreviewReportRefId.value, {
+      customerId: userModalCustomerId.value,
+      userId: userModalUser.value.id,
+    });
+    await nextTick();
+    if (!userPreviewContainerEl.value) throw new Error("Container nao encontrado");
+    if (!userPreviewService) {
+      userPreviewService = new pbi.service.Service(
+        pbi.factories.hpmFactory,
+        pbi.factories.wpmpFactory,
+        pbi.factories.routerFactory,
+      );
+    }
+    userPreviewService.reset(userPreviewContainerEl.value);
+    userPreviewReport = userPreviewService.embed(userPreviewContainerEl.value, {
+      type: "report",
+      tokenType: pbi.models.TokenType.Embed,
+      accessToken: cfg.embedToken,
+      embedUrl: cfg.embedUrl,
+      id: cfg.reportId,
+      pageName: userPreviewActivePageName.value ?? undefined,
+      settings: { panes: { pageNavigation: { visible: false }, filters: { visible: false } } },
+    }) as pbi.Report;
+
+    if (userPreviewGuard) {
+      userPreviewReport.off("pageChanged");
+    }
+    userPreviewGuard = async (event: any) => {
+      const pageName = event?.detail?.newPage?.name ?? event?.detail?.newPage?.pageName;
+      if (!pageName) return;
+      if (userPreviewPages.value.some((p) => p.pageName === pageName)) {
+        userPreviewActivePageName.value = pageName;
+        return;
+      }
+      const fallback = userPreviewPages.value[0]?.pageName;
+      if (fallback && userPreviewReport) {
+        try {
+          await userPreviewReport.setPage(fallback);
+          userPreviewActivePageName.value = fallback;
+        } catch {
+          // ignore
+        }
+      }
+    };
+    userPreviewReport.on("pageChanged", userPreviewGuard);
+  } catch (e: any) {
+    const ne = normalizeApiError(e);
+    userPreviewError.value = ne.message;
+  } finally {
+    userPreviewLoading.value = false;
+  }
+}
+
+async function setUserPreviewPage(pageName: string) {
+  if (!userPreviewPages.value.some((p) => p.pageName === pageName)) return;
+  userPreviewActivePageName.value = pageName;
+  if (userPreviewReport) {
+    try {
+      await userPreviewReport.setPage(pageName);
+    } catch {
+      // ignore
+    }
+  }
+}
 
 function pickDefaultCustomerId() {
   const ms = userPerms.value?.memberships ?? [];
@@ -1052,6 +1321,26 @@ watch(pageReportRefId, async () => {
 });
 
 watch(userReportOptions, syncPageReportSelection);
+
+watch(userPreviewReportOptions, () => {
+  if (!userPreviewOpen.value) return;
+  if (!userPreviewReportRefId.value && userPreviewReportOptions.value.length > 0) {
+    userPreviewReportRefId.value = userPreviewReportOptions.value[0]?.reportRefId ?? "";
+  }
+});
+
+watch(userPreviewReportRefId, () => {
+  if (userPreviewOpen.value && userPreviewReportRefId.value) {
+    void loadUserPreview();
+  }
+});
+
+watch(userModalCustomerId, () => {
+  if (userPreviewOpen.value) {
+    userPreviewReportRefId.value = "";
+    resetUserPreview();
+  }
+});
 
 async function loadUserPageAccess() {
   if (!userModalUser.value || !pageReportRefId.value) return;

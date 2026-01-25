@@ -22,8 +22,10 @@ Legenda:
 ## EPIC-04 - Mobile-first 100% + responsividade (WEB)
 - [x] P0 Corrigir overflow Shell (mobile)
 - [x] P0 Ajustes UX de navegacao (loading + topbar + sidebar)
-- [ ] P1 Padrao Drawer/Menu mobile (dep BaseDrawer)
-- [ ] P1 Tabelas Admin responsivas (dep BaseTable)
+- [x] P0 Estabilidade mobile nos fluxos Admin (Customer/Users modais, tabs e listas)
+- [x] P0 Preview da visao efetiva (Customer/Usuario)
+- [x] P1 Padrao Drawer/Menu mobile (dep BaseDrawer)
+- [x] P1 Tabelas Admin responsivas (dep BaseTable)
 
 ## EPIC-05 - Rebuild do front-end com Shadcn (WEB)
 - [ ] P2 Refazer UI com componentes Shadcn
@@ -62,3 +64,4 @@ Legenda:
 - [x] P1 Modal de Customer com abas (Resumo/Relatorios/Permissoes de paginas)
 - [x] P1 Tree view de workspaces + reports com toggles imediatos
 - [x] P1 Permissoes de paginas no modal (grupos + preview multi-pagina)
+- [x] P1 Reestrutura da aba Users (Pendentes/Usuarios/Admins unificados)

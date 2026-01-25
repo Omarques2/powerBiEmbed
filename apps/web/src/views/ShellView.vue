@@ -32,17 +32,12 @@
         />
       </aside>
 
-      <!-- Mobile overlay -->
-      <div
-        v-if="drawerOpen"
-        class="fixed inset-0 z-40 bg-black/40 lg:hidden"
-        @click="drawerOpen = false"
-      />
-
       <!-- Mobile drawer -->
-      <aside
-        class="fixed left-0 top-0 z-50 h-full w-80 max-w-[85vw] border-r bg-white dark:bg-slate-900 dark:border-slate-800 shadow-lg transition-transform lg:hidden"
-        :class="drawerOpen ? 'translate-x-0' : '-translate-x-full'"
+      <BaseDrawer
+        :open="drawerOpen"
+        overlay-class="lg:hidden"
+        panel-class="lg:hidden"
+        @close="drawerOpen = false"
       >
         <SidebarContent
           mode="mobile"
@@ -65,7 +60,7 @@
           :user-email="me?.email ?? null"
           @close="drawerOpen = false"
         />
-      </aside>
+      </BaseDrawer>
 
       <!-- Main viewer -->
       <main class="flex min-w-0 flex-1 flex-col overflow-hidden">
@@ -327,6 +322,7 @@ import * as pbi from "powerbi-client";
 import ThemeToggle from "@/ui/theme/ThemeToggle.vue";
 import { useToast } from "@/ui/toast/useToast";
 import PillToggle from "@/ui/toggles/PillToggle.vue";
+import BaseDrawer from "@/ui/BaseDrawer.vue";
 
 import { http } from "@/api/http";
 import { unwrapData, type ApiEnvelope } from "@/api/envelope";
