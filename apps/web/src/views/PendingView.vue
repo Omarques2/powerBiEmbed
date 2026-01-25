@@ -5,11 +5,16 @@
              dark:border-slate-800 dark:bg-slate-900"
     >
       <h1 class="text-lg font-semibold text-slate-900 dark:text-slate-100">
-        Aguardando liberação do administrador
+        {{ currentStatus === "disabled" ? "Acesso recusado" : "Aguardando liberação do administrador" }}
       </h1>
 
       <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">
-        Seu acesso foi criado, mas ainda não foi ativado. Assim que o administrador liberar, você será redirecionado.
+        <span v-if="currentStatus === 'disabled'">
+          Seu acesso foi recusado. Entre em contato com o administrador para reativar.
+        </span>
+        <span v-else>
+          Seu acesso foi criado, mas ainda não foi ativado. Assim que o administrador liberar, você será redirecionado.
+        </span>
       </p>
 
       <div v-if="statusMessage" class="mt-4 text-xs text-slate-500 dark:text-slate-400">
@@ -18,6 +23,7 @@
 
       <div class="mt-6 flex items-center justify-between gap-3">
         <button
+          v-if="currentStatus !== 'disabled'"
           class="inline-flex items-center justify-center rounded-xl border border-slate-900 bg-white px-4 py-2 text-sm
                  hover:bg-slate-50 active:scale-[0.98] transition
                  dark:border-slate-800 dark:bg-slate-300 dark:hover:bg-slate-200"
@@ -57,6 +63,7 @@ const router = useRouter();
 
 const checking = ref(false);
 const statusMessage = ref("");
+const currentStatus = ref<MeResponse["status"] | null>(null);
 
 let timer: number | null = null;
 
@@ -86,6 +93,7 @@ async function checkNow() {
       return;
     }
     const st = me?.status;
+    currentStatus.value = st ?? null;
 
     if (st === "active") {
       // liberado -> volta para o app
@@ -95,6 +103,7 @@ async function checkNow() {
 
     if (st === "disabled") {
       statusMessage.value = "Seu usuário está desativado. Contate o administrador.";
+      if (timer) window.clearInterval(timer);
       return;
     }
 

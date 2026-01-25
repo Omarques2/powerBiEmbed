@@ -231,6 +231,128 @@ export class PowerBiCatalogSyncService {
     };
   }
 
+  async syncGlobalCatalog(input: { deactivateMissing: boolean }) {
+    // 1) Puxa workspaces do Power BI (remoto)
+    let remoteWorkspaces: Array<{ id: string; name: string | null }> = [];
+    try {
+      const ws = await this.pbi.listWorkspaces();
+      remoteWorkspaces = ws.map((w) => ({
+        id: String(w.id),
+        name: w.name ?? null,
+      }));
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : String(e);
+      throw new InternalServerErrorException(
+        `Failed to list workspaces from Power BI: ${message}`,
+      );
+    }
+
+    const upsertedWorkspaceRefIds: Array<{
+      workspaceId: string;
+      workspaceRefId: string;
+    }> = [];
+
+    await this.prisma.$transaction(
+      async (tx) => {
+        for (const w of remoteWorkspaces) {
+          const row = await tx.biWorkspace.upsert({
+            where: { workspaceId: w.id },
+            create: {
+              workspaceId: w.id,
+              workspaceName: w.name ?? undefined,
+              isActive: true,
+            },
+            update: {
+              workspaceName: w.name ?? undefined,
+              isActive: true,
+            },
+            select: { id: true, workspaceId: true },
+          });
+
+          upsertedWorkspaceRefIds.push({
+            workspaceId: row.workspaceId,
+            workspaceRefId: row.id,
+          });
+        }
+
+        if (input.deactivateMissing) {
+          const remoteSet = new Set(remoteWorkspaces.map((w) => w.id));
+          await tx.biWorkspace.updateMany({
+            where: { workspaceId: { notIn: Array.from(remoteSet) } },
+            data: { isActive: false },
+          });
+        }
+      },
+      { timeout: 60000 },
+    );
+
+    for (const ws of upsertedWorkspaceRefIds) {
+      let remoteReports: Array<{
+        id: string;
+        name: string | null;
+        datasetId: string | null;
+      }> = [];
+
+      try {
+        const rr = await this.pbi.listReports(ws.workspaceId);
+        remoteReports = rr.map((r) => ({
+          id: String(r.id),
+          name: r.name ?? null,
+          datasetId: r.datasetId ?? null,
+        }));
+      } catch (e: unknown) {
+        const message = e instanceof Error ? e.message : String(e);
+        throw new InternalServerErrorException(
+          `Failed to list reports for workspace ${ws.workspaceId}: ${message}`,
+        );
+      }
+
+      await this.prisma.$transaction(
+        async (tx) => {
+          for (const r of remoteReports) {
+            await tx.biReport.upsert({
+              where: {
+                workspaceRefId_reportId: {
+                  workspaceRefId: ws.workspaceRefId,
+                  reportId: r.id,
+                },
+              },
+              create: {
+                workspaceRefId: ws.workspaceRefId,
+                reportId: r.id,
+                reportName: r.name ?? undefined,
+                datasetId: r.datasetId ?? undefined,
+                isActive: true,
+              },
+              update: {
+                reportName: r.name ?? undefined,
+                datasetId: r.datasetId ?? undefined,
+                isActive: true,
+              },
+            });
+          }
+
+          if (input.deactivateMissing) {
+            const remoteSet = new Set(remoteReports.map((r) => r.id));
+            await tx.biReport.updateMany({
+              where: {
+                workspaceRefId: ws.workspaceRefId,
+                reportId: { notIn: Array.from(remoteSet) },
+              },
+              data: { isActive: false },
+            });
+          }
+        },
+        { timeout: 60000 },
+      );
+    }
+
+    return {
+      ok: true,
+      workspacesSeenRemote: remoteWorkspaces.length,
+    };
+  }
+
   async getCustomerCatalog(customerIdRaw: string) {
     const customerId = (customerIdRaw ?? '').trim();
     if (!customerId) throw new BadRequestException('customerId is required');

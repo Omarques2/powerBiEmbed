@@ -118,8 +118,13 @@ export class AdminUsersController {
 
   @Get('active')
   listActive(@Query() query: ListActiveUsersQueryDto) {
+    const customerIds = query.customerIds
+      ?.split(',')
+      .map((id) => id.trim())
+      .filter((id) => id.length > 0);
     return this.svc.listActiveUsers({
       q: query.q,
+      customerIds: customerIds?.length ? customerIds : undefined,
       page: query.page ?? 1,
       pageSize: query.pageSize ?? 25,
     });

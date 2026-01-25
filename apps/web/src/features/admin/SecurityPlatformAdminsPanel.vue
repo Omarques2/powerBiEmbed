@@ -1,40 +1,16 @@
 <!-- apps/web/src/admin/SecurityPlatformAdminsPanel.vue -->
 <template>
-  <div class="space-y-4">
+  <div class="space-y-4 pt-2">
     <!-- Banner de risco -->
-    <div class="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-100">
-      <div class="text-sm font-semibold">Atenção: Platform Admin</div>
-      <div class="mt-1 text-sm opacity-90">
+    <div class="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-100">
+      <div class="text-xs font-semibold">Atenção: Admin global</div>
+      <div class="mt-1 text-xs opacity-90">
         Platform admin tem acesso total ao Admin Panel e às operações de Power BI. Conceda este acesso apenas quando necessário.
       </div>
     </div>
 
     <div class="min-w-0 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-      <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-        <div class="min-w-0">
-          <div class="text-sm font-semibold text-slate-900 dark:text-slate-100">Platform Admins</div>
-          <div class="mt-1 text-xs text-slate-600 dark:text-slate-300">
-            Baseado em <span class="font-mono">app_roles + user_app_roles</span> para <span class="font-mono">{{ appKey }}</span>.
-          </div>
-        </div>
-
-        <div class="flex min-w-0 items-center gap-2">
-          <input
-            v-model="q"
-            placeholder="Buscar..."
-            class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-800 dark:bg-slate-900 sm:w-[260px]"
-          />
-          <button
-            type="button"
-            class="shrink-0 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs hover:bg-slate-50
-                   disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
-            :disabled="loading"
-            @click="load"
-          >
-            {{ loading ? "Carregando..." : "Recarregar" }}
-          </button>
-        </div>
-      </div>
+      <div class="text-sm font-semibold text-slate-900 dark:text-slate-100">Platform Admins</div>
 
       <!-- Add -->
       <div class="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]">
@@ -73,7 +49,7 @@
           </thead>
 
           <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
-            <tr v-for="r in filtered" :key="r.userId" class="hover:bg-slate-50/60 dark:hover:bg-slate-950/30">
+            <tr v-for="r in rows" :key="r.userId" class="hover:bg-slate-50/60 dark:hover:bg-slate-950/30">
               <td class="px-4 py-3">
                 <div class="min-w-0">
                   <div class="truncate font-medium text-slate-900 dark:text-slate-100">
@@ -111,7 +87,7 @@
               </td>
             </tr>
 
-            <tr v-if="!filtered.length">
+            <tr v-if="!rows.length">
               <td colspan="4" class="px-4 py-6 text-center text-xs text-slate-500 dark:text-slate-400">
                 Nenhum platform admin encontrado.
               </td>
@@ -147,21 +123,10 @@ const rows = ref<PlatformAdminRow[]>([]);
 const loading = ref(false);
 const error = ref("");
 
-const q = ref("");
 const newEmail = ref("");
 const granting = ref(false);
 
 const isLastAdmin = computed(() => rows.value.length <= 1);
-
-const filtered = computed(() => {
-  const needle = q.value.trim().toLowerCase();
-  if (!needle) return rows.value;
-
-  return rows.value.filter((r) => {
-    const hay = `${r.email ?? ""} ${r.displayName ?? ""} ${r.userId ?? ""}`.toLowerCase();
-    return hay.includes(needle);
-  });
-});
 
 const canGrant = computed(() => {
   const email = newEmail.value.trim();

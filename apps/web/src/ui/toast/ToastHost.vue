@@ -1,6 +1,6 @@
 <!-- apps/web/src/ui/toast/ToastHost.vue -->
 <template>
-  <div class="fixed right-4 top-4 z-[1000] flex w-[420px] max-w-[92vw] flex-col gap-3">
+  <div class="fixed bottom-4 right-4 z-[1000] flex w-[420px] max-w-[92vw] flex-col gap-3">
     <div
       v-for="t in state.items"
       :key="t.id"

@@ -119,6 +119,10 @@ export class ListActiveUsersQueryDto {
   q?: string;
 
   @IsOptional()
+  @IsString()
+  customerIds?: string;
+
+  @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)

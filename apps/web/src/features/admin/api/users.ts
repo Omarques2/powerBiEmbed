@@ -19,6 +19,7 @@ export type ActiveUserRow = {
   created_at: string;
   last_login_at: string | null;
   status: "pending" | "active" | "disabled";
+  isPlatformAdmin?: boolean;
 };
 
 export type ActivatePayload = {
@@ -37,8 +38,15 @@ export async function listPendingUsers() {
   return unwrapData(res.data as ApiEnvelope<PendingUserRow[]>);
 }
 
-export async function listActiveUsers(q = "", page = 1, pageSize = 25) {
-  const res = await http.get("/admin/users/active", { params: { q, page, pageSize } });
+export async function listActiveUsers(
+  q = "",
+  page = 1,
+  pageSize = 25,
+  customerIds?: string[],
+) {
+  const res = await http.get("/admin/users/active", {
+    params: { q, page, pageSize, customerIds: customerIds?.join(",") },
+  });
   return unwrapPaged(res.data as ApiEnvelope<ActiveUserRow[]>);
 }
 

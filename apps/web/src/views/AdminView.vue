@@ -56,27 +56,10 @@
           </div>
 
           <!-- ========================= -->
-          <!-- TAB: PENDING -->
+          <!-- TAB: USERS -->
           <!-- ========================= -->
-          <div v-else-if="tab === 'pending'">
-            <PendingUsersTab
-              :loading-pending="loadingPending"
-              :saving-pending="savingPending"
-              :pending="pending"
-              :customers="customersActiveFirst"
-              :selected-pending="selectedPending"
-              :pending-customer-id="pendingCustomerId"
-              :pending-role="pendingRole"
-              :pending-grant-customer-workspaces="pendingGrantCustomerWorkspaces"
-              :pending-action-msg="pendingActionMsg"
-              :fmt-date="fmtDate"
-              @select-pending="selectedPending = $event"
-              @update:pending-customer-id="pendingCustomerId = $event"
-              @update:pending-role="pendingRole = $event"
-              @update:pending-grant-customer-workspaces="pendingGrantCustomerWorkspaces = $event"
-              @approve="approvePending"
-              @disable="disablePending"
-            />
+          <div v-else-if="tab === 'users'">
+            <UsersPanel ref="usersPanelRef" />
           </div>
 
           <!-- ========================= -->
@@ -86,17 +69,7 @@
             <RlsPanel ref="rlsPanelRef" :customers="customersActiveFirst" />
           </div>
 
-          <!-- ========================= -->
-          <!-- TAB: SECURITY -->
-          <!-- ========================= -->
-          <div v-else-if="tab === 'security'">
-            <SecurityPlatformAdminsPanel />
-          </div>
-
-          <!-- ========================= -->
-          <!-- TAB: ACTIVE USERS + PERMS -->
-          <!-- ========================= -->
-          <ActiveUsersPermsPanel v-else-if="tab === 'active'" />
+          
 
           <!-- ========================= -->
           <!-- TAB: AUDIT -->
@@ -123,33 +96,24 @@ import { useRouter } from "vue-router";
 import AdminSidebar, { type AdminTabKey } from "@/features/admin/components/AdminSidebar.vue";
 import AdminTopBar from "@/features/admin/components/AdminTopBar.vue";
 
-import PendingUsersTab from "@/features/admin/tabs/PendingUsersTab.vue";
 import AuditTab from "@/features/admin/tabs/AuditTab.vue";
 import OverviewPanel from "@/features/admin/OverviewPanel.vue";
-import ActiveUsersPermsPanel from "@/features/admin/panels/ActiveUsersPermsPanel.vue";
+import UsersPanel from "@/features/admin/UsersPanel.vue";
 
 import {
   type CustomerRow,
-  type PendingUserRow,
-  type MembershipRole,
   type AuditRow,
   listCustomers,
-  listPendingUsers,
-  activateUser,
-  disableUser,
   listAuditLogs,
 } from "@/features/admin/api";
 
 import CustomersPanel from "@/features/admin/CustomersPanel.vue";
-import SecurityPlatformAdminsPanel from "@/features/admin/SecurityPlatformAdminsPanel.vue";
 import RlsPanel from "@/features/admin/RlsPanel.vue";
 
-import { useConfirm } from "@/ui/confirm/useConfirm";
 import { useToast } from "@/ui/toast/useToast";
 import { normalizeApiError } from "@/ui/ops/normalizeApiError";
 
 const router = useRouter();
-const { confirm } = useConfirm();
 const { push } = useToast();
 
 // ------------------------------------
@@ -158,10 +122,8 @@ const { push } = useToast();
 const sidebarItems: Array<{ key: AdminTabKey; label: string }> = [
   { key: "overview", label: "Overview" },
   { key: "customers", label: "Customers" },
-  { key: "pending", label: "Pending users" },
+  { key: "users", label: "Users" },
   { key: "rls", label: "RLS" },
-  { key: "security", label: "Security" },
-  { key: "active", label: "Active users + perms" },
   { key: "audit", label: "Audit" },
 ];
 
@@ -195,10 +157,8 @@ const title = computed(() => {
   switch (tab.value) {
     case "overview": return "Overview";
     case "customers": return "Customers";
-    case "pending": return "Usuários pendentes";
+    case "users": return "Usuários";
     case "rls": return "RLS";
-    case "security": return "Security";
-    case "active": return "Usuários ativos + permissões";
     case "audit": return "Auditoria";
     default: return "Admin";
   }
@@ -215,6 +175,7 @@ function goBack() {
 // ------------------------------------
 const error = ref("");
 const rlsPanelRef = ref<{ refresh: () => Promise<void> | void } | null>(null);
+const usersPanelRef = ref<{ refresh: () => Promise<void> | void } | null>(null);
 
 // ---------- CUSTOMERS ----------
 const loadingCustomers = ref(false);
@@ -251,114 +212,6 @@ const customersActiveFirst = computed(() => {
   return arr;
 });
 
-// ---------- PENDING ----------
-const loadingPending = ref(false);
-const savingPending = ref(false);
-
-const pending = ref<PendingUserRow[]>([]);
-const selectedPending = ref<PendingUserRow | null>(null);
-
-const pendingCustomerId = ref<string>("");
-const pendingRole = ref<MembershipRole>("viewer");
-const pendingGrantCustomerWorkspaces = ref<boolean>(true);
-const pendingActionMsg = ref("");
-
-async function loadPending() {
-  loadingPending.value = true;
-  error.value = "";
-  try {
-    const [p, c] = await Promise.all([listPendingUsers(), listCustomers()]);
-    pending.value = p;
-    customers.value = c;
-
-    if (selectedPending.value && !pending.value.find((x) => x.id === selectedPending.value!.id)) {
-      selectedPending.value = null;
-      pendingCustomerId.value = "";
-    }
-  } catch (e: any) {
-    const ne = normalizeApiError(e);
-    error.value = ne.message;
-    push({
-      kind: "error",
-      title: "Falha ao carregar pendências",
-      message: ne.message,
-      details: ne.details,
-      timeoutMs: 9000,
-    });
-  } finally {
-    loadingPending.value = false;
-  }
-}
-
-async function approvePending() {
-  if (!selectedPending.value || !pendingCustomerId.value) return;
-
-  savingPending.value = true;
-  error.value = "";
-  pendingActionMsg.value = "";
-
-  try {
-    await activateUser(selectedPending.value.id, {
-      customerId: pendingCustomerId.value,
-      role: pendingRole.value,
-      grantCustomerWorkspaces: pendingGrantCustomerWorkspaces.value,
-    });
-
-    pendingActionMsg.value = "Usuário ativado com sucesso.";
-    push({ kind: "success", title: "Usuário ativado", message: selectedPending.value.email ?? selectedPending.value.id });
-
-    await loadPending();
-  } catch (e: any) {
-    const ne = normalizeApiError(e);
-    error.value = ne.message;
-    push({
-      kind: "error",
-      title: "Falha ao ativar usuário",
-      message: ne.message,
-      details: ne.details,
-      timeoutMs: 9000,
-    });
-  } finally {
-    savingPending.value = false;
-  }
-}
-
-async function disablePending() {
-  if (!selectedPending.value) return;
-
-  const ok = await confirm({
-    title: "Desativar usuário?",
-    message: "Você está prestes a desativar este usuário. Esta ação é destrutiva e pode afetar acessos existentes.",
-    confirmText: "Desativar",
-    cancelText: "Cancelar",
-    danger: true,
-  });
-  if (!ok) return;
-
-  savingPending.value = true;
-  error.value = "";
-  pendingActionMsg.value = "";
-
-  try {
-    await disableUser(selectedPending.value.id);
-    pendingActionMsg.value = "Usuário desativado.";
-    push({ kind: "success", title: "Usuário desativado", message: selectedPending.value.email ?? selectedPending.value.id });
-
-    await loadPending();
-  } catch (e: any) {
-    const ne = normalizeApiError(e);
-    error.value = ne.message;
-    push({
-      kind: "error",
-      title: "Falha ao desativar usuário",
-      message: ne.message,
-      details: ne.details,
-      timeoutMs: 9000,
-    });
-  } finally {
-    savingPending.value = false;
-  }
-}
 
 // ---------- AUDIT ----------
 const loadingAudit = ref(false);
@@ -415,16 +268,14 @@ async function loadAudit(page: number) {
 // “any loading” (TopBar)
 const loadingAny = computed(() =>
   loadingCustomers.value ||
-  loadingPending.value ||
-  savingPending.value ||
   loadingAudit.value
 );
 
 async function reloadCurrentTab() {
   error.value = "";
-  if (tab.value === "pending") return loadPending();
   if (tab.value === "customers") return loadCustomers();
   if (tab.value === "rls") return rlsPanelRef.value?.refresh?.();
+  if (tab.value === "users") return usersPanelRef.value?.refresh?.();
   if (tab.value === "audit") return loadAudit(auditPaged.value.page || 1);
 }
 
@@ -435,16 +286,12 @@ watch(tab, async (t) => {
     await loadCustomers();
   }
 
-  if (t === "pending" && pending.value.length === 0 && !loadingPending.value) {
-    await loadPending();
-  }
-
   if (t === "audit" && auditPaged.value.rows.length === 0 && !loadingAudit.value) {
     await loadAudit(1);
   }
 });
 
 onMounted(async () => {
-  await loadPending();
+  await loadCustomers();
 });
 </script>

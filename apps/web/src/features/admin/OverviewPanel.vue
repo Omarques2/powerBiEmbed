@@ -29,13 +29,13 @@
         type="button"
         class="rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm hover:bg-slate-50
                dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
-        @click="$emit('navigate', { key: 'pending' })"
+        @click="$emit('navigate', { key: 'users' })"
       >
         <div class="text-xs text-slate-600 dark:text-slate-300">Pendências</div>
         <div class="mt-1 text-2xl font-semibold text-slate-900 dark:text-slate-100">
           {{ overview?.counts.pendingUsers ?? "—" }}
         </div>
-        <div class="mt-1 text-xs text-slate-500 dark:text-slate-400">Usuários pending</div>
+        <div class="mt-1 text-xs text-slate-500 dark:text-slate-400">Usuários pendentes</div>
       </button>
 
       <button
@@ -55,9 +55,9 @@
         type="button"
         class="rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm hover:bg-slate-50
                dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
-        @click="$emit('navigate', { key: 'security' })"
+        @click="$emit('navigate', { key: 'users' })"
       >
-        <div class="text-xs text-slate-600 dark:text-slate-300">Segurança</div>
+        <div class="text-xs text-slate-600 dark:text-slate-300">Admins</div>
         <div class="mt-1 text-2xl font-semibold text-slate-900 dark:text-slate-100">
           {{ overview?.counts.platformAdmins ?? "—" }}
         </div>

@@ -52,8 +52,8 @@
           <tr>
             <th class="w-40 px-4 py-3">Code</th>
             <th class="px-4 py-3">Nome</th>
-            <th class="w-28 px-4 py-3">Status</th>
-            <th class="w-44 px-4 py-3 text-right"></th>
+            <th class="w-36 px-4 py-3">Status</th>
+            <th class="w-28 px-4 py-3 text-right"></th>
           </tr>
         </thead>
 
@@ -68,14 +68,13 @@
             </td>
 
             <td class="px-4 py-3">
-              <span
-                class="inline-flex items-center rounded-full border px-2 py-1 text-[11px]"
-                :class="c.status === 'active'
-                  ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/40 dark:text-emerald-200'
-                  : 'border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-200'"
-              >
-                {{ c.status }}
-              </span>
+              <PermSwitch
+                :model-value="c.status === 'active'"
+                :loading="busy.isBusy(c.id)"
+                on-label="Ativo"
+                off-label="Inativo"
+                @toggle="toggleStatus(c)"
+              />
             </td>
 
             <td class="px-4 py-3">
@@ -90,17 +89,6 @@
                   Editar
                 </button>
 
-                <button
-                  type="button"
-                  class="rounded-xl px-3 py-2 text-xs font-semibold disabled:opacity-60"
-                  :class="c.status === 'active'
-                    ? 'border border-rose-200 bg-rose-600 text-white hover:bg-rose-500 dark:border-rose-900/40 dark:bg-rose-700 dark:hover:bg-rose-600'
-                    : 'border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-900/40 dark:bg-emerald-950/40 dark:text-emerald-200'"
-                  :disabled="busy.isBusy(c.id)"
-                  @click="toggleStatus(c)"
-                >
-                  {{ busy.isBusy(c.id) ? "..." : (c.status === "active" ? "Desativar" : "Ativar") }}
-                </button>
               </div>
             </td>
           </tr>
@@ -363,7 +351,7 @@
                   {{ catalogError }}
                 </div>
 
-                <div v-if="loadingCatalog && !catalogWorkspaces.length" class="mt-3 space-y-3 animate-pulse">
+                <div v-if="showCatalogSkeleton" class="mt-3 space-y-3 animate-pulse">
                   <div class="h-16 rounded-xl border border-slate-200 bg-slate-100 dark:border-slate-800 dark:bg-slate-800"></div>
                   <div class="h-16 rounded-xl border border-slate-200 bg-slate-100 dark:border-slate-800 dark:bg-slate-800"></div>
                   <div class="h-16 rounded-xl border border-slate-200 bg-slate-100 dark:border-slate-800 dark:bg-slate-800"></div>
@@ -455,15 +443,18 @@
                     </div>
                   </details>
 
-                  <div v-if="!catalogWorkspaces.length" class="text-xs text-slate-500 dark:text-slate-400">
-                    Nenhum workspace no catalogo.
+                  <div v-if="!catalogWorkspaces.length && !showCatalogSkeleton" class="text-xs text-slate-500 dark:text-slate-400">
+                    Nenhum workspace encontrado no catalogo.
                   </div>
                 </div>
               </div>
             </div>
 
             <!-- TAB: PAGES -->
-            <div v-else class="max-h-[70vh] space-y-4 overflow-y-auto pr-1 pb-2 lg:max-h-none lg:overflow-visible lg:pr-0 lg:pb-0">
+            <div
+              v-else
+              class="min-h-0 max-h-[70vh] space-y-4 overflow-y-auto pr-1 pb-2 lg:max-h-none lg:overflow-visible lg:pr-0 lg:pb-0"
+            >
               <div class="rounded-2xl border border-slate-200 p-4 dark:border-slate-800">
                 <div class="flex flex-wrap items-start justify-between gap-3">
                   <div class="min-w-0">
@@ -601,12 +592,21 @@
 
                   <div class="space-y-3 lg:col-start-1 lg:row-start-2">
                     <div class="rounded-2xl border border-slate-200 p-3 dark:border-slate-800">
-                      <div class="flex items-center justify-between">
-                        <div class="text-xs font-semibold text-slate-900 dark:text-slate-100">Paginas</div>
-                        <div class="text-[11px] text-slate-500 dark:text-slate-400">
-                          {{ pageAccessPages.length }} paginas
+                        <div class="flex items-center justify-between gap-2">
+                          <div class="text-xs font-semibold text-slate-900 dark:text-slate-100">Paginas</div>
+                          <div class="flex items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400">
+                            <button
+                              type="button"
+                              class="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] hover:bg-slate-50
+                                     disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+                              :disabled="pagesLoading || hasActiveGroupAssignments || !pageAccessPages.length"
+                              @click="selectAllPages"
+                            >
+                              Selecionar todas
+                            </button>
+                            <span>{{ pageAccessPages.length }} paginas</span>
+                          </div>
                         </div>
-                      </div>
 
                       <div
                         v-if="hasActiveGroupAssignments"
@@ -1063,6 +1063,7 @@ const busyWorkspacePerm = useBusyMap();
 const busyReportPerm = useBusyMap();
 
 const catalogWorkspaces = computed(() => catalog.value?.workspaces ?? []);
+const showCatalogSkeleton = computed(() => (loadingCatalog.value || syncing.value) && !catalogWorkspaces.value.length);
 
 function cloneCatalog<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
@@ -1210,16 +1211,16 @@ const busyGroupAssign = useBusyMap();
 const selectedPageIds = ref(new Set<string>());
 const selectedGroupIds = ref(new Set<string>());
 
-const pageReportOptions = computed(() => {
-  return (catalog.value?.workspaces ?? []).flatMap((w) =>
-    (w.reports ?? [])
-      .filter((r) => r.isActive)
-      .map((r) => ({
-        reportRefId: r.reportRefId,
-        label: `${w.name} / ${r.name}`,
-      })),
-  );
-});
+  const pageReportOptions = computed(() => {
+    return (catalog.value?.workspaces ?? []).flatMap((w) =>
+      (w.reports ?? [])
+        .filter((r) => r.isActive && r.canView)
+        .map((r) => ({
+          reportRefId: r.reportRefId,
+          label: `${w.name} / ${r.name}`,
+        })),
+    );
+  });
 
 const hasActiveGroupAssignments = computed(() =>
   pageGroupsWithAccess.value.some((g) => g.assigned),
@@ -1378,8 +1379,30 @@ async function togglePageAllow(page: ReportPage & { canView?: boolean }) {
         p.id === page.id ? { ...p, canView: !!page.canView } : p,
       );
     },
-  });
-}
+    });
+  }
+
+  async function selectAllPages() {
+    if (!modalCustomer.value || hasActiveGroupAssignments.value) return;
+    const toEnable = pageAccessPages.value.filter((p) => !p.canView);
+    if (!toEnable.length) return;
+
+    pageAccessPages.value = pageAccessPages.value.map((p) => ({ ...p, canView: true }));
+    toEnable.forEach((p) => busyPageAllow.setBusy(p.id, true));
+
+    try {
+      await Promise.all(
+        toEnable.map((p) => setCustomerPageAllow(modalCustomer.value!.id, p.id, true)),
+      );
+      push({ kind: "success", title: "Paginas ativadas", message: "Todas as paginas foram liberadas." });
+    } catch (e: any) {
+      const ne = normalizeApiError(e);
+      push({ kind: "error", title: "Falha ao ativar paginas", message: ne.message, details: ne.details });
+      await loadPageConfig();
+    } finally {
+      toEnable.forEach((p) => busyPageAllow.clear(p.id));
+    }
+  }
 
 async function toggleGroupAssign(group: PageGroup & { assigned?: boolean }) {
   if (!modalCustomer.value) return;

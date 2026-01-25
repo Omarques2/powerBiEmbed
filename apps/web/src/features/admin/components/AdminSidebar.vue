@@ -90,10 +90,8 @@ import { computed } from "vue";
 
 export type AdminTabKey =
   | "overview"
-  | "pending"
-  | "active"
   | "customers"
-  | "security"
+  | "users"
   | "audit"
   | "rls";
 

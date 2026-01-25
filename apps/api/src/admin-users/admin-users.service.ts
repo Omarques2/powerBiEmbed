@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -98,9 +99,10 @@ export class AdminUsersService {
     userId: string,
     customerId: string,
     role: string,
-    grantCustomerWorkspaces = true,
+    _grantCustomerWorkspaces = true,
     actorSub: string | null = null,
   ) {
+    void _grantCustomerWorkspaces;
     if (!ALLOWED_ROLES.has(role as MembershipRole)) {
       throw new BadRequestException(`Invalid role: ${role}`);
     }
@@ -156,14 +158,10 @@ export class AdminUsersService {
         update: { role: membershipRole, isActive: true },
       });
 
-      let wsGranted = 0;
-      let rpGranted = 0;
+      const wsGranted = 0;
+      const rpGranted = 0;
 
-      if (grantCustomerWorkspaces) {
-        const granted = await this.grantCustomerCatalogAccessTx(tx, customerId);
-        wsGranted = granted.wsGranted;
-        rpGranted = granted.rpGranted;
-      }
+      // O acesso do usuário já é herdado do customer; não ativar o catálogo aqui.
 
       const after = {
         user: { id: userId, status: 'active' },
@@ -246,6 +244,22 @@ export class AdminUsersService {
       select: { id: true, status: true, email: true },
     });
     if (!user) throw new NotFoundException('User not found');
+
+    const isPlatformAdmin = await this.prisma.userAppRole.findFirst({
+      where: {
+        userId: userId,
+        customerId: null,
+        application: { appKey: 'PBI_EMBED' },
+        appRole: { roleKey: 'platform_admin' },
+      },
+      select: { id: true },
+    });
+    if (isPlatformAdmin) {
+      throw new ForbiddenException({
+        code: 'PLATFORM_ADMIN_IMMUTABLE',
+        message: 'Platform admin não pode ser desativado.',
+      });
+    }
 
     const actorUserId = await this.resolveActorUserId(actorSub);
 
@@ -396,10 +410,6 @@ export class AdminUsersService {
       throw new BadRequestException(`Invalid role: ${role}`);
 
     const isActive = asBool(input.isActive, true);
-    const grantCustomerWorkspaces = asBool(
-      input.grantCustomerWorkspaces,
-      false,
-    );
     const revokeCustomerPermissions = asBool(
       input.revokeCustomerPermissions,
       false,
@@ -441,7 +451,7 @@ export class AdminUsersService {
         select: { id: true, customerId: true, role: true, isActive: true }, // <-- inclui id
       });
 
-      let granted = { wsGranted: 0, rpGranted: 0 };
+      const granted = { wsGranted: 0, rpGranted: 0 };
       let revoked = { wsRevoked: 0, rpRevoked: 0 };
 
       // regra recomendada: se está desativando, revoga permissões do customer
@@ -450,9 +460,7 @@ export class AdminUsersService {
       }
 
       // se está ativando e pediu grant, aplica grant
-      if (isActive && grantCustomerWorkspaces) {
-        granted = await this.grantCustomerCatalogAccessTx(tx, customerId);
-      }
+      // O acesso do usuário é herdado do customer; não ativar o catálogo aqui.
 
       await tx.auditLog.create({
         data: {
@@ -521,10 +529,6 @@ export class AdminUsersService {
 
     const isActive =
       input.isActive === undefined ? undefined : asBool(input.isActive);
-    const grantCustomerWorkspaces = asBool(
-      input.grantCustomerWorkspaces,
-      false,
-    );
     const revokeCustomerPermissions = asBool(
       input.revokeCustomerPermissions,
       false,
@@ -556,15 +560,13 @@ export class AdminUsersService {
         select: { id: true, customerId: true, role: true, isActive: true }, // <-- inclui id
       });
 
-      let granted = { wsGranted: 0, rpGranted: 0 };
+      const granted = { wsGranted: 0, rpGranted: 0 };
       let revoked = { wsRevoked: 0, rpRevoked: 0 };
 
       if (!nextIsActive && revokeCustomerPermissions) {
         revoked = await this.revokeCustomerCatalogAccessTx(tx, customerId);
       }
-      if (nextIsActive && grantCustomerWorkspaces) {
-        granted = await this.grantCustomerCatalogAccessTx(tx, customerId);
-      }
+      // O acesso do usuário é herdado do customer; não ativar o catálogo aqui.
 
       await tx.auditLog.create({
         data: {
@@ -708,11 +710,12 @@ export class AdminUsersService {
       input.revokeFromCustomerPermissions,
       true,
     );
-    const grantToCustomerWorkspaces = asBool(
+    const _grantToCustomerWorkspaces = asBool(
       input.grantToCustomerWorkspaces,
       false,
     );
     const toIsActive = asBool(input.toIsActive, true);
+    void _grantToCustomerWorkspaces;
 
     // valida usuário + customers
     const { user: usr } = await this.assertUserAndCustomer(
@@ -762,10 +765,7 @@ export class AdminUsersService {
         select: { id: true, customerId: true, role: true, isActive: true }, // <-- inclui id
       });
 
-      const granted =
-        toIsActive && grantToCustomerWorkspaces
-          ? await this.grantCustomerCatalogAccessTx(tx, toCustomerId)
-          : { wsGranted: 0, rpGranted: 0 };
+      const granted = { wsGranted: 0, rpGranted: 0 };
 
       await tx.auditLog.create({
         data: {
@@ -1512,7 +1512,12 @@ export class AdminUsersService {
   // =========================
   // LISTAR USUÁRIOS ATIVOS (paginação + busca)
   // =========================
-  async listActiveUsers(input: { q?: string; page: number; pageSize: number }) {
+  async listActiveUsers(input: {
+    q?: string;
+    page: number;
+    pageSize: number;
+    customerIds?: string[];
+  }) {
     const page = Number.isFinite(input.page) && input.page > 0 ? input.page : 1;
     const pageSize = Math.max(
       1,
@@ -1527,6 +1532,16 @@ export class AdminUsersService {
         { email: { contains: q } }, // citext ajuda no case-insensitive
         { displayName: { contains: q, mode: 'insensitive' } },
       ];
+    }
+
+    if (input.customerIds?.length) {
+      where.memberships = {
+        some: {
+          customerId: { in: input.customerIds },
+          isActive: true,
+          customer: { status: 'active' },
+        },
+      };
     }
 
     const [total, rows] = await this.prisma.$transaction([
@@ -1547,7 +1562,26 @@ export class AdminUsersService {
       }),
     ]);
 
-    return { page, pageSize, total, rows };
+    if (!rows.length) return { page, pageSize, total, rows };
+
+    const platformAdmins = await this.prisma.userAppRole.findMany({
+      where: {
+        userId: { in: rows.map((row) => row.id) },
+        customerId: null,
+        application: { appKey: 'PBI_EMBED' },
+        appRole: { roleKey: 'platform_admin' },
+      },
+      select: { userId: true },
+    });
+
+    const platformAdminSet = new Set(platformAdmins.map((row) => row.userId));
+
+    const enrichedRows = rows.map((row) => ({
+      ...row,
+      isPlatformAdmin: platformAdminSet.has(row.id),
+    }));
+
+    return { page, pageSize, total, rows: enrichedRows };
   }
 
   // =========================
