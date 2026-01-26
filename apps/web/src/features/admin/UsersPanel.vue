@@ -1,7 +1,7 @@
 <!-- apps/web/src/features/admin/UsersPanel.vue -->
 <template>
   <PanelCard>
-    <PanelTabs v-model="activeTab" :tabs="tabs" />
+    <UiTabs v-model="activeTab" :tabs="tabs" />
 
     <UsersPendingTab
       v-if="activeTab === 'pending'"
@@ -42,125 +42,124 @@
 
   <!-- Activate modal -->
   <div v-if="activateModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-    <div class="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-xl dark:border-slate-800 dark:bg-slate-900">
+    <div class="w-full max-w-md rounded-2xl border border-border bg-card p-5 shadow-xl">
       <div class="flex items-start justify-between gap-3">
         <div>
-          <div class="text-sm font-semibold text-slate-900 dark:text-slate-100">Ativar usuário</div>
-          <div class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+          <div class="text-sm font-semibold text-foreground">Ativar usuário</div>
+          <div class="mt-1 text-xs text-muted-foreground">
             Selecione o customer e o papel de acesso.
           </div>
         </div>
-        <button
+        <UiButton
           type="button"
-          class="rounded-lg border border-slate-200 px-2 py-1 text-xs dark:border-slate-800"
+          variant="outline"
+          size="sm"
+          class="h-8 px-3 text-xs"
           :disabled="pendingSaving"
           @click="closeActivateModal"
         >
           Fechar
-        </button>
+        </UiButton>
       </div>
 
       <div class="mt-4 space-y-3">
         <div>
-          <label class="text-xs font-medium text-slate-700 dark:text-slate-300">Customer</label>
-          <select
-            v-model="activateCustomerId"
-            class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
-                   dark:border-slate-800 dark:bg-slate-950"
-          >
+          <label class="text-xs font-medium text-muted-foreground">Customer</label>
+          <UiSelect v-model="activateCustomerId" class="mt-1 w-full">
             <option value="">-- selecione --</option>
             <option v-for="c in customers" :key="c.id" :value="c.id">
               {{ c.name }} ({{ c.code }})
             </option>
-          </select>
+          </UiSelect>
         </div>
 
         <div>
-          <label class="text-xs font-medium text-slate-700 dark:text-slate-300">Role</label>
-          <select
-            v-model="activateRole"
-            class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
-                   dark:border-slate-800 dark:bg-slate-950"
-          >
+          <label class="text-xs font-medium text-muted-foreground">Role</label>
+          <UiSelect v-model="activateRole" class="mt-1 w-full">
             <option value="viewer">viewer</option>
             <option value="member">member</option>
             <option value="admin">admin</option>
             <option value="owner">owner</option>
-          </select>
+          </UiSelect>
         </div>
 
-        <div v-if="pendingActionMsg" class="text-xs text-slate-500 dark:text-slate-400">
+        <div v-if="pendingActionMsg" class="text-xs text-muted-foreground">
           {{ pendingActionMsg }}
         </div>
       </div>
 
       <div class="mt-5 flex items-center justify-end gap-2">
-        <button
+        <UiButton
           type="button"
-          class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm hover:bg-slate-50
-                 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+          variant="outline"
+          size="md"
+          class="h-9 px-3 text-sm"
           :disabled="pendingSaving"
           @click="closeActivateModal"
         >
           Cancelar
-        </button>
-        <button
+        </UiButton>
+        <UiButton
           type="button"
-          class="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500
-                 disabled:opacity-60"
+          variant="default"
+          size="md"
+          class="h-9 px-4 text-sm"
+          :class="'bg-emerald-600 hover:bg-emerald-500 text-white'"
           :disabled="pendingSaving || !activateCustomerId"
           @click="approvePending"
         >
           {{ pendingSaving ? "Salvando..." : "Ativar" }}
-        </button>
+        </UiButton>
       </div>
     </div>
   </div>
 
   <!-- User modal -->
   <div v-if="userModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-    <div class="max-h-[92vh] w-full max-w-5xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-900">
-      <div class="flex items-start justify-between gap-3 border-b border-slate-200 p-4 dark:border-slate-800">
+    <div class="max-h-[92vh] w-full max-w-5xl overflow-hidden rounded-2xl border border-border bg-card shadow-xl">
+      <div class="flex items-start justify-between gap-3 border-b border-border p-4">
         <div class="min-w-0">
-          <div class="text-sm font-semibold text-slate-900 dark:text-slate-100">Usuário</div>
-          <div class="mt-1 truncate text-xs font-medium text-slate-700 dark:text-slate-200">
+          <div class="text-sm font-semibold text-foreground">Usuário</div>
+          <div class="mt-1 truncate text-xs font-medium text-foreground">
             {{ userModalUser?.display_name ?? "—" }}
           </div>
-          <div class="truncate text-xs text-slate-500 dark:text-slate-400">
+          <div class="truncate text-xs text-muted-foreground">
             {{ userModalUser?.email ?? "sem email" }}
           </div>
         </div>
         <div class="flex items-center gap-2">
-          <button
+          <UiButton
             type="button"
-            class="rounded-lg border border-slate-200 bg-white px-3 py-1 text-xs hover:bg-slate-50
-                   disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+            variant="outline"
+            size="sm"
+            class="h-8 px-3 text-xs"
             :disabled="!userModalUser || !userModalCustomerId"
             @click="openUserPreview"
           >
             Preview
-          </button>
-          <button
+          </UiButton>
+          <UiButton
             type="button"
-            class="rounded-lg border border-slate-200 px-2 py-1 text-xs dark:border-slate-800"
+            variant="outline"
+            size="sm"
+            class="h-8 px-3 text-xs"
             @click="closeUserModal"
           >
             Fechar
-          </button>
+          </UiButton>
         </div>
       </div>
 
       <div class="max-h-[calc(92vh-92px)] overflow-y-auto">
         <div class="space-y-4 p-4">
-          <div class="rounded-2xl border border-slate-200 p-4 text-sm dark:border-slate-800">
-            <div class="text-xs font-semibold text-slate-700 dark:text-slate-300">Contexto do customer</div>
+          <div class="rounded-2xl border border-border p-4 text-sm">
+            <div class="text-xs font-semibold text-muted-foreground">Contexto do customer</div>
             <div class="mt-3 flex flex-wrap items-end gap-2">
               <div class="min-w-[220px] flex-1">
-                <label class="text-xs font-medium text-slate-700 dark:text-slate-300">Customer</label>
-                <select
+                <label class="text-xs font-medium text-muted-foreground">Customer</label>
+                <UiSelect
                   v-model="userModalCustomerId"
-                  class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
-                         dark:border-slate-800 dark:bg-slate-950"
+                  class="mt-1 w-full"
                   @change="loadUserPerms"
                 >
                   <option
@@ -170,19 +169,20 @@
                   >
                     {{ m.customer?.name ?? m.customerId }} ({{ m.customer?.code ?? "" }})
                   </option>
-                </select>
+                </UiSelect>
               </div>
-              <button
+              <UiButton
                 type="button"
-                class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs hover:bg-slate-50
-                       dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+                variant="outline"
+                size="sm"
+                class="h-9 px-3 text-xs"
                 @click="membershipModalOpen = true"
               >
                 + Customer
-              </button>
+              </UiButton>
             </div>
 
-            <div class="mt-3 text-xs text-slate-500 dark:text-slate-400">
+            <div class="mt-3 text-xs text-muted-foreground">
               O usuário só pode acessar o que o customer permite.
             </div>
           </div>
@@ -227,15 +227,16 @@
             <div class="min-h-0 rounded-2xl border border-slate-200 p-4 dark:border-slate-800">
               <div class="flex items-center justify-between gap-2">
                 <div class="text-sm font-semibold text-slate-900 dark:text-slate-100">Workspaces e reports</div>
-                <button
+                <UiButton
                   type="button"
-                  class="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] hover:bg-slate-50
-                         dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+                  variant="outline"
+                  size="sm"
+                  class="h-7 px-2 text-[11px]"
                   :disabled="userPermsLoading"
                   @click="loadUserPerms"
                 >
                   {{ userPermsLoading ? "..." : "Recarregar" }}
-                </button>
+                </UiButton>
               </div>
 
               <div v-if="!visibleWorkspaces.length" class="mt-3 text-xs text-slate-500 dark:text-slate-400">
@@ -296,29 +297,26 @@
             <div class="min-h-0 rounded-2xl border border-slate-200 p-4 text-xs dark:border-slate-800">
               <div class="flex items-center justify-between gap-2">
                 <div class="font-semibold text-slate-900 dark:text-slate-100">Páginas por report</div>
-                <button
+                <UiButton
                   type="button"
-                  class="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] hover:bg-slate-50
-                         dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+                  variant="outline"
+                  size="sm"
+                  class="h-7 px-2 text-[11px]"
                   :disabled="!pageReportRefId || pageAccessLoading"
                   @click="loadUserPageAccess"
                 >
                   {{ pageAccessLoading ? "..." : "Atualizar" }}
-                </button>
+                </UiButton>
               </div>
 
               <div class="mt-2">
                 <label class="text-[11px] font-medium text-slate-700 dark:text-slate-300">Report</label>
-                <select
-                  v-model="pageReportRefId"
-                  class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
-                         dark:border-slate-800 dark:bg-slate-950"
-                >
+                <UiSelect v-model="pageReportRefId" class="mt-1 w-full">
                   <option value="">-- selecione --</option>
                   <option v-for="opt in userReportOptions" :key="opt.reportRefId" :value="opt.reportRefId">
                     {{ opt.label }}
                   </option>
-                </select>
+                </UiSelect>
               </div>
 
               <div v-if="pageAccessError" class="mt-2 text-[11px] text-rose-600 dark:text-rose-300">
@@ -372,15 +370,16 @@
                 <div>
                     <div class="flex items-center justify-between gap-2">
                       <div class="text-[11px] font-semibold text-slate-700 dark:text-slate-300">Páginas permitidas</div>
-                      <button
+                      <UiButton
                         type="button"
-                        class="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] hover:bg-slate-50
-                               disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+                        variant="outline"
+                        size="sm"
+                        class="h-7 px-2 text-[11px]"
                         :disabled="pageAccessLoading || !pageAccess.pages.length"
                         @click="selectAllUserPages"
                       >
                         Selecionar todas
-                      </button>
+                      </UiButton>
                     </div>
                   <div class="mt-2 space-y-2">
                     <div
@@ -426,27 +425,25 @@
             Simulacao das paginas permitidas para {{ userModalUser?.email ?? "usuário" }}.
           </div>
         </div>
-        <button
+        <UiButton
           type="button"
-          class="rounded-lg border border-slate-200 px-2 py-1 text-xs dark:border-slate-800"
+          variant="outline"
+          size="sm"
+          class="h-8 px-3 text-xs"
           @click="closeUserPreview"
         >
           Fechar
-        </button>
+        </UiButton>
       </div>
 
       <div class="mt-3">
         <label class="text-xs font-medium text-slate-700 dark:text-slate-300">Report</label>
-        <select
-          v-model="userPreviewReportRefId"
-          class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
-                 dark:border-slate-800 dark:bg-slate-950"
-        >
+        <UiSelect v-model="userPreviewReportRefId" class="mt-1 w-full">
           <option value="">-- selecione --</option>
           <option v-for="opt in userPreviewReportOptions" :key="opt.reportRefId" :value="opt.reportRefId">
             {{ opt.label }}
           </option>
-        </select>
+        </UiSelect>
       </div>
 
       <div
@@ -522,21 +519,23 @@
 
   <!-- Membership modal -->
   <div v-if="membershipModalOpen" class="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4">
-      <div class="max-h-[90vh] w-full max-w-4xl overflow-auto rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-800 dark:bg-slate-900">
+    <div class="max-h-[90vh] w-full max-w-4xl overflow-auto rounded-2xl border border-border bg-card p-4 shadow-xl">
       <div class="flex items-start justify-between gap-3">
         <div>
-          <div class="text-sm font-semibold text-slate-900 dark:text-slate-100">Memberships</div>
-          <div class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+          <div class="text-sm font-semibold text-foreground">Memberships</div>
+          <div class="mt-1 text-xs text-muted-foreground">
             Gerencie customers vinculados ao usuário.
           </div>
         </div>
-        <button
+        <UiButton
           type="button"
-          class="rounded-lg border border-slate-200 px-2 py-1 text-xs dark:border-slate-800"
+          variant="outline"
+          size="sm"
+          class="h-8 px-3 text-xs"
           @click="membershipModalOpen = false"
         >
           Fechar
-        </button>
+        </UiButton>
       </div>
 
       <div class="mt-3">
@@ -558,7 +557,11 @@ import SecurityPlatformAdminsPanel from "@/features/admin/SecurityPlatformAdmins
 import UsersActiveTab from "@/features/admin/users/UsersActiveTab.vue";
 import UsersPendingTab from "@/features/admin/users/UsersPendingTab.vue";
 import PanelCard from "@/ui/PanelCard.vue";
-import PanelTabs from "@/ui/PanelTabs.vue";
+import {
+  Button as UiButton,
+  Select as UiSelect,
+  Tabs as UiTabs,
+} from "@/components/ui";
 import { useToast } from "@/ui/toast/useToast";
 import { useConfirm } from "@/ui/confirm/useConfirm";
 import { normalizeApiError } from "@/ui/ops";

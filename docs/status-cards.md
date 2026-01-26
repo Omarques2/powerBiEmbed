@@ -33,7 +33,7 @@ Legenda:
 - [x] Milestone 1: Infra + tokens (Tailwind v4 + @theme inline + cn/CVA)
 - [x] Milestone 2: Componentes base (Button/Input/Select/Tabs/Dialog/Sheet/Toast/Skeleton/Card)
 - [x] Milestone 3: Layout e shell (Home/Shell/Admin/Sidebar/Topbar)
-- [ ] Milestone 4: Admin core (Customers/Users/Rls/Overview/Security)
+- [x] Milestone 4: Admin core (Customers/Users/Rls/Overview/Security)
 - [ ] Milestone 5: Auth + Pending + Callback + modais globais
 - [ ] Milestone 6: Power BI embeds e previews
 - [ ] Milestone 7: QA final (lint/test/build + regressao visual)

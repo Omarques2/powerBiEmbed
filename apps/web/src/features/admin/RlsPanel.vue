@@ -24,24 +24,24 @@
               Defina a coluna base que sera usada no filtro RLS.
             </div>
           </div>
-          <button
+          <UiButton
             type="button"
-            class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs hover:bg-slate-50
-                   disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+            variant="outline"
+            size="sm"
+            class="h-8 px-3 text-xs"
             :disabled="savingTarget"
             @click="closeTargetModal"
           >
             Fechar
-          </button>
+          </UiButton>
         </div>
 
         <div class="mt-4 grid grid-cols-1 gap-3">
           <div>
             <label class="text-xs font-medium text-slate-700 dark:text-slate-300">Display name</label>
-            <input
+            <UiInput
               v-model="targetForm.displayName"
-              class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
-                     dark:border-slate-800 dark:bg-slate-900"
+              class="mt-1 w-full"
               :disabled="savingTarget"
               placeholder="ex: Instituicao Financeira"
               @blur="fillTargetKeyFromName"
@@ -50,10 +50,9 @@
 
           <div>
             <label class="text-xs font-medium text-slate-700 dark:text-slate-300">target_key</label>
-            <input
+            <UiInput
               v-model="targetForm.targetKey"
-              class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
-                     dark:border-slate-800 dark:bg-slate-900"
+              class="mt-1 w-full"
               :disabled="savingTarget"
               placeholder="ex: instituicao_financeira"
             />
@@ -62,20 +61,18 @@
           <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label class="text-xs font-medium text-slate-700 dark:text-slate-300">Fact table</label>
-              <input
+              <UiInput
                 v-model="targetForm.factTable"
-                class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
-                       dark:border-slate-800 dark:bg-slate-900"
+                class="mt-1 w-full"
                 :disabled="savingTarget"
                 placeholder="ex: LoteFormacao_2"
               />
             </div>
             <div>
               <label class="text-xs font-medium text-slate-700 dark:text-slate-300">Fact column</label>
-              <input
+              <UiInput
                 v-model="targetForm.factColumn"
-                class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
-                       dark:border-slate-800 dark:bg-slate-900"
+                class="mt-1 w-full"
                 :disabled="savingTarget"
                 placeholder="ex: Instituicao Financeira"
               />
@@ -85,66 +82,65 @@
           <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div>
               <label class="text-xs font-medium text-slate-700 dark:text-slate-300">Value type</label>
-              <select
+              <UiSelect
                 v-model="targetForm.valueType"
-                class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
-                       dark:border-slate-800 dark:bg-slate-900"
+                class="mt-1 w-full"
                 :disabled="savingTarget"
               >
                 <option value="text">text</option>
                 <option value="int">int</option>
                 <option value="uuid">uuid</option>
-              </select>
+              </UiSelect>
             </div>
 
             <div>
               <label class="text-xs font-medium text-slate-700 dark:text-slate-300">Default behavior</label>
-              <select
+              <UiSelect
                 v-model="targetForm.defaultBehavior"
-                class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
-                       dark:border-slate-800 dark:bg-slate-900"
+                class="mt-1 w-full"
                 :disabled="savingTarget"
               >
                 <option value="allow">allow</option>
                 <option value="deny">deny</option>
-              </select>
+              </UiSelect>
             </div>
 
             <div>
               <label class="text-xs font-medium text-slate-700 dark:text-slate-300">Status</label>
-              <select
+              <UiSelect
                 v-model="targetForm.status"
-                class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
-                       dark:border-slate-800 dark:bg-slate-900"
+                class="mt-1 w-full"
                 :disabled="savingTarget"
               >
                 <option value="draft">draft</option>
                 <option value="active">active</option>
-              </select>
+              </UiSelect>
             </div>
           </div>
         </div>
 
         <div class="mt-4 flex items-center justify-end gap-2">
-          <button
+          <UiButton
             type="button"
-            class="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm hover:bg-slate-50
-                   disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+            variant="outline"
+            size="md"
+            class="h-9 px-4 text-sm"
             :disabled="savingTarget"
             @click="closeTargetModal"
           >
             Cancelar
-          </button>
+          </UiButton>
 
-          <button
+          <UiButton
             type="button"
-            class="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800
-                   disabled:opacity-60 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
+            variant="default"
+            size="md"
+            class="h-9 px-4 text-sm"
             :disabled="savingTarget || !canSaveTarget"
             @click="saveTarget"
           >
             {{ savingTarget ? "Salvando..." : "Salvar" }}
-          </button>
+          </UiButton>
         </div>
       </div>
     </div>
@@ -161,96 +157,91 @@
               Informe o escopo e os valores permitidos/negados.
             </div>
           </div>
-          <button
+          <UiButton
             type="button"
-            class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs hover:bg-slate-50
-                   disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+            variant="outline"
+            size="sm"
+            class="h-8 px-3 text-xs"
             :disabled="ruleModalSaving"
             @click="closeRuleModal"
           >
             Fechar
-          </button>
+          </UiButton>
         </div>
 
         <div class="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-4">
           <div>
             <label class="text-xs font-medium text-slate-700 dark:text-slate-300">Target</label>
-            <select
+            <UiSelect
               v-model="ruleForm.targetId"
-              class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
-                     dark:border-slate-800 dark:bg-slate-900"
+              class="mt-1 w-full"
             >
               <option value="">-- selecione --</option>
               <option v-for="t in targets" :key="t.id" :value="t.id">
                 {{ t.displayName }} ({{ t.targetKey }})
               </option>
-            </select>
-            <div class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+            </UiSelect>
+            <div class="mt-1 text-[11px] text-muted-foreground">
               value_type: {{ ruleFormTarget?.valueType || "-" }}
             </div>
           </div>
 
           <div>
             <label class="text-xs font-medium text-slate-700 dark:text-slate-300">Escopo</label>
-            <select
+            <UiSelect
               v-model="ruleForm.scope"
-              class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
-                     dark:border-slate-800 dark:bg-slate-900"
+              class="mt-1 w-full"
             >
               <option value="customer">Customer</option>
               <option value="user">Usuario</option>
-            </select>
+            </UiSelect>
           </div>
 
           <div>
             <label class="text-xs font-medium text-slate-700 dark:text-slate-300">Entidade</label>
-            <select
+            <UiSelect
               v-if="ruleForm.scope === 'customer'"
               v-model="ruleForm.customerId"
-              class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
-                     dark:border-slate-800 dark:bg-slate-900"
+              class="mt-1 w-full"
             >
               <option value="">-- selecione --</option>
               <option v-for="c in customers" :key="c.id" :value="c.id">
                 {{ c.code }} - {{ c.name }}
               </option>
-            </select>
-            <select
+            </UiSelect>
+            <UiSelect
               v-else
               v-model="ruleForm.userId"
-              class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
-                     dark:border-slate-800 dark:bg-slate-900"
+              class="mt-1 w-full"
             >
               <option value="">-- selecione --</option>
               <option v-for="u in activeUsers" :key="u.id" :value="u.id">
                 {{ u.display_name || u.email || u.id }}
               </option>
-            </select>
+            </UiSelect>
           </div>
 
           <div>
             <label class="text-xs font-medium text-slate-700 dark:text-slate-300">Operacao</label>
-            <select
+            <UiSelect
               v-model="ruleForm.op"
-              class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
-                     dark:border-slate-800 dark:bg-slate-900"
+              class="mt-1 w-full"
             >
               <option value="include">include</option>
               <option value="exclude">exclude</option>
-            </select>
+            </UiSelect>
           </div>
         </div>
 
         <div class="mt-3">
           <label class="text-xs font-medium text-slate-700 dark:text-slate-300">Valores</label>
-          <textarea
+          <UiTextarea
             v-model="ruleForm.values"
-            rows="3"
-            class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
-                   dark:border-slate-800 dark:bg-slate-900"
+            :rows="3"
+            class="mt-1 w-full"
             :placeholder="ruleValuesPlaceholder"
           />
-          <div class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+          <div class="mt-1 text-[11px] text-muted-foreground">
             Separe por virgula, ponto e virgula ou quebra de linha.
           </div>
         </div>
@@ -264,30 +255,32 @@
         </div>
 
         <div class="mt-4 flex items-center justify-end gap-2">
-          <button
+          <UiButton
             type="button"
-            class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs hover:bg-slate-50
-                   disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+            variant="outline"
+            size="sm"
+            class="h-8 px-3 text-xs"
             :disabled="ruleModalSaving"
             @click="closeRuleModal"
           >
             Cancelar
-          </button>
-          <button
+          </UiButton>
+          <UiButton
             type="button"
-            class="rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800
-                   disabled:opacity-60 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
+            variant="default"
+            size="sm"
+            class="h-8 px-3 text-xs"
             :disabled="ruleModalSaving || !canSaveRule"
             @click="saveRuleModal"
           >
             {{ ruleModalSaving ? "Salvando..." : "Salvar regra" }}
-          </button>
+          </UiButton>
         </div>
       </div>
     </div>
 
     <PanelCard>
-      <PanelTabs v-model="activeTab" :tabs="tabs" />
+    <UiTabs v-model="activeTab" :tabs="tabs" />
 
       <div class="mt-4">
         <!-- TAB: TARGETS -->
@@ -309,15 +302,16 @@
                 </div>
               </div>
 
-              <button
+              <UiButton
                 type="button"
-                class="rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800
-                       disabled:opacity-60 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
+                variant="default"
+                size="sm"
+                class="h-8 px-3 text-xs"
                 :disabled="!datasetId"
                 @click="openTargetCreate"
               >
                 + Novo target
-              </button>
+              </UiButton>
             </div>
 
             <div
@@ -377,24 +371,26 @@
                       </td>
                       <td class="px-4 py-3">
                         <div class="flex items-center justify-end gap-2">
-                          <button
+                          <UiButton
                             type="button"
-                            class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs hover:bg-slate-50
-                                   disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+                            variant="outline"
+                            size="sm"
+                            class="h-8 px-3 text-xs"
                             :disabled="targetBusy.isBusy(t.id)"
                             @click="openTargetEdit(t)"
                           >
                             Editar
-                          </button>
-                          <button
+                          </UiButton>
+                          <UiButton
                             type="button"
-                            class="rounded-xl border border-rose-200 bg-rose-600 px-3 py-2 text-xs font-semibold text-white hover:bg-rose-500
-                                   disabled:opacity-60 dark:border-rose-900/40 dark:bg-rose-700 dark:hover:bg-rose-600"
+                            variant="destructive"
+                            size="sm"
+                            class="h-8 px-3 text-xs"
                             :disabled="targetBusy.isBusy(t.id)"
                             @click="removeTarget(t)"
                           >
                             {{ targetBusy.isBusy(t.id) ? "..." : "Excluir" }}
-                          </button>
+                          </UiButton>
                         </div>
                       </td>
                     </tr>
@@ -433,72 +429,63 @@
             <div class="grid grid-cols-1 gap-3 lg:grid-cols-4">
               <div>
                 <label class="text-xs font-medium text-slate-700 dark:text-slate-300">Target</label>
-                <select
-                  v-model="selectedTargetId"
-                  class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
-                         dark:border-slate-800 dark:bg-slate-900"
-                >
+                <UiSelect v-model="selectedTargetId" class="mt-1 w-full">
                   <option v-for="t in targets" :key="t.id" :value="t.id">
                     {{ t.displayName }} ({{ t.targetKey }})
                   </option>
-                </select>
-                <div class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                </UiSelect>
+                <div class="mt-1 text-[11px] text-muted-foreground">
                   value_type: {{ selectedTarget?.valueType || "-" }}
                 </div>
               </div>
 
               <div>
                 <label class="text-xs font-medium text-slate-700 dark:text-slate-300">Filtro</label>
-                <select
-                  v-model="rulesFilterScope"
-                  class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
-                         dark:border-slate-800 dark:bg-slate-900"
-                >
+                <UiSelect v-model="rulesFilterScope" class="mt-1 w-full">
                   <option value="all">-- todos --</option>
                   <option value="customer">Customer</option>
                   <option value="user">Usuario</option>
-                </select>
+                </UiSelect>
               </div>
 
               <div>
                 <label class="text-xs font-medium text-slate-700 dark:text-slate-300">Entidade</label>
-                <select
+                <UiSelect
                   v-if="rulesFilterScope === 'customer'"
                   v-model="rulesFilterCustomerId"
-                  class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
-                         dark:border-slate-800 dark:bg-slate-900"
+                  class="mt-1 w-full"
                 >
                   <option value="">-- todas --</option>
                   <option v-for="c in customers" :key="c.id" :value="c.id">
                     {{ c.code }} - {{ c.name }}
                   </option>
-                </select>
-                <select
+                </UiSelect>
+                <UiSelect
                   v-else-if="rulesFilterScope === 'user'"
                   v-model="rulesFilterUserId"
-                  class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
-                         dark:border-slate-800 dark:bg-slate-900"
+                  class="mt-1 w-full"
                 >
                   <option value="">-- todos --</option>
                   <option v-for="u in activeUsers" :key="u.id" :value="u.id">
                     {{ u.display_name || u.email || u.id }}
                   </option>
-                </select>
-                <div v-else class="mt-3 text-[11px] text-slate-500 dark:text-slate-400">
+                </UiSelect>
+                <div v-else class="mt-3 text-[11px] text-muted-foreground">
                   Selecione um filtro.
                 </div>
               </div>
 
               <div class="flex items-end justify-end">
-                <button
+                <UiButton
                   type="button"
-                  class="rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800
-                         disabled:opacity-60 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
+                  variant="default"
+                  size="sm"
+                  class="h-8 px-3 text-xs"
                   :disabled="ruleModalSaving"
                   @click="openRuleCreate"
                 >
                   + Nova regra
-                </button>
+                </UiButton>
               </div>
             </div>
             <div v-if="rulesError" class="mt-3 text-xs text-rose-600 dark:text-rose-300">
@@ -552,15 +539,16 @@
                     </td>
                     <td class="px-4 py-3">
                       <div class="flex items-center justify-end">
-                        <button
+                        <UiButton
                           type="button"
-                          class="rounded-xl border border-rose-200 bg-rose-600 px-3 py-2 text-xs font-semibold text-white hover:bg-rose-500
-                                 disabled:opacity-60 dark:border-rose-900/40 dark:bg-rose-700 dark:hover:bg-rose-600"
+                          variant="destructive"
+                          size="sm"
+                          class="h-8 px-3 text-xs"
                           :disabled="ruleBusy.isBusy(r.id)"
                           @click="removeRule(r)"
                         >
                           {{ ruleBusy.isBusy(r.id) ? "..." : "Excluir" }}
-                        </button>
+                        </UiButton>
                       </div>
                     </td>
                   </tr>
@@ -667,15 +655,16 @@
                     Exporta targets e regras para auditoria (JSON/CSV).
                   </div>
                 </div>
-                <button
+                <UiButton
                   type="button"
-                  class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs hover:bg-slate-50
-                         disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+                  variant="outline"
+                  size="sm"
+                  class="h-8 px-3 text-xs"
                   :disabled="snapshotLoading"
                   @click="loadSnapshot"
                 >
                   {{ snapshotLoading ? "Gerando..." : "Gerar snapshot" }}
-                </button>
+                </UiButton>
               </div>
 
               <div v-if="snapshotError" class="mt-2 text-xs text-rose-600 dark:text-rose-300">
@@ -701,24 +690,26 @@
             <div class="rounded-xl border border-slate-200 p-3 dark:border-slate-800">
               <div class="text-xs font-semibold text-slate-900 dark:text-slate-100">Exportar</div>
               <div class="mt-2 flex flex-wrap gap-2">
-                <button
+                <UiButton
                   type="button"
-                  class="rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800
-                         disabled:opacity-60 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
+                  variant="default"
+                  size="sm"
+                  class="h-8 px-3 text-xs"
                   :disabled="snapshotExporting !== ''"
                   @click="exportSnapshot('json')"
                 >
                   {{ snapshotExporting === "json" ? "Exportando..." : "Exportar JSON" }}
-                </button>
-                <button
+                </UiButton>
+                <UiButton
                   type="button"
-                  class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs hover:bg-slate-50
-                         disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+                  variant="outline"
+                  size="sm"
+                  class="h-8 px-3 text-xs"
                   :disabled="snapshotExporting !== ''"
                   @click="exportSnapshot('csv')"
                 >
                   {{ snapshotExporting === "csv" ? "Exportando..." : "Exportar CSV" }}
-                </button>
+                </UiButton>
               </div>
             </div>
           </div>
@@ -741,14 +732,15 @@
             </div>
           </div>
 
-          <button
+          <UiButton
             type="button"
-            class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs hover:bg-slate-50
-                   dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+            variant="outline"
+            size="sm"
+            class="h-8 px-3 text-xs"
             @click="closeGuide"
           >
             Fechar
-          </button>
+          </UiButton>
         </div>
 
         <div class="border-b border-slate-200 px-4 py-3 dark:border-slate-800">
@@ -800,14 +792,15 @@
             <div v-if="currentGuideStep.showDax && guideTarget" class="mt-4">
               <div class="flex items-center justify-between">
                 <div class="text-[11px] font-semibold text-slate-700 dark:text-slate-200">DAX da role</div>
-                <button
+                <UiButton
                   type="button"
-                  class="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] hover:bg-slate-50
-                         dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+                  variant="outline"
+                  size="sm"
+                  class="h-7 px-2 text-[11px]"
                   @click="copyGuideDax"
                 >
                   Copiar DAX
-                </button>
+                </UiButton>
               </div>
               <pre class="mt-2 whitespace-pre-wrap rounded-lg border border-slate-200 bg-white p-2 text-[11px] text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200">{{ daxForTarget(guideTarget) }}</pre>
             </div>
@@ -827,24 +820,26 @@
             {{ currentGuideStep?.title || "" }}
           </div>
           <div class="flex items-center gap-2">
-            <button
+            <UiButton
               type="button"
-              class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs hover:bg-slate-50
-                     disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+              variant="outline"
+              size="sm"
+              class="h-8 px-3 text-xs"
               :disabled="guideStepIndex === 0"
               @click="guideStepIndex = Math.max(guideStepIndex - 1, 0)"
             >
               Anterior
-            </button>
-            <button
+            </UiButton>
+            <UiButton
               type="button"
-              class="rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800
-                     disabled:opacity-60 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
+              variant="default"
+              size="sm"
+              class="h-8 px-3 text-xs"
               :disabled="guideSteps.length === 0"
               @click="nextGuideStep"
             >
               {{ guideStepIndex >= guideSteps.length - 1 ? "Concluir" : "Proximo" }}
-            </button>
+            </UiButton>
           </div>
         </div>
       </div>
@@ -880,12 +875,18 @@ import {
   updateRlsTarget,
 } from "@/features/admin/api/rls";
 import PanelCard from "@/ui/PanelCard.vue";
-import PanelTabs from "@/ui/PanelTabs.vue";
 import RlsDatasetCard from "@/features/admin/rls/RlsDatasetCard.vue";
 import { useConfirm } from "@/ui/confirm/useConfirm";
 import { useBusyMap } from "@/ui/ops/useBusyMap";
 import { normalizeApiError } from "@/ui/ops/normalizeApiError";
 import { useToast } from "@/ui/toast/useToast";
+import {
+  Button as UiButton,
+  Input as UiInput,
+  Select as UiSelect,
+  Tabs as UiTabs,
+  Textarea as UiTextarea,
+} from "@/components/ui";
 
 const props = defineProps<{
   customers: CustomerRow[];

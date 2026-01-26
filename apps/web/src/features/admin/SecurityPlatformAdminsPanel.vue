@@ -9,27 +9,27 @@
       </div>
     </div>
 
-    <div class="min-w-0 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-      <div class="text-sm font-semibold text-slate-900 dark:text-slate-100">Platform Admins</div>
+    <div class="min-w-0 flex flex-col gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm">
+      <div class="text-sm font-semibold text-foreground">Platform Admins</div>
 
       <!-- Add -->
       <div class="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]">
-        <input
+        <UiInput
           v-model="newEmail"
           placeholder="Email do usuário para conceder Platform Admin"
-          class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-800 dark:bg-slate-900"
           :disabled="granting"
           @keydown.enter.prevent="onGrant"
         />
-        <button
+        <UiButton
           type="button"
-          class="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800
-                 disabled:opacity-60 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
+          variant="default"
+          size="sm"
+          class="h-10 px-4 text-sm"
           :disabled="granting || !canGrant"
           @click="onGrant"
         >
           {{ granting ? "Concedendo..." : "Conceder" }}
-        </button>
+        </UiButton>
       </div>
 
       <div v-if="error" class="rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700 dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-200">
@@ -111,6 +111,7 @@ import { useConfirm } from "@/ui/confirm/useConfirm";
 import { useBusyMap } from "@/ui/ops/useBusyMap";
 import { useOptimisticMutation } from "@/ui/ops/useOptimisticMutation";
 import { normalizeApiError } from "@/ui/ops/normalizeApiError";
+import { Button as UiButton, Input as UiInput } from "@/components/ui";
 
 const appKey = "PBI_EMBED";
 

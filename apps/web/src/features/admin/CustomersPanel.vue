@@ -3,31 +3,33 @@
   <PanelCard>
     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <div class="min-w-0">
-        <div class="text-sm font-semibold text-slate-900 dark:text-slate-100">Customers</div>
-        <div class="mt-1 text-xs text-slate-600 dark:text-slate-300">
+        <div class="text-sm font-semibold text-foreground">Customers</div>
+        <div class="mt-1 text-xs text-muted-foreground">
           Gerencie customers e suas permissoes de Power BI em um unico fluxo.
         </div>
       </div>
 
       <div class="flex shrink-0 items-center gap-2">
-        <button
+        <UiButton
           type="button"
-          class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs hover:bg-slate-50
-                 disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+          variant="outline"
+          size="sm"
+          class="h-9 px-3 text-xs"
           :disabled="!!loading"
           @click="refreshSafe"
         >
           {{ loading ? "Carregando..." : "Recarregar" }}
-        </button>
+        </UiButton>
 
-        <button
+        <UiButton
           type="button"
-          class="rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800
-                 disabled:opacity-60 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
+          variant="default"
+          size="sm"
+          class="h-9 px-3 text-xs"
           @click="openCreate"
         >
           + Novo customer
-        </button>
+        </UiButton>
       </div>
     </div>
 
@@ -36,12 +38,12 @@
     </div>
 
     <div class="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
-      <input
+      <UiInput
         v-model="q"
-        class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-800 dark:bg-slate-900"
+        class="w-full"
         placeholder="Buscar por code/nome"
       />
-      <div class="shrink-0 text-xs text-slate-500 dark:text-slate-400">
+      <div class="shrink-0 text-xs text-muted-foreground">
         {{ filtered.length }} / {{ customers.length }}
       </div>
     </div>
@@ -58,50 +60,51 @@
       <div
         class="max-h-[92vh] w-full max-w-6xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-900"
       >
-        <div class="flex items-start justify-between gap-3 border-b border-slate-200 p-4 dark:border-slate-800">
+        <div class="flex items-start justify-between gap-3 border-b border-border p-4">
           <div class="min-w-0">
-            <div class="text-sm font-semibold text-slate-900 dark:text-slate-100">
+            <div class="text-sm font-semibold text-foreground">
               {{ modalCustomer ? `Customer • ${modalCustomer.code}` : "Novo customer" }}
             </div>
-            <div class="mt-1 text-xs text-slate-600 dark:text-slate-300">
+            <div class="mt-1 text-xs text-muted-foreground">
               {{ modalCustomer ? "Central de configuracoes do customer." : "Crie um customer para liberar as configuracoes." }}
             </div>
           </div>
 
-          <button
+          <UiButton
             type="button"
-            class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs hover:bg-slate-50
-                   disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+            variant="outline"
+            size="sm"
+            class="h-8 px-3 text-xs"
             :disabled="modalSaving"
             @click="closeModal"
           >
             Fechar
-          </button>
+          </UiButton>
         </div>
 
         <div class="max-h-[82vh] overflow-hidden p-4">
-          <div v-if="!modalCustomer" class="rounded-2xl border border-slate-200 p-4 dark:border-slate-800">
-            <div class="text-sm font-semibold text-slate-900 dark:text-slate-100">Informacoes basicas</div>
-            <div class="mt-1 text-xs text-slate-600 dark:text-slate-300">
+          <div v-if="!modalCustomer" class="rounded-2xl border border-border p-4">
+            <div class="text-sm font-semibold text-foreground">Informacoes basicas</div>
+            <div class="mt-1 text-xs text-muted-foreground">
               Salve o customer para liberar as abas de configuracao.
             </div>
 
             <div class="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
               <div>
-                <label class="text-xs font-medium text-slate-700 dark:text-slate-300">Code</label>
-                <input
+                <label class="text-xs font-medium text-muted-foreground">Code</label>
+                <UiInput
                   v-model="form.code"
-                  class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-800 dark:bg-slate-900"
+                  class="mt-1 w-full"
                   :disabled="modalSaving"
                   placeholder="ex: ACME"
                 />
               </div>
 
               <div>
-                <label class="text-xs font-medium text-slate-700 dark:text-slate-300">Nome</label>
-                <input
+                <label class="text-xs font-medium text-muted-foreground">Nome</label>
+                <UiInput
                   v-model="form.name"
-                  class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-800 dark:bg-slate-900"
+                  class="mt-1 w-full"
                   :disabled="modalSaving"
                   placeholder="ex: ACME Ltda"
                 />
@@ -109,86 +112,91 @@
             </div>
 
             <div class="mt-4 flex items-center justify-end gap-2">
-              <button
+              <UiButton
                 type="button"
-                class="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm hover:bg-slate-50
-                       disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+                variant="outline"
+                size="md"
+                class="h-9 px-4 text-sm"
                 :disabled="modalSaving"
                 @click="closeModal"
               >
                 Cancelar
-              </button>
+              </UiButton>
 
-              <button
+              <UiButton
                 type="button"
-                class="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800
-                       disabled:opacity-60 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
+                variant="default"
+                size="md"
+                class="h-9 px-4 text-sm"
                 :disabled="modalSaving || !canSubmit"
                 @click="saveCustomer"
               >
                 {{ modalSaving ? "Salvando..." : "Salvar" }}
-              </button>
+              </UiButton>
             </div>
           </div>
 
           <div v-else class="flex h-full flex-col">
-            <div class="sticky top-0 z-10 border-b border-slate-200 bg-white pb-2 dark:border-slate-800 dark:bg-slate-900">
-              <PanelTabs v-model="modalTab" :tabs="modalTabs" />
+            <div class="sticky top-0 z-10 border-b border-border bg-card pb-2">
+              <UiTabs v-model="modalTab" :tabs="modalTabs" />
             </div>
 
             <div class="mt-4 min-h-0 flex-1 overflow-y-auto">
               <!-- TAB: SUMMARY -->
               <div v-if="modalTab === 'summary'" class="space-y-4">
               <div class="grid grid-cols-1 gap-4 lg:grid-cols-[2fr_1fr]">
-                <div class="rounded-2xl border border-slate-200 p-4 dark:border-slate-800">
-                  <div class="text-sm font-semibold text-slate-900 dark:text-slate-100">Dados basicos</div>
+                <div class="rounded-2xl border border-border p-4">
+                  <div class="text-sm font-semibold text-foreground">Dados basicos</div>
                   <div class="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
                     <div>
-                      <label class="text-xs font-medium text-slate-700 dark:text-slate-300">Code</label>
-                      <input
+                      <label class="text-xs font-medium text-muted-foreground">Code</label>
+                      <UiInput
                         v-model="form.code"
-                        class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-800 dark:bg-slate-900"
+                        class="mt-1 w-full"
                         :disabled="modalSaving"
                       />
                     </div>
 
                     <div>
-                      <label class="text-xs font-medium text-slate-700 dark:text-slate-300">Nome</label>
-                      <input
+                      <label class="text-xs font-medium text-muted-foreground">Nome</label>
+                      <UiInput
                         v-model="form.name"
-                        class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-800 dark:bg-slate-900"
+                        class="mt-1 w-full"
                         :disabled="modalSaving"
                       />
                     </div>
                   </div>
 
                   <div class="mt-4 flex flex-wrap items-center gap-2">
-                    <button
+                    <UiButton
                       type="button"
-                      class="rounded-xl bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800
-                             disabled:opacity-60 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
+                      variant="default"
+                      size="sm"
+                      class="h-9 px-4 text-xs"
                       :disabled="modalSaving || !canSubmit"
                       @click="saveCustomer"
                     >
                       {{ modalSaving ? "Salvando..." : "Salvar alteracoes" }}
-                    </button>
+                    </UiButton>
 
-                    <button
+                    <UiButton
                       type="button"
-                      class="rounded-xl px-4 py-2 text-xs font-semibold"
+                      variant="outline"
+                      size="sm"
+                      class="h-9 px-4 text-xs"
                       :class="modalCustomer.status === 'active'
-                        ? 'border border-rose-200 bg-rose-600 text-white hover:bg-rose-500 dark:border-rose-900/40 dark:bg-rose-700 dark:hover:bg-rose-600'
-                        : 'border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-900/40 dark:bg-emerald-950/40 dark:text-emerald-200'"
+                        ? 'border-rose-200 bg-rose-600 text-white hover:bg-rose-500 dark:border-rose-900/40 dark:bg-rose-700 dark:hover:bg-rose-600'
+                        : 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-900/40 dark:bg-emerald-950/40 dark:text-emerald-200'"
                       :disabled="busy.isBusy(modalCustomer.id)"
                       @click="toggleStatus(modalCustomer)"
                     >
                       {{ modalCustomer.status === 'active' ? "Desativar" : "Ativar" }}
-                    </button>
+                    </UiButton>
                   </div>
                 </div>
 
-                <div class="rounded-2xl border border-slate-200 p-4 dark:border-slate-800">
-                  <div class="text-sm font-semibold text-slate-900 dark:text-slate-100">Resumo rapido</div>
+                <div class="rounded-2xl border border-border p-4">
+                  <div class="text-sm font-semibold text-foreground">Resumo rapido</div>
                   <div v-if="summaryLoading" class="mt-3 space-y-2 animate-pulse">
                     <div class="h-3 rounded bg-slate-200 dark:bg-slate-800"></div>
                     <div class="h-3 rounded bg-slate-200 dark:bg-slate-800"></div>
@@ -235,31 +243,32 @@
 
             <!-- TAB: REPORTS -->
             <div v-else-if="modalTab === 'reports'" class="space-y-4">
-              <div class="rounded-2xl border border-slate-200 p-4 dark:border-slate-800">
+              <div class="rounded-2xl border border-border p-4">
                 <div class="flex flex-wrap items-center justify-between gap-3">
                   <div class="min-w-0">
-                    <div class="text-sm font-semibold text-slate-900 dark:text-slate-100">Workspaces e relatorios</div>
-                    <div class="mt-1 text-xs text-slate-600 dark:text-slate-300">
+                    <div class="text-sm font-semibold text-foreground">Workspaces e relatorios</div>
+                    <div class="mt-1 text-xs text-muted-foreground">
                       Ative ou desative workspaces e reports. O toggle aplica imediatamente.
                     </div>
                   </div>
 
                   <div class="flex flex-wrap items-center gap-2">
-                    <button
+                    <UiButton
                       type="button"
-                      class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs hover:bg-slate-50
-                             disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+                      variant="outline"
+                      size="sm"
+                      class="h-9 px-3 text-xs"
                       :disabled="syncing"
                       @click="runSync"
                     >
                       <span class="inline-flex items-center gap-2">
                         <span
                           v-if="syncing"
-                          class="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-slate-300 border-t-slate-700 dark:border-slate-700 dark:border-t-slate-200"
+                          class="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-muted-foreground border-t-foreground"
                         ></span>
                         <span>{{ syncing ? "Sincronizando..." : "Sincronizar catalogo" }}</span>
                       </span>
-                    </button>
+                    </UiButton>
                   </div>
                 </div>
 
@@ -375,57 +384,55 @@
               v-else-if="modalTab === 'pages'"
               class="min-h-0 max-h-[70vh] space-y-4 overflow-y-auto pr-1 pb-2 lg:max-h-none lg:overflow-visible lg:pr-0 lg:pb-0"
             >
-              <div class="rounded-2xl border border-slate-200 p-4 dark:border-slate-800">
+              <div class="rounded-2xl border border-border p-4">
                 <div class="flex flex-wrap items-start justify-between gap-3">
                   <div class="min-w-0">
-                    <div class="text-sm font-semibold text-slate-900 dark:text-slate-100">Permissoes de paginas</div>
-                    <div class="mt-1 text-xs text-slate-600 dark:text-slate-300">
+                    <div class="text-sm font-semibold text-foreground">Permissoes de paginas</div>
+                    <div class="mt-1 text-xs text-muted-foreground">
                       Defina paginas individuais ou grupos reutilizaveis por report.
                     </div>
                   </div>
 
                   <div class="flex flex-wrap items-center gap-2">
-                    <button
+                    <UiButton
                       type="button"
-                      class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs hover:bg-slate-50
-                             disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+                      variant="outline"
+                      size="sm"
+                      class="h-9 px-3 text-xs"
                       :disabled="!pageReportRefId || syncingPages"
                       @click="syncPages"
                     >
                       <span class="inline-flex items-center gap-2">
                         <span
                           v-if="syncingPages"
-                          class="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-slate-300 border-t-slate-700 dark:border-slate-700 dark:border-t-slate-200"
+                          class="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-muted-foreground border-t-foreground"
                         ></span>
                         <span>{{ syncingPages ? "Sincronizando..." : "Sync paginas" }}</span>
                       </span>
-                    </button>
-                    <button
+                    </UiButton>
+                    <UiButton
                       type="button"
-                      class="rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800
-                             disabled:opacity-60 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
+                      variant="default"
+                      size="sm"
+                      class="h-9 px-3 text-xs"
                       :disabled="!pageReportRefId || !hasPreviewSelection"
                       @click="openPreview"
                     >
                       Preview
-                    </button>
+                    </UiButton>
                   </div>
                 </div>
 
                 <div class="mt-3 grid grid-cols-1 gap-4 lg:grid-cols-[1.25fr_1fr]">
-                  <div class="rounded-2xl border border-slate-200 p-3 dark:border-slate-800 lg:col-span-2">
-                    <label class="text-xs font-medium text-slate-700 dark:text-slate-300">Report</label>
-                    <select
-                      v-model="pageReportRefId"
-                      class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
-                             dark:border-slate-800 dark:bg-slate-900"
-                    >
+                  <div class="rounded-2xl border border-border p-3 lg:col-span-2">
+                    <label class="text-xs font-medium text-muted-foreground">Report</label>
+                    <UiSelect v-model="pageReportRefId" class="mt-1 w-full">
                       <option value="">-- selecione --</option>
                       <option v-for="r in pageReportOptions" :key="r.reportRefId" :value="r.reportRefId">
                         {{ r.label }}
                       </option>
-                    </select>
-                    <div class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                    </UiSelect>
+                    <div class="mt-1 text-[11px] text-muted-foreground">
                       O sync atualiza a lista de paginas do report.
                     </div>
                   </div>
@@ -439,20 +446,21 @@
                   </div>
 
                   <div class="space-y-3 lg:col-start-2 lg:row-start-2">
-                    <div class="rounded-2xl border border-slate-200 p-3 dark:border-slate-800">
+                    <div class="rounded-2xl border border-border p-3">
                       <div class="flex items-center justify-between">
-                        <div class="text-xs font-semibold text-slate-900 dark:text-slate-100">Grupos</div>
-                        <button
+                        <div class="text-xs font-semibold text-foreground">Grupos</div>
+                        <UiButton
                           type="button"
-                          class="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] hover:bg-slate-50
-                                 disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+                          variant="outline"
+                          size="sm"
+                          class="h-7 px-2 text-[11px]"
                           :disabled="!pageReportRefId"
                           @click="openGroupModal()"
                         >
                           Novo grupo
-                        </button>
+                        </UiButton>
                       </div>
-                      <div class="mt-2 text-[11px] text-slate-500 dark:text-slate-400">
+                      <div class="mt-2 text-[11px] text-muted-foreground">
                         Ao ativar um grupo, as paginas individuais ficam somente leitura.
                       </div>
 
@@ -481,15 +489,16 @@
                           </div>
 
                           <div class="flex items-center gap-2">
-                            <button
+                            <UiButton
                               type="button"
-                              class="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] hover:bg-slate-50
-                                     disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+                              variant="outline"
+                              size="sm"
+                              class="h-7 px-2 text-[11px]"
                               :disabled="busyGroupAssign.isBusy(g.id)"
                               @click.stop="openGroupModal(g)"
                             >
                               Editar
-                            </button>
+                            </UiButton>
 
                             <PermSwitch
                               :model-value="!!g.assigned"
@@ -511,19 +520,20 @@
                   </div>
 
                   <div class="space-y-3 lg:col-start-1 lg:row-start-2">
-                    <div class="rounded-2xl border border-slate-200 p-3 dark:border-slate-800">
+                    <div class="rounded-2xl border border-border p-3">
                         <div class="flex items-center justify-between gap-2">
-                          <div class="text-xs font-semibold text-slate-900 dark:text-slate-100">Paginas</div>
-                          <div class="flex items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400">
-                            <button
+                          <div class="text-xs font-semibold text-foreground">Paginas</div>
+                          <div class="flex items-center gap-2 text-[11px] text-muted-foreground">
+                            <UiButton
                               type="button"
-                              class="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] hover:bg-slate-50
-                                     disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+                              variant="outline"
+                              size="sm"
+                              class="h-7 px-2 text-[11px]"
                               :disabled="pagesLoading || hasActiveGroupAssignments || !pageAccessPages.length"
                               @click="selectAllPages"
                             >
                               Selecionar todas
-                            </button>
+                            </UiButton>
                             <span>{{ pageAccessPages.length }} paginas</span>
                           </div>
                         </div>
@@ -583,29 +593,25 @@
 
             <!-- TAB: PREVIEW -->
             <div v-else-if="modalTab === 'preview'" class="space-y-4">
-              <div class="rounded-2xl border border-slate-200 p-4 dark:border-slate-800">
+              <div class="rounded-2xl border border-border p-4">
                 <div class="flex flex-wrap items-center justify-between gap-3">
                   <div class="min-w-0">
-                    <div class="text-sm font-semibold text-slate-900 dark:text-slate-100">Preview do customer</div>
-                    <div class="mt-1 text-xs text-slate-600 dark:text-slate-300">
+                    <div class="text-sm font-semibold text-foreground">Preview do customer</div>
+                    <div class="mt-1 text-xs text-muted-foreground">
                       Simulacao da experiencia do customer com paginas permitidas.
                     </div>
                   </div>
                 </div>
 
                 <div class="mt-3">
-                  <label class="text-xs font-medium text-slate-700 dark:text-slate-300">Report</label>
-                  <select
-                    v-model="previewReportRefId"
-                    class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm
-                           dark:border-slate-800 dark:bg-slate-900"
-                  >
+                  <label class="text-xs font-medium text-muted-foreground">Report</label>
+                  <UiSelect v-model="previewReportRefId" class="mt-1 w-full">
                     <option value="">-- selecione --</option>
                     <option v-for="r in pageReportOptions" :key="r.reportRefId" :value="r.reportRefId">
                       {{ r.label }}
                     </option>
-                  </select>
-                  <div class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                  </UiSelect>
+                  <div class="mt-1 text-[11px] text-muted-foreground">
                     O preview usa somente reports ativos para este customer.
                   </div>
                 </div>
@@ -686,44 +692,44 @@
 
     <!-- MODAL: group editor -->
     <div v-if="groupModalOpen" class="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 p-4">
-      <div class="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-800 dark:bg-slate-900">
+      <div class="w-full max-w-lg rounded-2xl border border-border bg-card p-4 shadow-xl">
         <div class="flex items-start justify-between gap-3">
           <div class="min-w-0">
-            <div class="text-sm font-semibold text-slate-900 dark:text-slate-100">
+            <div class="text-sm font-semibold text-foreground">
               {{ groupModalMode === 'create' ? 'Novo grupo' : 'Editar grupo' }}
             </div>
-            <div class="mt-1 text-xs text-slate-600 dark:text-slate-300">
+            <div class="mt-1 text-xs text-muted-foreground">
               Selecione paginas para compor o grupo.
             </div>
           </div>
-          <button
+          <UiButton
             type="button"
-            class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs hover:bg-slate-50
-                   disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+            variant="outline"
+            size="sm"
+            class="h-8 px-3 text-xs"
             :disabled="pageModalSaving"
             @click="closeGroupModal"
           >
             Fechar
-          </button>
+          </UiButton>
         </div>
 
         <div class="mt-4">
-          <label class="text-xs font-medium text-slate-700 dark:text-slate-300">Nome</label>
-          <input
+          <label class="text-xs font-medium text-muted-foreground">Nome</label>
+          <UiInput
             v-model="groupModalName"
-            class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-800 dark:bg-slate-900"
+            class="mt-1 w-full"
             :disabled="pageModalSaving"
           />
         </div>
 
         <div class="mt-4">
-          <div class="text-xs font-medium text-slate-700 dark:text-slate-300">Paginas</div>
+          <div class="text-xs font-medium text-muted-foreground">Paginas</div>
           <div class="mt-2 max-h-[240px] space-y-2 overflow-y-auto">
             <label
               v-for="p in pageAccessPages"
               :key="p.id"
-              class="flex items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs
-                     dark:border-slate-800 dark:bg-slate-950"
+              class="flex items-center justify-between gap-2 rounded-xl border border-border bg-card px-3 py-2 text-xs"
             >
               <span class="truncate">{{ p.displayName || p.pageName }}</span>
               <input v-model="groupModalPageIds" type="checkbox" :value="p.id" />
@@ -734,46 +740,49 @@
         <div v-if="groupModalError" class="mt-3 text-xs text-rose-600 dark:text-rose-300">{{ groupModalError }}</div>
 
         <div class="mt-4 flex items-center justify-end gap-2">
-          <button
+          <UiButton
             type="button"
-            class="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm hover:bg-slate-50
-                   disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+            variant="outline"
+            size="md"
+            class="h-9 px-4 text-sm"
             :disabled="pageModalSaving"
             @click="closeGroupModal"
           >
             Cancelar
-          </button>
-          <button
+          </UiButton>
+          <UiButton
             type="button"
-            class="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800
-                   disabled:opacity-60 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
+            variant="default"
+            size="md"
+            class="h-9 px-4 text-sm"
             :disabled="pageModalSaving"
             @click="saveGroupModal"
           >
             {{ pageModalSaving ? "Salvando..." : "Salvar" }}
-          </button>
+          </UiButton>
         </div>
       </div>
     </div>
 
     <!-- MODAL: preview -->
     <div v-if="previewOpen" class="fixed inset-0 z-[70] flex items-center justify-center bg-black/30 p-4">
-      <div class="w-full max-w-5xl rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-800 dark:bg-slate-900">
+      <div class="w-full max-w-5xl rounded-2xl border border-border bg-card p-4 shadow-xl">
         <div class="flex items-start justify-between gap-3">
           <div class="min-w-0">
-            <div class="text-sm font-semibold text-slate-900 dark:text-slate-100">Preview do report</div>
-            <div class="mt-1 text-xs text-slate-600 dark:text-slate-300">
+            <div class="text-sm font-semibold text-foreground">Preview do report</div>
+            <div class="mt-1 text-xs text-muted-foreground">
               Simulacao das paginas permitidas para o customer.
             </div>
           </div>
-          <button
+          <UiButton
             type="button"
-            class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs hover:bg-slate-50
-                   disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+            variant="outline"
+            size="sm"
+            class="h-8 px-3 text-xs"
             @click="closePreview"
           >
             Fechar
-          </button>
+          </UiButton>
         </div>
 
         <div class="mt-3 flex flex-wrap gap-2">
@@ -844,7 +853,7 @@ import {
 
 import CustomerTable from "@/features/admin/customers/CustomerTable.vue";
 import PanelCard from "@/ui/PanelCard.vue";
-import PanelTabs from "@/ui/PanelTabs.vue";
+import { Button as UiButton, Input as UiInput, Select as UiSelect, Tabs as UiTabs } from "@/components/ui";
 import { useConfirm } from "@/ui/confirm/useConfirm";
 import { useBusyMap } from "@/ui/ops/useBusyMap";
 import { useOptimisticMutation } from "@/ui/ops/useOptimisticMutation";
