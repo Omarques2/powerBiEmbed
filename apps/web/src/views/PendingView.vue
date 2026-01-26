@@ -1,14 +1,13 @@
 <template>
-  <div class="min-h-screen flex items-center justify-center bg-slate-50 p-6 dark:bg-slate-950">
+  <div class="min-h-screen flex items-center justify-center bg-background p-6 text-foreground">
     <div
-      class="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-sm
-             dark:border-slate-800 dark:bg-slate-900"
+      class="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-sm"
     >
-      <h1 class="text-lg font-semibold text-slate-900 dark:text-slate-100">
+      <h1 class="text-lg font-semibold text-foreground">
         {{ currentStatus === "disabled" ? "Acesso recusado" : "Aguardando liberação do administrador" }}
       </h1>
 
-      <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">
+      <p class="mt-2 text-sm text-muted-foreground">
         <span v-if="currentStatus === 'disabled'">
           Seu acesso foi recusado. Entre em contato com o administrador para reativar.
         </span>
@@ -17,30 +16,30 @@
         </span>
       </p>
 
-      <div v-if="statusMessage" class="mt-4 text-xs text-slate-500 dark:text-slate-400">
+      <div v-if="statusMessage" class="mt-4 text-xs text-muted-foreground">
         {{ statusMessage }}
       </div>
 
       <div class="mt-6 flex items-center justify-between gap-3">
-        <button
+        <UiButton
           v-if="currentStatus !== 'disabled'"
-          class="inline-flex items-center justify-center rounded-xl border border-slate-900 bg-white px-4 py-2 text-sm
-                 hover:bg-slate-50 active:scale-[0.98] transition
-                 dark:border-slate-800 dark:bg-slate-300 dark:hover:bg-slate-200"
+          variant="outline"
+          size="sm"
+          class="h-9 px-4 text-sm"
           :disabled="checking"
           @click="checkNow"
         >
           {{ checking ? "Verificando..." : "Verificar agora" }}
-        </button>
+        </UiButton>
 
-        <button
-          class="inline-flex items-center justify-center rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white
-                 hover:bg-slate-800 active:scale-[0.98] transition
-                 dark:bg-slate-300 dark:text-slate-900 dark:hover:bg-slate-200"
+        <UiButton
+          variant="default"
+          size="sm"
+          class="h-9 px-4 text-sm"
           @click="onLogout"
         >
           Sair
-        </button>
+        </UiButton>
       </div>
     </div>
   </div>
@@ -52,6 +51,7 @@ import { useRouter } from "vue-router";
 import { http } from "@/api/http";
 import { unwrapData, type ApiEnvelope } from "@/api/envelope";
 import { logout } from "../auth/auth";
+import { Button as UiButton } from "@/components/ui";
 
 type MeResponse = {
   status?: "pending" | "active" | "disabled";

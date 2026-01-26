@@ -139,7 +139,7 @@ Checklist de milestones (EPIC-05):
 - [x] Milestone 2: Componentes base
 - [x] Milestone 3: Layout e shell
 - [x] Milestone 4: Admin core
-- [ ] Milestone 5: Auth + Pending + Callback + modais globais
+- [x] Milestone 5: Auth + Pending + Callback + modais globais
 - [ ] Milestone 6: Power BI embeds/previews
 - [ ] Milestone 7: QA final
 - [ ] Milestone 8: Ajustes finais de UX/branding

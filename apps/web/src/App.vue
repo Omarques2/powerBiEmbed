@@ -5,13 +5,13 @@
   <transition name="fade">
     <div
       v-if="routeLoading && !isAuthRoute"
-      class="fixed inset-0 z-[100] grid place-items-center bg-slate-950/40 backdrop-blur-sm"
+      class="fixed inset-0 z-[100] grid place-items-center bg-background/60 backdrop-blur-sm"
       aria-live="polite"
       aria-busy="true"
     >
-      <div class="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white/95 px-4 py-3 text-sm font-medium text-slate-700 shadow-lg dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200">
+      <div class="flex items-center gap-3 rounded-2xl border border-border bg-card/95 px-4 py-3 text-sm font-medium text-foreground shadow-lg">
         <div
-          class="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-slate-900 dark:border-slate-700 dark:border-t-slate-100"
+          class="h-4 w-4 animate-spin rounded-full border-2 border-muted border-t-foreground"
         />
         <span>Carregando...</span>
       </div>

@@ -1,6 +1,6 @@
 <!-- src/views/LoginView.vue -->
 <template>
-  <div class="relative min-h-screen overflow-hidden bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
+  <div class="relative min-h-screen overflow-hidden bg-background text-foreground">
     <!-- BI background (SVG) -->
     <svg
       class="pointer-events-none absolute inset-0 h-full w-full login-bg opacity-[0.42] dark:opacity-[0.25]"
@@ -168,8 +168,7 @@
     <!-- Login card -->
     <div class="relative mx-auto flex min-h-screen max-w-6xl items-center justify-center px-4 py-12">
       <div
-        class="w-full max-w-xl rounded-[32px] border border-slate-200 bg-white/78 p-10 shadow-2xl backdrop-blur
-               dark:border-slate-800 dark:bg-slate-900/58"
+        class="w-full max-w-xl rounded-[32px] border border-border bg-card/80 p-10 shadow-2xl backdrop-blur"
       >
         <div class="flex flex-col items-center text-center">
           <img :src="logoUrl" alt="SigFarm" class="h-24 w-24 object-contain" />
@@ -178,18 +177,19 @@
             SigFarm
           </div>
 
-          <div class="mt-2 text-base text-slate-600 dark:text-slate-300">
+          <div class="mt-2 text-base text-muted-foreground">
             Entre para acessar seus relatórios.
           </div>
 
-          <button
-            class="mt-8 inline-flex w-[60%] items-center justify-center gap-2 rounded-2xl px-6 py-4 text-base font-semibold
-                   bg-slate-900 text-white hover:bg-slate-800 active:scale-[0.98] transition
-                   dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
+          <UiButton
+            type="button"
+            variant="default"
+            size="lg"
+            class="mt-8 w-[60%] rounded-2xl px-6 py-4 text-base font-semibold"
             @click="onLogin"
           >
             Entrar / Cadastrar
-          </button>
+          </UiButton>
         </div>
       </div>
     </div>
@@ -198,6 +198,7 @@
 
 <script setup lang="ts">
 import { login } from "../auth/auth";
+import { Button as UiButton } from "@/components/ui";
 import logoUrl from "../assets/logo.png";
 
 async function onLogin() {
