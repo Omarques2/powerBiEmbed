@@ -49,9 +49,9 @@ Legenda:
 - [ ] P2 Battery de testes negativos e fuzzing leve (API)
 
 ## EPIC-08 - Modularizacao Admin + performance (API)
-- [ ] P2 Modularizar AdminUsersService por dominio
-- [ ] P2 Repositorio Prisma por dominio (camada de acesso a dados)
-- [ ] P2 Reduzir acoplamento entre dominios (eventos internos quando fizer sentido)
+- [x] P2 Modularizar AdminUsersService por dominio
+- [x] P2 Repositorio Prisma por dominio (camada de acesso a dados)
+- [x] P2 Reduzir acoplamento entre dominios (eventos internos quando fizer sentido)
 
 ## EPIC-14 - Componentizacao Vue e manutenibilidade (WEB)
 - [x] P2 Quebrar telas grandes (Customers/Users/Rls) em componentes menores

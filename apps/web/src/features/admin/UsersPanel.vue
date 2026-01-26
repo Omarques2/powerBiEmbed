@@ -983,12 +983,21 @@ function pickDefaultCustomerId() {
   return active?.customerId ?? ms[0]?.customerId ?? "";
 }
 
+function normalizeWorkspaceVisibility(workspaces: UserPermissionsResponse["workspaces"]) {
+  for (const ws of workspaces) {
+    if (!ws.canView && ws.reports.some((r) => r.canView)) {
+      ws.canView = true;
+    }
+  }
+}
+
 async function loadUserPerms() {
   if (!userModalUser.value) return;
   userPermsLoading.value = true;
   userPermsError.value = "";
   try {
     const res = await getUserPermissions(userModalUser.value.id, userModalCustomerId.value || undefined);
+    normalizeWorkspaceVisibility(res.workspaces);
     userPerms.value = res;
     if (!userModalCustomerId.value) userModalCustomerId.value = pickDefaultCustomerId();
     if (userModalCustomerId.value) await loadCustomerCatalog(userModalCustomerId.value);

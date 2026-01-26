@@ -233,6 +233,7 @@ Objetivo: cobertura da UI base (Shadcn) e menu mobile.
 ### EPIC-08: Modularizacao Admin + performance (API)
 Card P2 — API | Modularizar AdminUsersService por dominio  
 Objetivo: separar por dominios (customers, memberships, audit, security, perms).
+Status atual: concluido.
 
 Card P2 — API | Repositorio Prisma por dominio  
 Contexto: services acessam Prisma direto, dificultando testes e isolamento.  
@@ -245,6 +246,7 @@ Estrategia:
 Aceite:
 - Services nao acessam Prisma diretamente.
 - Testes unitarios usam repositorios mockados.
+Status atual: concluido.
 
 Card P2 — API | Reduzir acoplamento entre dominios  
 Contexto: orquestracao direta entre services dificulta manutencao.  
@@ -255,6 +257,7 @@ Estrategia:
 - Evitar chamadas diretas entre dominios quando possivel.
 Aceite:
 - Fluxos transversais removem dependencias diretas.
+Status atual: concluido.
 
 ### EPIC-10: Controle de acesso granular por report e RLS reutilizavel (API/WEB)
 Card P1 - API/WEB | Acesso por report (nao apenas por workspace)  

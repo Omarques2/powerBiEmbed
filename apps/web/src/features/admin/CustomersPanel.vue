@@ -916,6 +916,8 @@ function openCreate() {
   previewReportRefId.value = "";
   resetPreviewTab();
   modalOpen.value = true;
+  catalogLoaded.value = false;
+  catalogSyncAttempted.value = false;
 }
 
 function openEdit(c: CustomerRow) {
@@ -927,6 +929,8 @@ function openEdit(c: CustomerRow) {
   resetPreviewTab();
   modalOpen.value = true;
   void loadCustomerSummary();
+  catalogLoaded.value = false;
+  catalogSyncAttempted.value = false;
   void loadCatalog();
 }
 
@@ -935,6 +939,8 @@ function closeModal() {
   modalOpen.value = false;
   resetPreviewTab();
   previewReportRefId.value = "";
+  catalogLoaded.value = false;
+  catalogSyncAttempted.value = false;
 }
 
 async function refreshSafe() {
@@ -1092,12 +1098,18 @@ const catalog = ref<CustomerCatalog | null>(null);
 const loadingCatalog = ref(false);
 const catalogError = ref("");
 const syncing = ref(false);
+const catalogLoaded = ref(false);
+const catalogSyncAttempted = ref(false);
 
 const busyWorkspacePerm = useBusyMap();
 const busyReportPerm = useBusyMap();
 
 const catalogWorkspaces = computed(() => catalog.value?.workspaces ?? []);
-const showCatalogSkeleton = computed(() => (loadingCatalog.value || syncing.value) && !catalogWorkspaces.value.length);
+const showCatalogSkeleton = computed(
+  () =>
+    !catalogWorkspaces.value.length &&
+    (loadingCatalog.value || syncing.value || !catalogLoaded.value),
+);
 
 function cloneCatalog<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
@@ -1109,6 +1121,7 @@ async function loadCatalog(opts?: { silent?: boolean }) {
     loadingCatalog.value = true;
   }
   catalogError.value = "";
+  catalogLoaded.value = false;
   try {
     catalog.value = await getPowerBiCatalog(modalCustomer.value.id);
   } catch (e: any) {
@@ -1119,6 +1132,7 @@ async function loadCatalog(opts?: { silent?: boolean }) {
     if (!opts?.silent) {
       loadingCatalog.value = false;
     }
+    catalogLoaded.value = true;
   }
 }
 
@@ -1140,6 +1154,15 @@ async function syncCatalog(opts?: { silent?: boolean }) {
     }
   } finally {
     syncing.value = false;
+  }
+}
+
+async function ensureCatalog() {
+  if (!modalCustomer.value) return;
+  await loadCatalog();
+  if (!catalogWorkspaces.value.length && !catalogSyncAttempted.value) {
+    catalogSyncAttempted.value = true;
+    await syncCatalog({ silent: true });
   }
 }
 
@@ -1275,25 +1298,26 @@ watch(pageReportOptions, () => {
   }
 });
 
-watch(
-  () => modalCustomer.value?.id,
-  () => {
-    pageReportRefId.value = "";
-    pageAccessPages.value = [];
-    pageGroupsWithAccess.value = [];
-    selectedPageIds.value = new Set();
-    selectedGroupIds.value = new Set();
-    previewReportRefId.value = "";
-    resetPreviewTab();
-  },
-);
-
-watch(modalTab, (tab) => {
-  if (!modalCustomer.value) return;
-  if (tab === "reports") {
-    void loadCatalog();
-    void syncCatalog({ silent: true });
-  }
+  watch(
+    () => modalCustomer.value?.id,
+    () => {
+      pageReportRefId.value = "";
+      pageAccessPages.value = [];
+      pageGroupsWithAccess.value = [];
+      selectedPageIds.value = new Set();
+      selectedGroupIds.value = new Set();
+      previewReportRefId.value = "";
+      resetPreviewTab();
+      catalogLoaded.value = false;
+      catalogSyncAttempted.value = false;
+    },
+  );
+  
+  watch(modalTab, async (tab) => {
+    if (!modalCustomer.value) return;
+    if (tab === "reports") {
+      await ensureCatalog();
+    }
   if (tab === "pages") {
     if (!pageReportRefId.value && pageReportOptions.value.length > 0) {
       pageReportRefId.value = pageReportOptions.value[0]?.reportRefId ?? "";

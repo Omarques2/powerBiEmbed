@@ -125,6 +125,8 @@
               <PermSwitch
                 :model-value="u.status === 'active'"
                 :loading="!!statusBusy[u.id]"
+                :disabled="u.isPlatformAdmin || !!statusBusy[u.id]"
+                :title="u.isPlatformAdmin ? 'Platform admin nao pode ser desativado.' : undefined"
                 on-label="Ativo"
                 off-label="Inativo"
                 @toggle="$emit('toggle-status', u)"

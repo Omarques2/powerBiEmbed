@@ -78,7 +78,9 @@ export class AdminPowerBiController {
     if (!report) throw new NotFoundException('Report not found');
 
     if (query.userId && !query.customerId) {
-      throw new BadRequestException('customerId is required when userId is provided');
+      throw new BadRequestException(
+        'customerId is required when userId is provided',
+      );
     }
 
     if (query.customerId) {
@@ -114,7 +116,9 @@ export class AdminPowerBiController {
       report.reportId,
       query.customerId
         ? {
-            username: query.userId ? query.userId : `preview:${query.customerId}`,
+            username: query.userId
+              ? query.userId
+              : `preview:${query.customerId}`,
             roles: ['CustomerRLS'],
             customData: query.customerId,
             forceIdentity: query.forceIdentity,

@@ -150,14 +150,15 @@
 
         <!-- Viewer area (centralizado + sem scroll) -->
         <div class="flex-1 min-h-0 overflow-hidden bg-slate-50 dark:bg-slate-950 p-2 sm:p-3 lg:p-4">
-          <div class="h-full w-full overflow-hidden flex items-center justify-center">
-            <div
-              class="print-bi-area relative w-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm
-                    dark:border-slate-800 dark:bg-slate-900
-                    aspect-video
-                    max-h-[min(70vh,calc(100dvh-var(--topbar-h)-1.5rem))]
-                    lg:max-h-[min(64vh,calc(100dvh-var(--topbar-h)-2rem))]"
-            >
+<div ref="hostEl" class="h-full w-full overflow-hidden flex items-center justify-center">
+  <div
+    ref="frameEl"
+    class="print-bi-area relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm
+           dark:border-slate-800 dark:bg-slate-900 mx-auto aspect-[16/9]
+           w-[min(96vw,calc(100dvw-2rem))]
+           max-h-[min(70vh,calc(100dvh-var(--topbar-h)-1.5rem))]
+           md:w-auto md:h-auto"
+  >
               <div class="flex h-full flex-col">
                 <div ref="stageEl" class="relative flex-1 overflow-hidden">
                   <div ref="containerEl" class="absolute inset-0" />
@@ -375,8 +376,8 @@ const loadingPages = ref(false);
 const allowedPages = ref<AllowedPage[]>([]);
 const allowedPagesError = ref("");
 const activePageName = ref<string | null>(null);
-
-const stageEl = ref<HTMLDivElement | null>(null);
+const hostEl = ref<HTMLDivElement | null>(null);
+const frameEl = ref<HTMLDivElement | null>(null);
 const containerEl = ref<HTMLDivElement | null>(null);
 const printing = ref(false);
 const reportReady = ref(false);
@@ -384,8 +385,45 @@ const lastRenderAt = ref(0);
 
 const exportModalOpen = ref(false);
 
+
+const ASPECT = 16 / 9;
+let fitObs: ResizeObserver | null = null;
+
 const EXPORT_FORMAT_KEY = "pbi_export_format";
 const EXPORT_SCOPE_KEY = "pbi_export_scope";
+
+
+function fitFrame() {
+  const host = hostEl.value;
+  const frame = frameEl.value;
+  if (!host || !frame) return;
+
+  if (!window.matchMedia("(min-width: 768px)").matches) {
+    frame.style.removeProperty("width");
+    frame.style.removeProperty("height");
+    return;
+  }
+
+  const availW = host.clientWidth;
+  const availH = host.clientHeight;
+
+  let w = availW;
+  let h = w / ASPECT;
+
+  if (h > availH) {
+    h = availH;
+    w = h * ASPECT;
+  }
+
+  const pad = 8;
+  w = Math.max(0, w - pad);
+  h = Math.max(0, h - pad);
+
+  frame.style.width = `${Math.floor(w)}px`;
+  frame.style.height = `${Math.floor(h)}px`;
+
+  window.requestAnimationFrame(() => resizeEmbedded());
+}
 
 function loadExportPref<T extends string>(key: string, fallback: T, allowed: T[]): T {
   if (typeof window === "undefined") return fallback;
@@ -491,20 +529,46 @@ function resizeEmbedded() {
   }
 }
 
-function addResizeHandlers() {
-  window.addEventListener("resize", resizeEmbedded);
+let onWinResize: (() => void) | null = null;
 
-  if (typeof ResizeObserver !== "undefined" && stageEl.value) {
-    resizeObs = new ResizeObserver(() => resizeEmbedded());
-    resizeObs.observe(stageEl.value);
+function addResizeHandlers() {
+  onWinResize = () => {
+    fitFrame();
+    resizeEmbedded();
+  };
+
+  window.addEventListener("resize", onWinResize);
+
+  if (typeof ResizeObserver !== "undefined" && hostEl.value) {
+    resizeObs = new ResizeObserver(() => {
+      fitFrame();
+      resizeEmbedded();
+    });
+    resizeObs.observe(hostEl.value);
   }
+
+  // observer extra (opcional) se você quiser separar:
+  // fitObs = new ResizeObserver(() => fitFrame());
+  // fitObs.observe(stageEl.value);
+
+  // roda uma vez após layout estabilizar
+  window.requestAnimationFrame(() => {
+    fitFrame();
+    resizeEmbedded();
+  });
 }
 
 function removeResizeHandlers() {
-  window.removeEventListener("resize", resizeEmbedded);
+  if (onWinResize) window.removeEventListener("resize", onWinResize);
+  onWinResize = null;
+
   if (resizeObs) {
     resizeObs.disconnect();
     resizeObs = null;
+  }
+  if (fitObs) {
+    fitObs.disconnect();
+    fitObs = null;
   }
 }
 
@@ -816,11 +880,17 @@ async function exportReport() {
 }
 
 watch(sidebarOpen, () => {
-  window.setTimeout(() => resizeEmbedded(), 260);
+  window.setTimeout(() => {
+    fitFrame();
+    resizeEmbedded();
+  }, 260);
 });
 
 watch(drawerOpen, () => {
-  window.setTimeout(() => resizeEmbedded(), 80);
+  window.setTimeout(() => {
+    fitFrame();
+    resizeEmbedded();
+  }, 80);
 });
 
 watch(exportFormat, (value) => {
@@ -956,14 +1026,20 @@ async function openReport(r: Report) {
     report.on("loaded", async () => {
       loadingEmbed.value = false;
       await applyReportLayout();
-      window.setTimeout(() => resizeEmbedded(), 0);
+      window.setTimeout(() => {
+        fitFrame();
+        resizeEmbedded();
+      }, 0);
     });
 
     report.on("rendered", () => {
       loadingEmbed.value = false;
       reportReady.value = true;
       lastRenderAt.value = Date.now();
-      window.setTimeout(() => resizeEmbedded(), 0);
+      window.setTimeout(() => {
+        fitFrame();
+        resizeEmbedded();
+      }, 0);
     });
 
     report.off("pageChanged");
