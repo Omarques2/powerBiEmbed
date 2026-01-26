@@ -28,7 +28,13 @@ Legenda:
 - [x] P1 Tabelas Admin responsivas (dep BaseTable)
 
 ## EPIC-05 - Rebuild do front-end com Shadcn (WEB)
-- [ ] P2 Refazer UI com componentes Shadcn
+- [ ] P2 Fundacao Shadcn + tokens + infra (Tailwind v4)
+- [ ] P2 Biblioteca de componentes base (Shadcn)
+- [ ] P2 Layout e navegacao (Shell/Admin/Sidebar/Topbar)
+- [ ] P2 Migracao das telas Admin (Customers/Users/Rls/Overview/Security)
+- [ ] P2 Auth + Pending + Modais globais
+- [ ] P2 Power BI embeds e previews
+- [ ] P2 QA, acessibilidade e regressao visual
 
 ## EPIC-06 - CI/CD GitHub Actions (DEVOPS)
 - [x] P1 CI PR monorepo-aware (lint/type/test/build web+api + cache + paths-filter)
@@ -42,6 +48,12 @@ Legenda:
 
 ## EPIC-08 - Modularizacao Admin + performance (API)
 - [ ] P2 Modularizar AdminUsersService por dominio
+- [ ] P2 Repositorio Prisma por dominio (camada de acesso a dados)
+- [ ] P2 Reduzir acoplamento entre dominios (eventos internos quando fizer sentido)
+
+## EPIC-14 - Componentizacao Vue e manutenibilidade (WEB)
+- [ ] P2 Quebrar telas grandes (Customers/Users/Rls) em componentes menores
+- [ ] P2 Extrair componentes de UI reutilizaveis (listas, cards, modais, toggles)
 
 ## EPIC-10 - Controle granular de reports + RLS reutilizavel (API/WEB)
 - [x] P1 Acesso por report (nao apenas por workspace)

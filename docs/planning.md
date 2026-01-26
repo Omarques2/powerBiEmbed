@@ -111,19 +111,75 @@ Card P1 — WEB | Tabelas Admin responsivas (dep BaseTable)
 Objetivo: 390px sem corte; 768/1024 legivel.
 
 ### EPIC-05: Rebuild do front-end com Shadcn (WEB)
-Card P2 - WEB | Refazer UI com componentes Shadcn  
-Contexto: desejo de padronizar UI e acelerar consistencia visual com biblioteca de componentes.  
-Objetivo: migrar telas e UI base para Shadcn mantendo contratos e fluxos.  
-Escopo: WEB (componentes, layout, estilos, composables, testes).  
+Card P2 - WEB | Fundacao Shadcn + tokens + infra (Tailwind v4)  
+Contexto: hoje a UI usa classes utilitarias diretas e componentes customizados, sem biblioteca padronizada.  
+Objetivo: criar base de design system Shadcn-like com tokens semanticos e infra consistente.  
+Escopo: WEB (assets/main.css, estrutura de componentes, utilitarios).  
 Estrategia:
-- Congelar design atual apos producao, evitar rework antes de CD.
-- Criar baseline: config Shadcn, theme tokens e componentes base.
-- Migrar por blocos (Shell, Admin, Panels), com QA visual por tela.
-Criterios de aceite:
-- Paridade funcional com UI atual.
-- Sem regressao de acessibilidade e responsividade.
-- Build e testes web ok.
-Dependencias: EPIC-06 CD main concluido; EPIC-04 concluido ou incorporado na migracao.
+- Definir tokens semanticos (background/foreground/primary/muted/accent/border/ring/radius).
+- Aplicar padrao Tailwind v4 com `@theme inline` e `tw-animate-css`.
+- Criar `cn()` utilitario e convencao de variants (CVA).
+- Definir pasta de componentes (ex: `src/components/ui` ou `src/ui/shadcn`) e naming.
+- Escolher stack de primitives (Radix Vue ou shadcn-vue) para Dialog/Select/Dropdown/Tabs.
+Aceite:
+- Tokens definidos e usados em pelo menos 2 componentes base.
+- Build e preview ok com dark/light.
+Dependencias: EPIC-06 CD main concluido; EPIC-04 estabilizado.
+
+Card P2 - WEB | Biblioteca de componentes base (Shadcn)  
+Objetivo: criar componentes reutilizaveis com acessibilidade e variantes.  
+Escopo: WEB (UI base + wrappers).  
+Estrategia:
+- Button, Badge, Input, Textarea, Label, Select, Checkbox, Switch.
+- Card, Table, Tabs, Tooltip, Dropdown, Dialog/Sheet, Toast, Skeleton.
+- Mapear componentes atuais (`BaseDrawer`, toggles, toasts) para os novos.
+Aceite:
+- Componentes base com variantes documentadas e usados nas telas admin.
+
+Card P2 - WEB | Layout e navegacao (Shell/Admin/Sidebar/Topbar)  
+Objetivo: padronizar layout principal com novos componentes e spacing tokens.  
+Escopo: ShellView, AdminView, SidebarContent, AdminTopBar, AdminSidebar.  
+Estrategia:
+- Refatorar header, buttons, tabs e menu lateral.
+- Garantir responsivo e estados de loading coerentes.  
+Aceite:
+- Navegacao principal sem regressao e com consistencia visual.
+
+Card P2 - WEB | Migracao das telas Admin (Customers/Users/Rls/Overview/Security)  
+Objetivo: atualizar telas de maior uso para Shadcn mantendo fluxos atuais.  
+Escopo: CustomersPanel, UsersPanel, RlsPanel, OverviewPanel, SecurityPlatformAdminsPanel.  
+Estrategia:
+- Migrar por tela, mantendo modais e trees.
+- Consolidar estilos repetidos em componentes base.
+Aceite:
+- Paridade funcional e visual consistente entre telas.
+
+Card P2 - WEB | Auth + Pending + Modais globais  
+Objetivo: padronizar fluxos de login, callback e pending com a nova UI.  
+Escopo: LoginView, PendingView, CallbackView e modais globais.  
+Estrategia:
+- Aplicar componentes base e tokens de tipografia.
+- Padronizar mensagens de erro e estados vazios.  
+Aceite:
+- Fluxo de login/pending sem regressao e com layout consistente.
+
+Card P2 - WEB | Power BI embeds e previews  
+Objetivo: refatorar wrappers de embed para consistencia e acessibilidade.  
+Escopo: previews de customer/usuario, menu de paginas, export.  
+Estrategia:
+- Padronizar container, skeleton, empty state e menu de paginas.
+- Aplicar componentes base para tabs e cards.  
+Aceite:
+- Preview e embed com UI consistente, sem cortes e sem regressao.
+
+Card P2 - WEB | QA, acessibilidade e regressao visual  
+Objetivo: garantir qualidade e evitar regressao de UX.  
+Escopo: testes e checklist visual.  
+Estrategia:
+- Ajustar testes vitest e snapshots criticos.
+- Checklist por tela (desktop 1280, tablet 768, mobile 390).  
+Aceite:
+- Build, lint e testes ok; sem regressao visual detectada.
 
 ### EPIC-06: CI/CD GitHub Actions (DEVOPS)
 Card P1 — DEVOPS | CI PR monorepo-aware (web+api)  
@@ -155,6 +211,28 @@ Objetivo: cobertura da UI base (Shadcn) e menu mobile.
 ### EPIC-08: Modularizacao Admin + performance (API)
 Card P2 — API | Modularizar AdminUsersService por dominio  
 Objetivo: separar por dominios (customers, memberships, audit, security, perms).
+
+Card P2 — API | Repositorio Prisma por dominio  
+Contexto: services acessam Prisma direto, dificultando testes e isolamento.  
+Objetivo: criar camada de repositorio por dominio (customers, users, powerbi, rls).  
+Escopo: API (services + repositorios).  
+Estrategia:
+- Criar interfaces e implementacoes Prisma para cada dominio.
+- Injectar repositorios nos services.
+- Centralizar queries complexas e reduzir duplicacao.
+Aceite:
+- Services nao acessam Prisma diretamente.
+- Testes unitarios usam repositorios mockados.
+
+Card P2 — API | Reduzir acoplamento entre dominios  
+Contexto: orquestracao direta entre services dificulta manutencao.  
+Objetivo: usar eventos internos quando fizer sentido (ex: user/permissions/audit).  
+Escopo: API.  
+Estrategia:
+- Introduzir eventos internos leves para acoes transversais.
+- Evitar chamadas diretas entre dominios quando possivel.
+Aceite:
+- Fluxos transversais removem dependencias diretas.
 
 ### EPIC-10: Controle de acesso granular por report e RLS reutilizavel (API/WEB)
 Card P1 - API/WEB | Acesso por report (nao apenas por workspace)  
@@ -282,6 +360,28 @@ Aceite:
 - Paginas individuais ficam read-only quando ha grupo ativo e refletem o acesso efetivo.
 Notas:
 - Permissoes do customer devem refletir nos usuarios, mas a tela de usuarios sera tratada em card separado.
+
+### EPIC-14: Componentizacao Vue e manutenibilidade (WEB)
+Card P2 — WEB | Quebrar telas grandes em componentes menores  
+Contexto: telas longas dificultam manutencao e testes (ex: Customers/Users/Rls).  
+Objetivo: dividir em componentes claros e reutilizaveis.  
+Escopo: WEB (features/admin).  
+Estrategia:
+- Extrair subcomponentes por secao (tabs, listas, previews, modais).
+- Definir props tipadas e eventos claros.
+Aceite:
+- Componentes com responsabilidade unica.
+- Reducao de tamanho/complexidade nas telas principais.
+
+Card P2 — WEB | Extrair componentes de UI reutilizaveis  
+Contexto: padroes repetidos (cards/listas/toggles/modais).  
+Objetivo: criar componentes base reutilizaveis.  
+Escopo: WEB (src/ui).  
+Estrategia:
+- Criar componentes base com props tipadas.
+- Documentar uso em telas admin.
+Aceite:
+- Menos duplicacao de markup e estilos.
 
 ## Mini-roteiro (Opcao 3 + EPIC-11)
 1. UX dataset-first (WEB):
