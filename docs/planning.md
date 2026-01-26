@@ -111,6 +111,28 @@ Card P1 — WEB | Tabelas Admin responsivas (dep BaseTable)
 Objetivo: 390px sem corte; 768/1024 legivel.
 
 ### EPIC-05: Rebuild do front-end com Shadcn (WEB)
+Stack sugerido (compatibilidade validada com Vue 3.5 + Vite 7 + Tailwind v4):
+- shadcn-vue (componentes Shadcn para Vue) + radix-vue (primitives base).
+- tailwindcss@4 + @tailwindcss/vite + tw-animate-css (animacoes).
+- class-variance-authority + clsx + tailwind-merge (variants + cn).
+- lucide-vue-next (icons).
+- zod (validacao); vee-validate opcional (forms simples podem usar zod direto).
+Compatibilidade:
+- Tailwind v4 ja usado no projeto e combina com shadcn-vue.
+- Vue 3.5 e Vite 7 suportados pelos packages acima.
+- Sem dependencia de React/Next; stack 100% Vue.
+Observacao: evitar tailwind.config.ts (v4). Tokens via CSS + @theme inline.
+
+Estrategia de execucao (branch unica + milestones internos):
+- Branch sugerida: `feat/epic-05-shadcn-rebuild`.
+- Milestone 1: Infra + tokens (Tailwind v4 + @theme inline + tw-animate-css + cn/CVA).
+- Milestone 2: Componentes base (Button/Input/Select/Tabs/Dialog/Sheet/Toast/Skeleton/Card).
+- Milestone 3: Layout e shell (ShellView, AdminView, Sidebar/TopBar).
+- Milestone 4: Admin core (Customers/Users/Rls/Overview/Security).
+- Milestone 5: Auth + Pending + Callback + modais globais.
+- Milestone 6: Power BI embeds/previews (containers + estados vazios).
+- Milestone 7: QA final (lint/test/build + checklist manual 390/768/1280).
+
 Card P2 - WEB | Fundacao Shadcn + tokens + infra (Tailwind v4)  
 Contexto: hoje a UI usa classes utilitarias diretas e componentes customizados, sem biblioteca padronizada.  
 Objetivo: criar base de design system Shadcn-like com tokens semanticos e infra consistente.  
@@ -372,6 +394,7 @@ Estrategia:
 Aceite:
 - Componentes com responsabilidade unica.
 - Reducao de tamanho/complexidade nas telas principais.
+Status: concluido.
 
 Card P2 — WEB | Extrair componentes de UI reutilizaveis  
 Contexto: padroes repetidos (cards/listas/toggles/modais).  
@@ -382,6 +405,7 @@ Estrategia:
 - Documentar uso em telas admin.
 Aceite:
 - Menos duplicacao de markup e estilos.
+Status: concluido.
 
 ## Mini-roteiro (Opcao 3 + EPIC-11)
 1. UX dataset-first (WEB):

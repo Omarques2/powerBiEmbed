@@ -153,11 +153,10 @@
           <div class="h-full w-full overflow-hidden flex items-center justify-center">
             <div
               class="print-bi-area relative w-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm
-                     dark:border-slate-800 dark:bg-slate-900
-                     aspect-video
-                     max-h-[calc(100dvh-var(--topbar-h)-1rem)]
-                     sm:max-h-[calc(100dvh-var(--topbar-h)-1.5rem)]
-                     lg:aspect-auto lg:h-full lg:max-h-full"
+                    dark:border-slate-800 dark:bg-slate-900
+                    aspect-video
+                    max-h-[min(70vh,calc(100dvh-var(--topbar-h)-1.5rem))]
+                    lg:max-h-[min(64vh,calc(100dvh-var(--topbar-h)-2rem))]"
             >
               <div class="flex h-full flex-col">
                 <div ref="stageEl" class="relative flex-1 overflow-hidden">

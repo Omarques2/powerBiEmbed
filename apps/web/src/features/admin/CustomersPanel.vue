@@ -1,6 +1,6 @@
 <!-- apps/web/src/admin/CustomersPanel.vue -->
 <template>
-  <section class="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+  <PanelCard>
     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <div class="min-w-0">
         <div class="text-sm font-semibold text-slate-900 dark:text-slate-100">Customers</div>
@@ -46,61 +46,12 @@
       </div>
     </div>
 
-    <div class="mt-4 overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-800">
-      <table class="w-full table-fixed text-left text-sm">
-        <thead class="bg-slate-50 text-xs text-slate-600 dark:bg-slate-950/40 dark:text-slate-300">
-          <tr>
-            <th class="w-40 px-4 py-3">Code</th>
-            <th class="px-4 py-3">Nome</th>
-            <th class="w-36 px-4 py-3">Status</th>
-            <th class="w-28 px-4 py-3 text-right"></th>
-          </tr>
-        </thead>
-
-        <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
-          <tr v-for="c in filtered" :key="c.id" class="hover:bg-slate-50/60 dark:hover:bg-slate-950/30">
-            <td class="px-4 py-3 font-mono text-xs text-slate-900 dark:text-slate-100">
-              <div class="truncate">{{ c.code }}</div>
-            </td>
-
-            <td class="px-4 py-3 text-slate-900 dark:text-slate-100">
-              <div class="truncate">{{ c.name }}</div>
-            </td>
-
-            <td class="px-4 py-3">
-              <PermSwitch
-                :model-value="c.status === 'active'"
-                :loading="busy.isBusy(c.id)"
-                on-label="Ativo"
-                off-label="Inativo"
-                @toggle="toggleStatus(c)"
-              />
-            </td>
-
-            <td class="px-4 py-3">
-              <div class="flex items-center justify-end gap-2">
-                <button
-                  type="button"
-                  class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs hover:bg-slate-50
-                         disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
-                  :disabled="busy.isBusy(c.id)"
-                  @click="openEdit(c)"
-                >
-                  Editar
-                </button>
-
-              </div>
-            </td>
-          </tr>
-
-          <tr v-if="!filtered.length">
-            <td colspan="4" class="px-4 py-6 text-center text-xs text-slate-500 dark:text-slate-400">
-              Nenhum customer encontrado.
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+    <CustomerTable
+      :rows="filtered"
+      :is-busy="busy.isBusy"
+      @edit="openEdit"
+      @toggle-status="toggleStatus"
+    />
 
     <!-- MODAL: customer hub -->
     <div v-if="modalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
@@ -182,48 +133,7 @@
 
           <div v-else class="flex h-full flex-col">
             <div class="sticky top-0 z-10 border-b border-slate-200 bg-white pb-2 dark:border-slate-800 dark:bg-slate-900">
-              <div class="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  class="rounded-xl px-3 py-2 text-xs font-semibold"
-                  :class="modalTab === 'summary'
-                    ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900'
-                    : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200'"
-                  @click="modalTab = 'summary'"
-                >
-                  Resumo
-                </button>
-                <button
-                  type="button"
-                  class="rounded-xl px-3 py-2 text-xs font-semibold"
-                  :class="modalTab === 'reports'
-                    ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900'
-                    : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200'"
-                  @click="modalTab = 'reports'"
-                >
-                  Relatorios
-                </button>
-                <button
-                  type="button"
-                  class="rounded-xl px-3 py-2 text-xs font-semibold"
-                  :class="modalTab === 'pages'
-                    ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900'
-                    : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200'"
-                  @click="modalTab = 'pages'"
-                >
-                  Paginas
-                </button>
-                <button
-                  type="button"
-                  class="rounded-xl px-3 py-2 text-xs font-semibold"
-                  :class="modalTab === 'preview'
-                    ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900'
-                    : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200'"
-                  @click="modalTab = 'preview'"
-                >
-                  Preview
-                </button>
-              </div>
+              <PanelTabs v-model="modalTab" :tabs="modalTabs" />
             </div>
 
             <div class="mt-4 min-h-0 flex-1 overflow-y-auto">
@@ -898,7 +808,7 @@
         </div>
       </div>
     </div>
-  </section>
+  </PanelCard>
 </template>
 
 <script setup lang="ts">
@@ -932,6 +842,9 @@ import {
   type ReportPage,
 } from "@/features/admin/api/powerbi";
 
+import CustomerTable from "@/features/admin/customers/CustomerTable.vue";
+import PanelCard from "@/ui/PanelCard.vue";
+import PanelTabs from "@/ui/PanelTabs.vue";
 import { useConfirm } from "@/ui/confirm/useConfirm";
 import { useBusyMap } from "@/ui/ops/useBusyMap";
 import { useOptimisticMutation } from "@/ui/ops/useOptimisticMutation";
@@ -977,6 +890,12 @@ const modalTab = ref<"summary" | "reports" | "pages" | "preview">("summary");
 const modalCustomer = ref<CustomerRow | null>(null);
 const modalSaving = ref(false);
 const previewReportRefId = ref("");
+const modalTabs = [
+  { key: "summary", label: "Resumo" },
+  { key: "reports", label: "Relatorios" },
+  { key: "pages", label: "Paginas" },
+  { key: "preview", label: "Preview" },
+];
 
 const form = reactive({
   code: "",

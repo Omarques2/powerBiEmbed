@@ -28,6 +28,8 @@ Legenda:
 - [x] P1 Tabelas Admin responsivas (dep BaseTable)
 
 ## EPIC-05 - Rebuild do front-end com Shadcn (WEB)
+- [ ] Stack definido (shadcn-vue + radix-vue + Tailwind v4 + tw-animate-css + lucide-vue-next + zod)
+- [ ] Estrategia de execucao (branch unica + milestones internos) registrada
 - [ ] P2 Fundacao Shadcn + tokens + infra (Tailwind v4)
 - [ ] P2 Biblioteca de componentes base (Shadcn)
 - [ ] P2 Layout e navegacao (Shell/Admin/Sidebar/Topbar)
@@ -52,8 +54,8 @@ Legenda:
 - [ ] P2 Reduzir acoplamento entre dominios (eventos internos quando fizer sentido)
 
 ## EPIC-14 - Componentizacao Vue e manutenibilidade (WEB)
-- [ ] P2 Quebrar telas grandes (Customers/Users/Rls) em componentes menores
-- [ ] P2 Extrair componentes de UI reutilizaveis (listas, cards, modais, toggles)
+- [x] P2 Quebrar telas grandes (Customers/Users/Rls) em componentes menores
+- [x] P2 Extrair componentes de UI reutilizaveis (listas, cards, modais, toggles)
 
 ## EPIC-10 - Controle granular de reports + RLS reutilizavel (API/WEB)
 - [x] P1 Acesso por report (nao apenas por workspace)
