@@ -1,12 +1,12 @@
 <!-- src/views/ShellView.vue -->
 <template>
   <div
-    class="h-screen w-screen overflow-hidden bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 [--topbar-h:72px]"
+    class="h-screen w-screen overflow-hidden bg-background text-foreground [--topbar-h:72px]"
   >
     <div class="flex h-screen overflow-hidden">
       <!-- Desktop sidebar (collapsible) -->
       <aside
-        class="hidden shrink-0 border-r bg-white dark:bg-slate-900 dark:border-slate-800 lg:flex lg:flex-col transition-[width] duration-200"
+        class="hidden shrink-0 border-r border-border bg-card lg:flex lg:flex-col transition-[width] duration-200"
         :class="sidebarOpen ? 'w-80' : 'w-[72px]'"
       >
         <SidebarContent
@@ -33,7 +33,7 @@
       </aside>
 
       <!-- Mobile drawer -->
-      <BaseDrawer
+      <UiSheet
         :open="drawerOpen"
         overlay-class="lg:hidden"
         panel-class="lg:hidden"
@@ -60,40 +60,40 @@
           :user-email="me?.email ?? null"
           @close="drawerOpen = false"
         />
-      </BaseDrawer>
+      </UiSheet>
 
       <!-- Main viewer -->
       <main class="flex min-w-0 flex-1 flex-col overflow-hidden">
         <!-- Top bar -->
         <div
-          class="border-b bg-white dark:bg-slate-900 dark:border-slate-800 px-4 h-[var(--topbar-h)] flex items-center"
+          class="border-b border-border bg-card px-4 h-[var(--topbar-h)] flex items-center"
         >
           <div class="flex w-full items-center gap-3">
             <!-- Hamburger (mobile only) -->
-            <button
-              class="shrink-0 inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white
-                     hover:bg-slate-50 active:scale-[0.98] transition
-                     dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800 lg:hidden"
+            <UiButton
+              class="shrink-0 lg:hidden"
+              variant="outline"
+              size="icon"
               aria-label="Abrir menu"
               title="Menu"
               @click="drawerOpen = !drawerOpen"
             >
               <HamburgerIcon class="h-5 w-5" />
-            </button>
+            </UiButton>
 
             <!-- Title / Context -->
             <div class="min-w-0 flex-1">
               <div class="truncate text-sm font-semibold">
                 {{ selectedReport?.name ?? "Selecione um relatório" }}
               </div>
-              <div class="truncate text-xs text-slate-500 dark:text-slate-400">
+              <div class="truncate text-xs text-muted-foreground">
                 {{ selectedWorkspace?.name ?? "Selecione um workspace" }}
               </div>
             </div>
 
             <!-- Actions -->
             <div class="shrink-0 flex items-center gap-2">
-              <div v-if="loadingEmbed" class="hidden sm:block text-xs text-slate-500 dark:text-slate-400">
+              <div v-if="loadingEmbed" class="hidden sm:block text-xs text-muted-foreground">
                 Gerando embed token...
               </div>
 
@@ -101,11 +101,10 @@
               <ThemeToggle />
 
               <!-- Print BI -->
-              <button
-                class="inline-flex h-10 items-center justify-center gap-2 rounded-xl border px-3 text-sm font-medium
-                       border-slate-200 bg-white hover:bg-slate-50 active:scale-[0.98] transition
-                       disabled:opacity-60 disabled:cursor-not-allowed
-                       dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+              <UiButton
+                variant="outline"
+                size="md"
+                class="h-10 gap-2 px-3"
                 :disabled="!selectedReport || loadingEmbed || printing || !reportReady"
                 @click="openExportModal"
               >
@@ -128,14 +127,13 @@
                 <span class="hidden md:inline">
                   {{ printing ? "Gerando..." : "Exportar" }}
                 </span>
-              </button>
+              </UiButton>
 
               <!-- Refresh -->
-              <button
-                class="inline-flex h-10 items-center justify-center gap-2 rounded-xl border px-3 text-sm font-medium
-                       border-slate-200 bg-white hover:bg-slate-50 active:scale-[0.98] transition
-                       disabled:opacity-60 disabled:cursor-not-allowed
-                       dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+              <UiButton
+                variant="outline"
+                size="md"
+                class="h-10 gap-2 px-3"
                 :disabled="!selectedReport || loadingEmbed"
                 @click="refreshEmbed"
               >
@@ -143,18 +141,18 @@
                 <span class="hidden md:inline">
                   {{ loadingEmbed ? "Recarregando…" : "Recarregar" }}
                 </span>
-              </button>
+              </UiButton>
             </div>
           </div>
         </div>
 
         <!-- Viewer area (centralizado + sem scroll) -->
-        <div class="flex-1 min-h-0 overflow-hidden bg-slate-50 dark:bg-slate-950 p-2 sm:p-3 lg:p-4">
+        <div class="flex-1 min-h-0 overflow-hidden bg-background p-2 sm:p-3 lg:p-4">
 <div ref="hostEl" class="h-full w-full overflow-hidden flex items-center justify-center">
   <div
     ref="frameEl"
-    class="print-bi-area relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm
-           dark:border-slate-800 dark:bg-slate-900 mx-auto aspect-[16/9]
+    class="print-bi-area relative overflow-hidden rounded-2xl border border-border bg-card shadow-sm
+           mx-auto aspect-[16/9]
            w-[min(96vw,calc(100dvw-2rem))]
            max-h-[min(70vh,calc(100dvh-var(--topbar-h)-1.5rem))]
            md:w-auto md:h-auto"
@@ -166,12 +164,12 @@
                   <div v-if="!selectedReport" class="absolute inset-0 grid place-items-center p-6">
                     <div class="w-[min(760px,94%)]">
                       <div class="mb-4">
-                        <div class="text-sm font-medium text-slate-700 dark:text-slate-200">
-                          Selecione um relatório
-                        </div>
-                        <div class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                          Escolha um workspace e um report no menu lateral para renderizar o Power BI.
-                        </div>
+                      <div class="text-sm font-medium text-foreground">
+                        Selecione um relatório
+                      </div>
+                      <div class="mt-1 text-xs text-muted-foreground">
+                        Escolha um workspace e um report no menu lateral para renderizar o Power BI.
+                      </div>
                       </div>
 
                       <ReportSkeletonCard>
@@ -189,10 +187,9 @@
                     <div class="w-[min(760px,94%)]">
                       <div class="mb-4 flex items-center gap-3">
                         <div
-                          class="h-5 w-5 animate-spin rounded-full border-2 border-slate-300 border-t-slate-900
-                                 dark:border-slate-700 dark:border-t-slate-200"
+                          class="h-5 w-5 animate-spin rounded-full border-2 border-muted border-t-foreground"
                         />
-                        <div class="text-sm font-medium text-slate-700 dark:text-slate-200">
+                        <div class="text-sm font-medium text-foreground">
                           Carregando relatório…
                         </div>
                       </div>
@@ -224,8 +221,7 @@
 
                 <div
                   v-if="selectedReport && allowedPages.length"
-                  class="shrink-0 border-t border-slate-200 bg-white/90 px-2 py-1 text-[11px] text-slate-700
-                         dark:border-slate-800 dark:bg-slate-900/90 dark:text-slate-200"
+                  class="shrink-0 border-t border-border bg-background/90 px-2 py-1 text-[11px] text-foreground"
                 >
                   <div class="flex items-center gap-1 overflow-x-auto">
                     <button
@@ -233,10 +229,9 @@
                       :key="p.pageName"
                       type="button"
                       class="shrink-0 whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium transition
-                             border border-transparent hover:bg-slate-100 hover:border-slate-200
-                             dark:hover:bg-slate-800 dark:hover:border-slate-700"
+                             border border-transparent hover:bg-accent hover:text-accent-foreground"
                       :class="activePageName === p.pageName
-                        ? 'bg-slate-900 text-white border-slate-900 dark:bg-slate-100 dark:text-slate-900 dark:border-slate-100'
+                        ? 'bg-primary text-primary-foreground border-primary'
                         : 'bg-transparent'"
                       @click="setActivePage(p.pageName)"
                     >
@@ -257,34 +252,36 @@
       @click.self="closeExportModal"
     >
       <div
-        class="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-xl dark:border-slate-800 dark:bg-slate-900"
+        class="w-full max-w-md rounded-2xl border border-border bg-card p-5 shadow-xl"
       >
         <div class="flex items-center justify-between gap-4">
-          <div class="text-base font-semibold text-slate-900 dark:text-slate-100">Exportar report</div>
-          <button
-            class="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+          <div class="text-base font-semibold text-foreground">Exportar report</div>
+          <UiButton
+            variant="outline"
+            size="sm"
+            class="h-8 px-3"
             @click="closeExportModal"
           >
             Fechar
-          </button>
+          </UiButton>
         </div>
 
         <div class="mt-4 space-y-4">
           <div>
-            <div class="text-sm font-semibold text-slate-600 dark:text-slate-300">Formato</div>
+            <div class="text-sm font-semibold text-muted-foreground">Formato</div>
             <div class="mt-2">
               <PillToggle v-model="exportFormat" :options="exportFormatOptions" class="max-w-[280px]" />
             </div>
           </div>
 
           <div>
-            <div class="text-sm font-semibold text-slate-600 dark:text-slate-300">Escopo</div>
+            <div class="text-sm font-semibold text-muted-foreground">Escopo</div>
             <div class="mt-2">
               <PillToggle v-model="exportScope" :options="exportScopeOptions" class="max-w-[280px]" />
             </div>
             <div
               v-if="exportFormat === 'PNG' && exportScope === 'all'"
-              class="mt-2 text-sm text-amber-600 dark:text-amber-400"
+              class="mt-2 text-sm text-amber-600"
             >
               PNG com todas as abas gera um arquivo ZIP.
             </div>
@@ -292,22 +289,24 @@
         </div>
 
         <div class="mt-5 flex justify-end gap-2">
-          <button
-            class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 hover:bg-slate-50
-                   dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+          <UiButton
+            variant="outline"
+            size="md"
+            class="h-9 px-3"
             :disabled="printing"
             @click="closeExportModal"
           >
             Cancelar
-          </button>
-          <button
-            class="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-60
-                   dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
+          </UiButton>
+          <UiButton
+            variant="default"
+            size="md"
+            class="h-9 px-4"
             :disabled="printing"
             @click="confirmExport"
           >
             {{ printing ? "Gerando..." : "Exportar" }}
-          </button>
+          </UiButton>
         </div>
       </div>
     </div>
@@ -320,9 +319,9 @@ import { useRouter } from "vue-router";
 import * as pbi from "powerbi-client";
 
 import ThemeToggle from "@/ui/theme/ThemeToggle.vue";
+import { Button as UiButton, Sheet as UiSheet } from "@/components/ui";
 import { useToast } from "@/ui/toast/useToast";
 import PillToggle from "@/ui/toggles/PillToggle.vue";
-import BaseDrawer from "@/ui/BaseDrawer.vue";
 
 import { http } from "@/api/http";
 import { unwrapData, type ApiEnvelope } from "@/api/envelope";

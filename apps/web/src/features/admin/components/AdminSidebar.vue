@@ -4,58 +4,37 @@
   <aside class="min-w-0" v-bind="$attrs">
     <!-- MOBILE: Tabs horizontais (compacto) -->
     <div class="lg:hidden">
-      <div
-        class="rounded-2xl border border-slate-200 bg-white/80 p-2 shadow-sm backdrop-blur
-               dark:border-slate-800 dark:bg-slate-900/70"
-      >
+      <UiCard class="border-border/60 bg-card/80 shadow-sm backdrop-blur">
+        <UiCardContent class="p-2">
         <div class="flex items-center justify-between gap-2 px-1">
           <div class="min-w-0">
-            <div class="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
+            <div class="truncate text-sm font-semibold text-foreground">
               Admin
             </div>
-            <div class="truncate text-[11px] text-slate-500 dark:text-slate-400">
+            <div class="truncate text-[11px] text-muted-foreground">
               {{ activeLabel }}
             </div>
           </div>
 
           <div
-            class="shrink-0 rounded-full border border-slate-200 bg-white px-2 py-1 text-[11px] text-slate-600
-                   dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"
+            class="shrink-0 rounded-full border border-border bg-background px-2 py-1 text-[11px] text-muted-foreground"
           >
             Ops
           </div>
         </div>
 
-        <div
-          class="mt-2 flex gap-2 overflow-x-auto pb-1 pr-1 [-webkit-overflow-scrolling:touch]"
-          aria-label="Admin tabs"
-        >
-          <button
-            v-for="i in items"
-            :key="i.key"
-            type="button"
-            class="shrink-0 rounded-full border px-3 py-2 text-xs font-medium transition
-                   active:scale-[0.98]"
-            :class="activeKey === i.key
-              ? 'border-slate-900 bg-slate-900 text-white dark:border-slate-100 dark:bg-slate-100 dark:text-slate-900'
-              : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800'"
-            :aria-current="activeKey === i.key ? 'page' : undefined"
-            @click="$emit('select', i.key)"
-          >
-            {{ i.label }}
-          </button>
+        <div class="mt-2 pb-1 pr-1" aria-label="Admin tabs">
+          <UiTabs v-model="tabModel" :tabs="items" />
         </div>
-      </div>
+        </UiCardContent>
+      </UiCard>
     </div>
 
     <!-- DESKTOP: comportamento original (no fluxo normal, sem sticky) -->
-    <div
-      class="hidden lg:block rounded-2xl border border-slate-200 bg-white p-3 shadow-sm
-             dark:border-slate-800 dark:bg-slate-900"
-    >
+    <UiCard class="hidden lg:block border-border bg-card p-3 shadow-sm">
       <div class="flex items-center justify-between">
-        <div class="text-sm font-semibold text-slate-900 dark:text-slate-100">Admin Panel</div>
-        <div class="text-[11px] text-slate-500 dark:text-slate-400">Ops</div>
+        <div class="text-sm font-semibold text-foreground">Admin Panel</div>
+        <div class="text-[11px] text-muted-foreground">Ops</div>
       </div>
 
       <div class="mt-3 space-y-1">
@@ -64,10 +43,10 @@
           :key="i.key"
           type="button"
           class="w-full rounded-xl px-3 py-2 text-left text-sm transition
-                 focus:outline-none focus:ring-2 focus:ring-slate-300 dark:focus:ring-slate-700"
+                 focus:outline-none focus:ring-2 focus:ring-ring"
           :class="activeKey === i.key
-            ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900'
-            : 'text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800'"
+            ? 'bg-primary text-primary-foreground'
+            : 'text-foreground hover:bg-accent hover:text-accent-foreground'"
           :aria-current="activeKey === i.key ? 'page' : undefined"
           @click="$emit('select', i.key)"
         >
@@ -76,17 +55,21 @@
       </div>
 
       <div
-        class="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600
-               dark:border-slate-800 dark:bg-slate-950/30 dark:text-slate-300"
+        class="mt-4 rounded-xl border border-border bg-muted/50 p-3 text-xs text-muted-foreground"
       >
         Dica: use <span class="font-semibold">Ctrl+K</span> para buscar (se habilitado).
       </div>
-    </div>
+    </UiCard>
   </aside>
 </template>
 
 <script setup lang="ts">
 import { computed } from "vue";
+import {
+  Card as UiCard,
+  CardContent as UiCardContent,
+  Tabs as UiTabs,
+} from "@/components/ui";
 
 export type AdminTabKey =
   | "overview"
@@ -100,9 +83,21 @@ const props = defineProps<{
   items: Array<{ key: AdminTabKey; label: string }>;
 }>();
 
-defineEmits<{
+const emit = defineEmits<{
   (e: "select", key: AdminTabKey): void;
 }>();
+
+const tabModel = computed({
+  get: () => props.activeKey,
+  set: (value) => {
+    if (value !== props.activeKey) {
+      const next = value as AdminTabKey;
+      if (props.items.some((item) => item.key === next)) {
+        emit("select", next);
+      }
+    }
+  },
+});
 
 const activeLabel = computed(() => {
   return props.items.find((x) => x.key === props.activeKey)?.label ?? "";

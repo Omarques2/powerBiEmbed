@@ -28,15 +28,16 @@ Legenda:
 - [x] P1 Tabelas Admin responsivas (dep BaseTable)
 
 ## EPIC-05 - Rebuild do front-end com Shadcn (WEB)
-- [ ] Stack definido (shadcn-vue + radix-vue + Tailwind v4 + tw-animate-css + lucide-vue-next + zod)
-- [ ] Estrategia de execucao (branch unica + milestones internos) registrada
-- [ ] P2 Fundacao Shadcn + tokens + infra (Tailwind v4)
-- [ ] P2 Biblioteca de componentes base (Shadcn)
-- [ ] P2 Layout e navegacao (Shell/Admin/Sidebar/Topbar)
-- [ ] P2 Migracao das telas Admin (Customers/Users/Rls/Overview/Security)
-- [ ] P2 Auth + Pending + Modais globais
-- [ ] P2 Power BI embeds e previews
-- [ ] P2 QA, acessibilidade e regressao visual
+- [x] Stack definido (shadcn-vue + radix-vue + Tailwind v4 + tw-animate-css + lucide-vue-next + zod)
+- [x] Estrategia de execucao (branch unica + milestones internos) registrada
+- [x] Milestone 1: Infra + tokens (Tailwind v4 + @theme inline + cn/CVA)
+- [x] Milestone 2: Componentes base (Button/Input/Select/Tabs/Dialog/Sheet/Toast/Skeleton/Card)
+- [x] Milestone 3: Layout e shell (Home/Shell/Admin/Sidebar/Topbar)
+- [ ] Milestone 4: Admin core (Customers/Users/Rls/Overview/Security)
+- [ ] Milestone 5: Auth + Pending + Callback + modais globais
+- [ ] Milestone 6: Power BI embeds e previews
+- [ ] Milestone 7: QA final (lint/test/build + regressao visual)
+- [ ] Milestone 8: Ajustes finais de UX/branding (HomeView + cards + skeletons + loading + 404)
 
 ## EPIC-06 - CI/CD GitHub Actions (DEVOPS)
 - [x] P1 CI PR monorepo-aware (lint/type/test/build web+api + cache + paths-filter)

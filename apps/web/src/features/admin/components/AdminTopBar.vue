@@ -1,25 +1,21 @@
 <template>
-  <!-- Container “card-like” mas fino -->
-  <header
-    class="rounded-2xl border border-slate-200 bg-white/80 backdrop-blur
-           dark:border-slate-800 dark:bg-slate-900/70"
-  >
-    <div class="px-2.5 py-2 sm:px-3">
+  <UiCard class="border-border/60 bg-card/80 shadow-sm backdrop-blur">
+    <UiCardContent class="px-2.5 py-2 sm:px-3">
       <!-- Grid garante centralização real do título -->
       <div class="grid grid-cols-[auto_1fr_auto] items-center gap-2">
         <!-- Left: Home/App -->
-        <button
+        <UiButton
           type="button"
-          class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-xs
-                 hover:bg-slate-50 active:scale-[0.98] transition
-                 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+          variant="outline"
+          size="sm"
+          class="h-9 gap-2 px-3"
           title="Voltar para o App"
           aria-label="Voltar para o App"
           @click="$emit('back')"
         >
           <IconArrowLeft class="h-4 w-4" />
           <span class="hidden sm:inline">App</span>
-        </button>
+        </UiButton>
 
         <!-- Center: Admin / Section -->
         <div class="min-w-0 justify-self-center text-center">
@@ -43,12 +39,11 @@
 
         <!-- Right: actions -->
         <div class="flex items-center justify-self-end gap-2">
-          <button
+          <UiButton
             type="button"
-            class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs
-                   hover:bg-slate-50 active:scale-[0.98] transition
-                   disabled:opacity-60 disabled:cursor-not-allowed
-                   dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+            variant="outline"
+            size="sm"
+            class="h-9 gap-2 px-3"
             :disabled="loadingAny"
             title="Recarregar"
             aria-label="Recarregar"
@@ -56,27 +51,33 @@
           >
             <IconRefresh class="h-4 w-4" :class="loadingAny ? 'animate-spin' : ''" />
             <span class="hidden sm:inline">{{ loadingAny ? "Carregando..." : "Recarregar" }}</span>
-          </button>
+          </UiButton>
 
-          <button
+          <UiButton
             v-if="showSearch"
             type="button"
-            class="hidden rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs hover:bg-slate-50
-                   dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800 sm:inline-flex"
+            variant="outline"
+            size="sm"
+            class="hidden h-9 px-3 sm:inline-flex"
             @click="$emit('search')"
           >
             Buscar (Ctrl+K)
-          </button>
+          </UiButton>
 
           <ThemeToggle :show-label="true" size="sm" />
         </div>
       </div>
-    </div>
-  </header>
+    </UiCardContent>
+  </UiCard>
 </template>
 
 <script setup lang="ts">
 import { computed } from "vue";
+import {
+  Button as UiButton,
+  Card as UiCard,
+  CardContent as UiCardContent,
+} from "@/components/ui";
 import ThemeToggle from "@/ui/theme/ThemeToggle.vue";
 import IconRefresh from "@/components/icons/IconRefresh.vue";
 import IconArrowLeft from "@/components/icons/IconArrowLeft.vue";

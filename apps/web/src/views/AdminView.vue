@@ -1,6 +1,6 @@
 <!-- apps/web/src/views/AdminView.vue -->
 <template>
-  <div class="min-h-screen bg-slate-50 dark:bg-slate-950">
+  <div class="min-h-screen bg-background text-foreground">
     <div class="w-full px-2 py-3 sm:px-4 sm:py-4 lg:px-6">
       <!-- GLOBAL TOPBAR (spans sidebar + content) -->
       <AdminTopBar

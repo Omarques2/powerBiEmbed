@@ -132,6 +132,17 @@ Estrategia de execucao (branch unica + milestones internos):
 - Milestone 5: Auth + Pending + Callback + modais globais.
 - Milestone 6: Power BI embeds/previews (containers + estados vazios).
 - Milestone 7: QA final (lint/test/build + checklist manual 390/768/1280).
+- Milestone 8: Ajustes finais de UX/branding (HomeView, dark theme verde, loading global, 404, pending).
+
+Checklist de milestones (EPIC-05):
+- [x] Milestone 1: Infra + tokens
+- [x] Milestone 2: Componentes base
+- [x] Milestone 3: Layout e shell
+- [ ] Milestone 4: Admin core
+- [ ] Milestone 5: Auth + Pending + Callback + modais globais
+- [ ] Milestone 6: Power BI embeds/previews
+- [ ] Milestone 7: QA final
+- [ ] Milestone 8: Ajustes finais de UX/branding
 
 Card P2 - WEB | Fundacao Shadcn + tokens + infra (Tailwind v4)  
 Contexto: hoje a UI usa classes utilitarias diretas e componentes customizados, sem biblioteca padronizada.  
@@ -202,6 +213,33 @@ Estrategia:
 - Checklist por tela (desktop 1280, tablet 768, mobile 390).  
 Aceite:
 - Build, lint e testes ok; sem regressao visual detectada.
+
+Card P2 - WEB | Ajustes finais de UX/branding (Shadcn)  
+Objetivo: padronizar UX minimalista e reduzir saltos visuais.  
+Escopo: WEB (Shell/Home, Admin, Pending, Loading, 404).  
+Checklist:
+- [ ] Renomear ShellView -> HomeView (rotas, imports, nomenclatura).
+- [ ] Tabelas responsivas: reduzir colunas no mobile ou migrar para cards.
+- [ ] Skeleton em 100% dos loadings para evitar jump de layout.
+- [ ] Visual limpo/minimalista: remover labels explicativas; usar tooltip "?" quando necessario; inputs com placeholder.
+- [ ] Tela de loading global: transicao desfoca fundo + animacao.
+- [ ] Melhorar PendingView (layout e mensagem).
+- [ ] Criar 404 estilizada (tematica Power BI).
+- [ ] Minimizar uso de tabelas; preferir cards com icones simples.
+- [ ] Tema escuro com foco em verde (alinhar com logo).
+Aceite:
+- UX consistente em 390/768/1280, sem jumps perceptiveis.
+- Loading e empty states padronizados.
+
+Ordem recomendada (para evitar retrabalho):
+1. Fundacao Shadcn + tokens + infra (Milestone 1)
+2. Biblioteca de componentes base (Milestone 2)
+3. Layout e navegacao (Milestone 3)
+4. Migracao das telas Admin (Milestone 4)
+5. Auth + Pending + Modais globais (Milestone 5)
+6. Power BI embeds e previews (Milestone 6)
+7. QA, acessibilidade e regressao visual (Milestone 7)
+8. Ajustes finais de UX/branding (Milestone 8)
 
 ### EPIC-06: CI/CD GitHub Actions (DEVOPS)
 Card P1 — DEVOPS | CI PR monorepo-aware (web+api)  

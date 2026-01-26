@@ -1,25 +1,25 @@
 <!-- src/components/SidebarContent.vue -->
 <template>
-  <div class="flex h-full flex-col bg-white dark:bg-slate-900">
+  <div class="flex h-full flex-col bg-card text-foreground">
     <!-- Header -->
     <div
-      class="grid items-center border-b bg-white dark:bg-slate-900 dark:border-slate-800 h-[var(--topbar-h)]"
+      class="grid items-center border-b border-border bg-card h-[var(--topbar-h)]"
       :class="padHeader"
       style="grid-template-columns: 40px 1fr 40px;"
     >
       <!-- ESQUERDA -->
       <div class="flex items-center justify-start">
-        <button
+        <UiButton
           v-if="mode === 'desktop'"
-          class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white
-                 hover:bg-slate-50 active:scale-[0.98] transition
-                 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+          variant="outline"
+          size="icon"
+          class="h-10 w-10"
           :aria-label="collapsed ? 'Expandir menu' : 'Colapsar menu'"
           :title="collapsed ? 'Expandir' : 'Colapsar'"
           @click="$emit('toggleCollapsed')"
         >
           <HamburgerIcon class="h-5 w-5" />
-        </button>
+        </UiButton>
 
         <img
           v-else
@@ -37,11 +37,11 @@
 
       <!-- DIREITA -->
       <div class="flex items-center justify-end">
-        <button
+        <UiButton
           v-if="mode === 'mobile'"
-          class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white
-                 hover:bg-slate-50 active:scale-[0.98] transition
-                 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+          variant="outline"
+          size="icon"
+          class="h-10 w-10"
           aria-label="Fechar"
           title="Fechar"
           @click="$emit('close')"
@@ -51,7 +51,7 @@ class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-wid
                stroke-linecap="round" stroke-linejoin="round">
             <path d="M18 6 6 18M6 6l12 12" />
           </svg>
-        </button>
+        </UiButton>
 
         <img
           v-else-if="!collapsed"
@@ -65,12 +65,9 @@ class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-wid
     </div>
 
     <!-- Actions (top) -->
-    <div class="bg-white dark:bg-slate-900" :class="padSection">
-      <button
-        class="w-full rounded-xl px-3 py-2.5 text-sm font-medium transition
-               active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed disabled:active:scale-100
-               bg-slate-900 text-white hover:bg-slate-800
-               dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
+    <div class="bg-card" :class="padSection">
+      <UiButton
+        class="w-full justify-center gap-2"
         :disabled="loadingWorkspaces"
         :title="collapsed ? (loadingWorkspaces ? 'Carregando…' : 'Recarregar workspaces') : ''"
         :aria-busy="loadingWorkspaces ? 'true' : 'false'"
@@ -94,11 +91,11 @@ class="h-5 w-5" :class="loadingWorkspaces ? 'animate-spin' : ''" viewBox="0 0 24
             <path d="M3 21v-6h6" />
           </svg>
         </span>
-      </button>
+      </UiButton>
     </div>
 
     <!-- Scrollable list -->
-    <div class="flex-1 overflow-auto bg-white dark:bg-slate-900" :class="padList">
+    <div class="flex-1 overflow-auto bg-card" :class="padList">
       <!-- Error -->
       <div
         v-if="error"
@@ -134,8 +131,7 @@ class="h-5 w-5" :class="loadingWorkspaces ? 'animate-spin' : ''" viewBox="0 0 24
 
               <div
                 v-else
-                class="mx-auto grid h-10 w-10 place-items-center rounded-lg border border-slate-200 bg-white text-sm font-semibold
-                       dark:border-slate-800 dark:bg-slate-900"
+                class="mx-auto grid h-10 w-10 place-items-center rounded-lg border border-border bg-background text-sm font-semibold"
               >
                 {{ workspaceInitials(w.name ?? String(w.workspaceId ?? w.id)) }}
               </div>
@@ -156,11 +152,10 @@ class="h-5 w-5" :class="loadingWorkspaces ? 'animate-spin' : ''" viewBox="0 0 24
           <div class="flex items-center justify-between px-2 py-2">
             <div class="text-md font-semibold text-slate-800 dark:text-slate-200">Relatorios</div>
 
-            <button
-              class="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white p-1.5 text-xs font-medium
-                     hover:bg-slate-50 active:scale-[0.98] transition
-                     disabled:opacity-60 disabled:cursor-not-allowed disabled:active:scale-100
-                     dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+            <UiButton
+              variant="outline"
+              size="icon"
+              class="h-8 w-8"
               :disabled="loadingReports"
               title="Recarregar reports"
               :aria-busy="loadingReports ? 'true' : 'false'"
@@ -175,37 +170,40 @@ class="h-5 w-5" :class="loadingReports ? 'animate-spin' : ''"
                 <path d="M21 3v6h-6" />
                 <path d="M3 21v-6h6" />
               </svg>
-            </button>
+            </UiButton>
           </div>
 
           <div v-if="reports.length === 0 && !loadingReports" class="px-2 pb-2 text-xs text-slate-500 dark:text-slate-400">
             Nenhum report liberado neste workspace.
           </div>
 
-          <button
+          <UiButton
             v-for="r in reports"
             :key="r.id"
-            class="w-full rounded-xl border px-3 py-2 text-left text-sm hover:bg-slate-50 dark:hover:bg-slate-800
-                   bg-white dark:bg-slate-900"
+            variant="outline"
+            class="w-full justify-start rounded-xl border-border bg-background text-left text-sm hover:bg-accent hover:text-accent-foreground"
             :class="selectedReport?.id === r.id
-              ? 'border-slate-400 bg-slate-50 dark:border-slate-600 dark:bg-slate-800'
-              : 'border-slate-200 dark:border-slate-800'"
+              ? 'border-primary/50 bg-accent text-foreground'
+              : ''"
             @click="handleOpenReport(r)"
           >
-            <div class="truncate font-medium">{{ r.name ?? r.id }}</div>
-            <div class="mt-0.5 truncate text-xs text-slate-500 dark:text-slate-400">{{ r.id }}</div>
-          </button>
+            <div class="min-w-0 text-left">
+              <div class="truncate font-medium">{{ r.name ?? r.id }}</div>
+              <div class="mt-0.5 truncate text-xs text-muted-foreground">{{ r.id }}</div>
+            </div>
+          </UiButton>
         </div>
 
         <!-- Reports as icons when collapsed -->
         <div v-if="collapsed && selectedWorkspaceId" class="mt-2 space-y-2 px-1">
           <div class="mx-auto h-px w-10 bg-slate-200 dark:bg-slate-800" />
 
-          <button
+          <UiButton
             v-for="r in reports"
             :key="r.id"
-            class="mx-auto grid h-10 w-10 place-items-center rounded-lg border border-slate-200 bg-white hover:bg-slate-50
-                   dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+            variant="outline"
+            size="icon"
+            class="mx-auto h-10 w-10"
             :class="selectedReport?.id === r.id ? 'border-slate-400 bg-slate-50 dark:border-slate-600 dark:bg-slate-800' : ''"
             :title="r.name ?? r.id"
             @click="handleOpenReport(r)"
@@ -217,7 +215,7 @@ class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-wid
               <path d="M14 2v6h6" />
               <path d="M8 13h8M8 17h8M8 9h2" />
             </svg>
-          </button>
+          </UiButton>
         </div>
       </div>
     </div>
@@ -225,12 +223,10 @@ class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-wid
     <!-- Bottom area (Admin + User) -->
     <div class="mt-auto">
       <!-- Admin shortcut (fica embaixo, acima do footer do usuário) -->
-      <div v-if="showAdminButton" class="border-t bg-white dark:bg-slate-900 dark:border-slate-800" :class="padSection">
-        <button
-          class="w-full rounded-xl px-3 py-2.5 text-sm font-medium transition
-                 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed disabled:active:scale-100
-                 border border-slate-200 bg-white hover:bg-slate-50
-                 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+      <div v-if="showAdminButton" class="border-t border-border bg-card" :class="padSection">
+        <UiButton
+          variant="outline"
+          class="w-full gap-2"
           :disabled="!goAdmin"
           :title="collapsed ? 'Painel admin' : ''"
           aria-label="Painel admin"
@@ -244,7 +240,7 @@ class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-wid
               <path d="M9 12l2 2 4-4" />
             </svg>
             <span>Painel admin</span>
-          </span>
+            </span>
 
           <span v-else class="mx-auto inline-flex items-center justify-center">
             <svg
@@ -254,18 +250,18 @@ class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-wid
               <path d="M9 12l2 2 4-4" />
             </svg>
           </span>
-        </button>
+        </UiButton>
       </div>
 
       <!-- Footer (User) -->
-      <div class="border-t bg-white dark:bg-slate-900 dark:border-slate-800" :class="padSection">
+      <div class="border-t border-border bg-card" :class="padSection">
         <div class="relative">
           <button
             class="transition"
             :class="
               isCollapsedDesktop
                 ? 'mx-auto grid h-12 w-12 place-items-center rounded-full border-0 bg-transparent hover:bg-transparent'
-                : 'w-full rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800'
+                : 'w-full rounded-2xl border border-border bg-background hover:bg-accent p-3'
             "
             :title="isCollapsedDesktop ? userEmailOrFallback : ''"
             aria-label="Menu do usuário"
@@ -273,8 +269,7 @@ class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-wid
           >
             <template v-if="isCollapsedDesktop">
               <div
-class="grid h-10 w-10 place-items-center rounded-full border border-slate-200 bg-white text-sm font-semibold
-                          dark:border-slate-800 dark:bg-slate-900">
+class="grid h-10 w-10 place-items-center rounded-full border border-border bg-background text-sm font-semibold">
                 {{ userInitials }}
               </div>
             </template>
@@ -282,21 +277,20 @@ class="grid h-10 w-10 place-items-center rounded-full border border-slate-200 bg
             <template v-else>
               <div class="flex items-center gap-3">
                 <div
-class="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-slate-200 bg-white text-sm font-semibold
-                            dark:border-slate-800 dark:bg-slate-900">
+class="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-border bg-background text-sm font-semibold">
                   {{ userInitials }}
                 </div>
 
                 <div class="min-w-0 flex-1 text-left">
-                  <div class="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
+                  <div class="truncate text-sm font-semibold text-foreground">
                     {{ userNameOrFallback }}
                   </div>
-                  <div class="truncate text-xs text-slate-500 dark:text-slate-400">
+                  <div class="truncate text-xs text-muted-foreground">
                     {{ userEmailOrFallback }}
                   </div>
                 </div>
 
-                <div class="shrink-0 text-slate-500 dark:text-slate-400">
+                <div class="shrink-0 text-muted-foreground">
                   <svg
 class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                        stroke-linecap="round" stroke-linejoin="round">
@@ -309,32 +303,30 @@ class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-wid
 
           <div
             v-if="userMenuOpen"
-            class="absolute bottom-[calc(100%+8px)] z-30 rounded-2xl border border-slate-200 bg-white shadow-lg
-                   dark:border-slate-800 dark:bg-slate-900"
+            class="absolute bottom-[calc(100%+8px)] z-30 rounded-2xl border border-border bg-card shadow-lg"
             :class="isCollapsedDesktop ? 'left-full ml-2 w-[240px]' : 'left-0 w-full'"
           >
             <div class="p-2">
               <div class="px-3 py-2">
-                <div class="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
+                <div class="truncate text-sm font-semibold text-foreground">
                   {{ userNameOrFallback }}
                 </div>
-                <div class="truncate text-xs text-slate-500 dark:text-slate-400">
+                <div class="truncate text-xs text-muted-foreground">
                   {{ userEmailOrFallback }}
                 </div>
               </div>
 
-              <div class="my-2 h-px bg-slate-200 dark:bg-slate-800" />
+              <div class="my-2 h-px bg-border" />
 
               <button
-                class="w-full rounded-xl px-3 py-2 text-left text-sm hover:bg-slate-50 dark:hover:bg-slate-800"
+                class="w-full rounded-xl px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground"
                 @click="onAccount(); userMenuOpen=false"
               >
                 Minha conta
               </button>
 
               <button
-                class="w-full rounded-xl px-3 py-2 text-left text-sm text-red-700 hover:bg-red-50
-                       dark:text-red-300 dark:hover:bg-red-950/40"
+                class="w-full rounded-xl px-3 py-2 text-left text-sm text-destructive hover:bg-destructive/10"
                 @click="onLogout(); userMenuOpen=false"
               >
                 Sair
@@ -350,6 +342,7 @@ class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-wid
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { Button as UiButton } from "@/components/ui";
 import HamburgerIcon from "./icons/HamburgerIcon.vue";
 import logoUrl from "../assets/logo.png";
 
