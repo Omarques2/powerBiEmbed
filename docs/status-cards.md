@@ -35,7 +35,7 @@ Legenda:
 - [x] Milestone 3: Layout e shell (Home/Shell/Admin/Sidebar/Topbar)
 - [x] Milestone 4: Admin core (Customers/Users/Rls/Overview/Security)
 - [x] Milestone 5: Auth + Pending + Callback + modais globais
-- [ ] Milestone 6: Power BI embeds e previews
+- [x] Milestone 6: Power BI embeds e previews
 - [ ] Milestone 7: QA final (lint/test/build + regressao visual)
 - [ ] Milestone 8: Ajustes finais de UX/branding (HomeView + cards + skeletons + loading + 404)
 

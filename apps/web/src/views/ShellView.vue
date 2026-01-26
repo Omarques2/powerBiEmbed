@@ -182,7 +182,7 @@
 
                   <div
                     v-if="selectedReport && loadingEmbed"
-                    class="absolute inset-0 z-10 grid place-items-center bg-white/70 dark:bg-slate-950/60 backdrop-blur-sm"
+                    class="absolute inset-0 z-10 grid place-items-center bg-background/70 backdrop-blur-sm"
                   >
                     <div class="w-[min(760px,94%)]">
                       <div class="mb-4 flex items-center gap-3">
@@ -204,8 +204,7 @@
 
                   <div
                     v-if="embedError && selectedReport"
-                    class="absolute bottom-3 left-3 right-3 z-20 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 shadow
-                           dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-200"
+                    class="absolute bottom-3 left-3 right-3 z-20 rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive shadow"
                   >
                     {{ embedError }}
                   </div>
