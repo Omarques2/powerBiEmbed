@@ -1544,17 +1544,17 @@ onBeforeUnmount(() => {
     overflow: visible !important;
   }
 
-  .print-block .print-bi-area {
+  :global(.print-block) .print-bi-area {
     display: none !important;
   }
-  .print-block .print-warning {
+  :global(.print-block) .print-warning {
     display: flex !important;
   }
 
-  .app-shell:not(.has-report) .print-bi-area {
+  :global(.app-shell:not(.has-report)) .print-bi-area {
     display: none !important;
   }
-  .app-shell:not(.has-report) .print-warning {
+  :global(.app-shell:not(.has-report)) .print-warning {
     display: flex !important;
   }
 

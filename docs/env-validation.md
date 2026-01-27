@@ -23,8 +23,8 @@ Checklist local:
 
 ### Staging
 - **API**: container apps staging (deploy automatico pelo Actions).
-- **WEB**: unico ambiente SWA (como hoje), valida UI contra API staging.
-- **Banco**: pode ser DB test ou shadow, mas **nunca** prod.
+- **WEB**: SWA **staging** separado.
+- **Banco**: DB staging (clone via PITR ou dump/restore), **nunca** prod.
 
 Checklist staging (minimo):
 - `GET /health` e `GET /ready` 200
@@ -34,7 +34,7 @@ Checklist staging (minimo):
 
 ### Prod
 - **API**: container apps prod (deploy manual/approve).
-- **WEB**: mesmo SWA (quando usar prod, garantir API_BASE_URL correta).
+- **WEB**: SWA **prod** separado.
 - **Banco**: `pbi_embed` (prod). **Nao resetar.**
 
 Checklist prod (minimo):
@@ -46,14 +46,16 @@ Checklist prod (minimo):
 1. **Local**: testes e lint ok.
 2. **Push main**: CI roda. CD publica **staging**.
 3. **Validar staging**: smoke test e checagem de features criticas.
-4. **Promover prod**: liberar deploy para prod (manual/approve).
+4. **Promover prod**: liberar deploy para prod (manual/approve + imagem por digest).
 
 ## Protecoes essenciais
 - `TEST_DATABASE_URL` obrigatorio em `test:e2e`.
 - Actions nunca roda `migrate dev` em prod.
-- Variaveis separadas por ambiente (staging/prod).
+ - Variaveis separadas por ambiente (staging/prod) para API e URL do Web.
 - DB prod nunca resetado.
+ - Staging usa snapshot/clone do prod (PITR) quando for necessario validar migrations.
 
 ## Notas
 - Caso exista necessidade de validar feature de DB, sempre use DB test.
 - Se for necessario seed de prod, realizar manualmente e com revisao.
+ - Para clonar prod -> staging, consulte `docs/db-clone-pitr.md`.

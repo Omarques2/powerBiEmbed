@@ -1,11 +1,13 @@
-# CD Main - Azure Container Apps + Static Web Apps
+# CD Main - Azure Container Apps + Static Web Apps (Staging -> Prod)
 
-Este guia descreve como configurar o CD no Azure para a API (Container Apps) e o Web (Static Web Apps).
+Este guia descreve como configurar o CD no Azure para a API (Container Apps) e o Web (Static Web Apps),
+com separacao real de ambientes e promocao controlada (staging -> prod).
 
 ## 1) Pre-requisitos
 - Subscription Azure com permissao para criar recursos.
 - Repositorio GitHub com Actions habilitado.
-- Banco Postgres acessivel a partir do GitHub Actions (ou use o mesmo DB de teste).
+- Banco Postgres acessivel a partir do GitHub Actions.
+- Ambientes separados: **staging** (teste) e **prod**.
 
 ## 2) Criar Service Principal para o GitHub Actions (somente GUI)
 1. Azure Portal -> Entra ID -> App registrations -> New registration.
@@ -80,8 +82,9 @@ Azure Portal -> Container App -> Configuration -> Environment variables -> Add.
 
 Valores e onde encontrar:
 - `DATABASE_URL`
-  - String do Postgres (mesma usada localmente). Em Azure Postgres:
-    Azure Portal -> Postgres -> Connection strings -> Copie a string do user/app.
+  - **Staging** aponta para DB de teste/staging.
+  - **Prod** aponta para DB prod (nunca use DB de teste).
+  - Azure Portal -> Postgres -> Connection strings -> copie a string do user/app.
 - `ENTRA_API_AUDIENCE`
   - App Registration da API (Entra ID).  
     Azure Portal -> Entra ID -> App registrations -> sua API -> Overview -> Application (client) ID.
@@ -118,19 +121,19 @@ Valores e onde encontrar:
 - `DB_SSL_ALLOW_INVALID` (false em staging/prod)
   - `false`
 
-## 6) Static Web Apps (WEB)
+## 6) Static Web Apps (WEB) - Staging e Prod
+Crie **duas** Static Web Apps (uma para staging e outra para prod).
 1. Azure Portal -> Static Web Apps -> Create.
-2. Name: `pbi-embed-web`.
+2. Name: `pbi-embed-web-staging`.
 3. Deployment: escolha "Other" (vamos usar token).
 4. Defina region e crie.
 5. Pegue o token:
    - Static Web App -> Manage deployment token.
 6. Salve como secret no GitHub:
-   - `AZURE_STATIC_WEB_APPS_API_TOKEN`
-7. Configure a URL do backend na UI:
-   - GitHub -> Settings -> Secrets and variables -> Actions -> New repository secret
-   - Name: `VITE_API_BASE_URL`
-   - Value: `https://<staging-ou-prod-api-url>`
+   - `AZURE_STATIC_WEB_APPS_API_TOKEN_STAGING`
+7. Repita para prod:
+   - Name: `pbi-embed-web-prod`
+   - Token: `AZURE_STATIC_WEB_APPS_API_TOKEN_PROD`
 
 ## 7) Secrets no GitHub
 Em `Settings -> Secrets and variables -> Actions`:
@@ -141,10 +144,13 @@ Em `Settings -> Secrets and variables -> Actions`:
 - `AZURE_CONTAINER_REGISTRY_USERNAME`
 - `AZURE_CONTAINER_REGISTRY_PASSWORD`
 - `STAGING_DATABASE_URL`
+- `PROD_DATABASE_URL`
 - `STAGING_API_BASE_URL` (ex: https://<staging-url>)
 - `PROD_API_BASE_URL` (ex: https://<prod-url>)
-- `AZURE_STATIC_WEB_APPS_API_TOKEN`
-- `VITE_API_BASE_URL` (URL do backend para o build do web)
+- `AZURE_STATIC_WEB_APPS_API_TOKEN_STAGING`
+- `AZURE_STATIC_WEB_APPS_API_TOKEN_PROD`
+- `VITE_API_BASE_URL_STAGING`
+- `VITE_API_BASE_URL_PROD`
 - `VITE_ENTRA_SPA_CLIENT_ID`
 - `VITE_ENTRA_AUTHORITY`
 - `VITE_ENTRA_REDIRECT_URI`
@@ -154,19 +160,28 @@ Em `Settings -> Secrets and variables -> Actions`:
 ## 8.1) Node para o build do web
 O build do front usa Vite 7 (Node 20+). Garanta `NODE_VERSION=20.19.0` no job `web`.
 
-## 8) Workflow CD
+## 8) Workflow CD (promocao real)
 Arquivo: `.github/workflows/cd-main.yml`
-- Build & push da imagem da API para GHCR.
+- Build & push da imagem da API para GHCR (tag por commit).
 - Migrate em staging (`prisma migrate deploy`).
-- Deploy no Container App staging + `/health` e `/ready`.
-- Deploy no Container App prod + `/health` e `/ready`.
-- Deploy do web no Static Web Apps.
+- Deploy no Container App **staging** + `/health` e `/ready`.
+- Migrate em prod (`prisma migrate deploy`) **apenas apos aprovacao**.
+- Deploy no Container App **prod** usando **digest fixo** (imagem aprovada).
+- Deploy do **web staging** e **web prod** em SWAs separados.
+
+### 8.2) Aprovação manual para prod
+Crie environments no GitHub:
+1. Settings -> Environments -> New environment
+2. `staging` e `production`
+3. Em `production`, habilite **Required reviewers** (aprovacao manual).
 
 ## 9) Validacao final
-1. Push em `main`.
+1. Push em `main` (deploy staging acontece automaticamente).
 2. Verifique Actions:
-   - `CD Main` deve finalizar verde.
-3. Teste endpoints:
+   - `api-staging` e `web-staging` devem finalizar verde.
+3. Teste endpoints no staging:
    - `GET /health`
    - `GET /ready`
-4. Acesse o web publicado no Static Web Apps.
+4. Valide o web **staging**.
+5. Apos aprovacao manual, `api-prod` e `web-prod` sao liberados.
+6. Valide o web **prod** e endpoints da API prod.
