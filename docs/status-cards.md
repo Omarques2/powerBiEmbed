@@ -46,9 +46,11 @@ Legenda:
 
 ## EPIC-07 - Testes e qualidade (API/WEB)
 - [x] P1 Healthcheck/Readiness (gate CD)
-- [ ] P2 E2E isolado de DB real + alinhamento total
-- [ ] P2 Vitest coverage WEB (UI base Shadcn + Shell mobile)
-- [ ] P2 Battery de testes negativos e fuzzing leve (API)
+- [x] P1 Validacao de ambientes (local -> staging -> prod + DB safety)
+- [x] P2 E2E isolado de DB real + alinhamento total
+- [x] P2 Test factories + fixtures (seed deterministico)
+- [x] P2 Vitest coverage WEB (UI base Shadcn + Shell mobile)
+- [x] P2 Battery de testes negativos e fuzzing leve (API)
 
 ## EPIC-08 - Modularizacao Admin + performance (API)
 - [x] P2 Modularizar AdminUsersService por dominio

@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { buildCustomerCode, buildSeedIds, makeRunId } from './factories';
 
 export type SeedData = {
   runId: string;
@@ -51,16 +52,15 @@ export async function truncateAll(prisma: PrismaService) {
       "rls_target",
       "customers",
       "users"
+    RESTART IDENTITY
     CASCADE;
   `;
   await prisma.$executeRawUnsafe(sql);
 }
 
 export async function seedTestData(prisma: PrismaService): Promise<SeedData> {
-  const runId = randomUUID().slice(0, 8);
-  const datasetId = randomUUID();
-  const workspaceId = randomUUID();
-  const reportId = randomUUID();
+  const runId = makeRunId();
+  const { datasetId, workspaceId, reportId, entraOid } = buildSeedIds(runId);
 
   const app = await prisma.application.create({
     data: { appKey: 'PBI_EMBED', name: 'Power BI Embed' },
@@ -79,7 +79,7 @@ export async function seedTestData(prisma: PrismaService): Promise<SeedData> {
   const admin = await prisma.user.create({
     data: {
       entraSub: `test-admin-${runId}`,
-      entraOid: randomUUID(),
+      entraOid,
       email: `admin-${runId}@example.com`,
       displayName: `Admin ${runId}`,
       status: 'active',
@@ -133,7 +133,7 @@ export async function seedTestData(prisma: PrismaService): Promise<SeedData> {
 
   const customerA = await prisma.customer.create({
     data: {
-      code: `TEST_A_${runId}`,
+      code: buildCustomerCode('TEST_A', runId),
       name: `Customer A ${runId}`,
       status: 'active',
     },
@@ -142,7 +142,7 @@ export async function seedTestData(prisma: PrismaService): Promise<SeedData> {
 
   const customerB = await prisma.customer.create({
     data: {
-      code: `TEST_B_${runId}`,
+      code: buildCustomerCode('TEST_B', runId),
       name: `Customer B ${runId}`,
       status: 'active',
     },

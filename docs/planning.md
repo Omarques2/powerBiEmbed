@@ -266,23 +266,74 @@ Objetivo: deploy automatizado (Azure Container Apps + Static Web Apps), com gate
 
 ### EPIC-07: Testes e qualidade (API/WEB)
 Card P1 - API | Healthcheck/Readiness (gate CD)  
-Objetivo: /health (liveness) e /ready (DB check).
+Status: concluido.  
+Objetivo: /health (liveness) e /ready (DB check) para gates de CD.  
+Aceite:
+- /health responde 200 com payload padrao.
+- /ready responde 200 quando DB OK e falha controlada quando DB indisponivel.
+- E2E cobre /health e /ready.
+
+Card P1 - DEVOPS/QA | Validacao de ambientes (local -> staging -> prod)  
+Contexto: temos API staging/prod, um ambiente SWA e DB test/prod. Precisa garantir fluxo seguro de validacao sem risco ao DB prod.  
+Objetivo: documentar e validar o fluxo de testes e deploy por ambiente, com gates claros.  
+Status: concluido.  
+Estrategia:
+- Local: rodar unit + e2e usando TEST_DATABASE_URL (DB test), nunca prod.
+- CI/CD: push em main publica apenas API staging; prod somente via promote/approval manual.
+- Staging: smoke test /health, /ready, principais rotas admin e embed.
+- Prod: aplicar somente depois de validado no staging; DB prod nunca resetado.
+- Checklist de envs e secrets (DB URLs separadas, tokens, CORS, etc.).
+Aceite:
+- Checklist publicado com passos e verificacoes.
+- Pipeline documentado e exercitado (staging recebe changes automaticamente; prod por promote manual).
+- Evidencia de que DB prod nao e usado em testes locais/e2e.
 
 Card P2 - API | E2E isolado de DB real + alinhamento total  
-Objetivo: e2e usando DB de teste (TEST_DATABASE_URL) + migrate reset.
+Contexto: E2E deve rodar em base isolada sem risco de tocar prod/staging.  
+Objetivo: E2E usa TEST_DATABASE_URL, com reset/migrate/seed controlados.  
+Status: concluido.  
+Estrategia (Prisma + NestJS):
+- Usar TEST_DATABASE_URL no runner de E2E.
+- Aplicar migrations com `prisma migrate deploy` no DB de teste.
+- Limpar entre specs: truncate + reset de sequences + drop views seguras (se existirem).
+- Isolar chamadas externas (Power BI, Entra) com mocks/fakes no E2E.
+- Garantir `afterAll` fecha app + Prisma para evitar open handles.
+Aceite:
+- `npm run test:e2e` passa sem tocar prod/staging.
+- Sem warnings de conexão pendurada ou open handles.
 
 Card P2 - API | Battery de testes negativos e fuzzing leve  
-Objetivo: validar rejeicao de inputs invalidos (tamanho, tipos, caracteres estranhos, SQLi basico) e erro coerente no envelope.  
-Escopo: API (controllers e DTOs criticos).  
+Contexto: endurecer validação e evitar 5xx em inputs maliciosos.  
+Objetivo: cobrir payloads invalidos, limites e formatos estranhos com erros coerentes.  
+Status: concluido.  
 Estrategia:
-- casos de payload invalido por endpoint (tipos, overflow, strings maliciosas).
-- asserts de status + error.code + correlationId.
+- Casos negativos por endpoint (tipos invalidos, strings longas, caracteres estranhos, SQLi basico, arrays/objetos inesperados).
+- Assert de status + error.code + correlationId.
+- Cobrir DTOs criticos e pipes globais (ValidationPipe).
 Aceite:
-- 100% dos endpoints criticos com casos negativos cobrindo validacao.
-- Nenhum crash 5xx em inputs invalidos.
+- 100% dos endpoints criticos com casos negativos.
+- Nenhum 5xx em entradas invalidas.
+
+Card P2 - API | Test factories + fixtures (seed deterministico)  
+Contexto: E2E e unit dependem de setup repetitivo.  
+Objetivo: padronizar criacao de dados e reduzir flakiness.  
+Status: concluido.  
+Estrategia:
+- Factories para users/customers/memberships/workspaces/reports/paginas.
+- Seed deterministico por teste (IDs previsiveis).
+- Helpers para limpeza (truncate + reset).
+Aceite:
+- Tests mais curtos e consistentes.
+- Seed reutilizado por suites diferentes.
 
 Card P2 - WEB | Vitest coverage UI base (Shadcn) + Shell mobile  
-Objetivo: cobertura da UI base (Shadcn) e menu mobile.
+Objetivo: cobertura da UI base (Shadcn) e menu mobile.  
+Status: concluido.  
+Estrategia:
+- Testes para componentes base (Button/Dialog/Tabs/Toast).
+- Testes de comportamento do sidebar mobile e carregamento de listas com cache.
+Aceite:
+- Cobertura minima definida para UI base e Shell.
 
 ### EPIC-08: Modularizacao Admin + performance (API)
 Card P2 — API | Modularizar AdminUsersService por dominio  

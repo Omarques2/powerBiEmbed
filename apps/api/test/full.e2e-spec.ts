@@ -3,6 +3,7 @@ import request from 'supertest';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { createE2eApp, setTestUsers } from './helpers/e2e-utils';
 import { seedTestData, truncateAll } from './helpers/seed';
+import { createPowerBiStub, createRlsRefreshStub } from './helpers/stubs';
 
 describe('Full API (e2e)', () => {
   jest.setTimeout(60000);
@@ -15,42 +16,17 @@ describe('Full API (e2e)', () => {
   let newUserRuleId: string | null = null;
   let createdCustomerId: string | null = null;
 
-  const powerBiStub = {
-    listWorkspaces: jest.fn(async () => [
-      { id: seed?.workspaceId ?? 'ws', name: 'Test Workspace' },
-    ]),
-    listReports: jest.fn(async (workspaceId: string) => [
-      {
-        workspaceId,
-        id: seed?.reportId ?? 'report',
-        name: 'Test Report',
-        datasetId: seed?.datasetId ?? 'dataset',
-      },
-    ]),
-    getEmbedConfig: jest.fn(async (workspaceId: string, reportId: string) => ({
-      reportId,
-      workspaceId,
-      embedUrl: 'https://example.com/embed',
-      embedToken: 'test-embed-token',
-      expiresOn: new Date(Date.now() + 60_000).toISOString(),
-    })),
-    exportReportFile: jest.fn(async () => ({
-      buffer: Buffer.from('%PDF-1.4 test'),
-      kind: 'pdf',
-    })),
-    refreshDatasetInGroup: jest.fn(async () => ({ status: 'Queued' })),
-    listDatasetRefreshesInGroup: jest.fn(async () => []),
-  };
+  const powerBiStub = createPowerBiStub(() =>
+    seed
+      ? {
+          workspaceId: seed.workspaceId,
+          reportId: seed.reportId,
+          datasetId: seed.datasetId,
+        }
+      : null,
+  );
 
-  const rlsRefreshStub = {
-    requestRefresh: jest.fn(async () => ({
-      status: 'queued',
-      pending: true,
-      scheduledAt: null,
-      scheduledInMs: 0,
-    })),
-    listRefreshes: jest.fn(async () => []),
-  };
+  const rlsRefreshStub = createRlsRefreshStub();
 
   beforeAll(async () => {
     process.env.BOOTSTRAP_TOKEN =
