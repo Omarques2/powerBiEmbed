@@ -22,6 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       image: ${{ steps.meta.outputs.image }}
+      image_digest: ${{ steps.meta.outputs.image_digest }}
       digest: ${{ steps.build.outputs.digest }}
     steps:
       - name: Checkout
@@ -46,9 +47,11 @@ jobs:
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
-      - name: Set image output
+      - name: Set image outputs
         id: meta
-        run: echo "image=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}" >> "$GITHUB_OUTPUT"
+        run: |
+          echo "image=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}" >> "$GITHUB_OUTPUT"
+          echo "image_digest=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}" >> "$GITHUB_OUTPUT"
 
   api-staging:
     runs-on: ubuntu-latest
@@ -125,7 +128,7 @@ jobs:
         with:
           containerAppName: ${{ secrets.AZURE_CONTAINER_APP_NAME_PROD }}
           resourceGroup: ${{ secrets.AZURE_RESOURCE_GROUP }}
-          imageToDeploy: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ needs.api-build.outputs.digest }}
+          imageToDeploy: ${{ needs.api-build.outputs.image_digest }}
           registryUrl: ${{ env.REGISTRY }}
           registryUsername: ${{ secrets.AZURE_CONTAINER_REGISTRY_USERNAME }}
           registryPassword: ${{ secrets.AZURE_CONTAINER_REGISTRY_PASSWORD }}
