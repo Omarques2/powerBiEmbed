@@ -64,3 +64,8 @@ export async function disableUser(userId: string) {
   const res = await http.post(`/admin/users/${userId}/disable`);
   return unwrapData(res.data as ApiEnvelope<{ ok: boolean }>);
 }
+
+export async function setUserStatus(userId: string, status: "active" | "disabled") {
+  const res = await http.post(`/admin/users/${userId}/status`, { status });
+  return unwrapData(res.data as ApiEnvelope<{ ok: boolean }>);
+}

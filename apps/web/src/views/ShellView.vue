@@ -13,14 +13,12 @@
           mode="desktop"
           :collapsed="!sidebarOpen"
           :workspaces="workspaces"
-          :reports="reports"
+          :reports-by-workspace="reportsByWorkspace"
           :selected-workspace-id="selectedWorkspaceId"
           :selected-report="selectedReport"
           :loading-workspaces="loadingWorkspaces"
-          :loading-reports="loadingReports"
           :error="listError"
           :load-workspaces="loadWorkspaces"
-          :load-reports="loadReports"
           :select-workspace="selectWorkspace"
           :open-report="openReport"
           :is-admin="isAdmin"
@@ -43,14 +41,12 @@
           mode="mobile"
           :collapsed="false"
           :workspaces="workspaces"
-          :reports="reports"
+          :reports-by-workspace="reportsByWorkspace"
           :selected-workspace-id="selectedWorkspaceId"
           :selected-report="selectedReport"
           :loading-workspaces="loadingWorkspaces"
-          :loading-reports="loadingReports"
           :error="listError"
           :load-workspaces="loadWorkspaces"
-          :load-reports="loadReports"
           :select-workspace="selectWorkspace"
           :open-report="openReport"
           :is-admin="isAdmin"
@@ -329,6 +325,7 @@ import HamburgerIcon from "../components/icons/HamburgerIcon.vue";
 import SidebarContent from "../components/SidebarContent.vue";
 import ReportSkeletonCard from "../components/ReportSkeletonCard.vue";
 import IconRefresh from "../components/icons/IconRefresh.vue";
+import { readCache, writeCache } from "@/ui/storage/cache";
 
 type Workspace = { id?: string; workspaceId?: string; name?: string };
 type Report = { id: string; name?: string; workspaceId?: string };
@@ -358,7 +355,7 @@ const drawerOpen = ref(false);
 const sidebarOpen = ref(true);
 
 const workspaces = ref<Workspace[]>([]);
-const reports = ref<Report[]>([]);
+const reportsByWorkspace = ref<Record<string, Report[]>>({});
 
 const selectedWorkspace = ref<Workspace | null>(null);
 const selectedWorkspaceId = ref<string | null>(null);
@@ -382,6 +379,10 @@ const reportReady = ref(false);
 const lastRenderAt = ref(0);
 
 const exportModalOpen = ref(false);
+
+const WORKSPACES_CACHE_KEY = "pbi.cache.workspaces";
+const REPORTS_CACHE_KEY = "pbi.cache.reportsByWorkspace";
+const CACHE_TTL_MS = 5 * 60 * 1000;
 
 
 const ASPECT = 16 / 9;
@@ -899,21 +900,29 @@ watch(exportScope, (value) => {
   saveExportPref(EXPORT_SCOPE_KEY, value);
 });
 
-watch(sidebarOpen, (open) => {
-  if (!open && selectedWorkspaceId.value && reports.value.length === 0) {
-    void loadReports(selectedWorkspaceId.value);
-  }
-});
-
 async function loadWorkspaces() {
+  const cached = readCache<Workspace[]>(WORKSPACES_CACHE_KEY, CACHE_TTL_MS);
+  const hasCached = Boolean(cached?.data?.length);
+  if (hasCached) {
+    workspaces.value = cached?.data ?? [];
+    if (workspaces.value.length > 0 && !selectedWorkspaceId.value) {
+      await selectWorkspace(workspaces.value[0]!);
+    }
+  }
   listError.value = "";
-  loadingWorkspaces.value = true;
+  loadingWorkspaces.value = !hasCached;
   try {
     const res = await http.get("/powerbi/workspaces");
     workspaces.value = unwrapData(res.data as ApiEnvelope<Workspace[]>);
+    writeCache(WORKSPACES_CACHE_KEY, workspaces.value);
 
     if (workspaces.value.length > 0 && !selectedWorkspaceId.value) {
       await selectWorkspace(workspaces.value[0]!);
+    }
+    if (workspaces.value.length) {
+      await loadAllReports(workspaces.value);
+    } else {
+      reportsByWorkspace.value = {};
     }
   } catch (e: any) {
     const message = await extractErrorMessage(e);
@@ -923,20 +932,43 @@ async function loadWorkspaces() {
   }
 }
 
-async function loadReports(workspaceId: string) {
-  listError.value = "";
+async function loadAllReports(workspaceList: Workspace[]) {
+  const cached = readCache<Record<string, Report[]>>(REPORTS_CACHE_KEY, CACHE_TTL_MS);
+  if (cached?.data && Object.keys(reportsByWorkspace.value).length === 0) {
+    reportsByWorkspace.value = cached.data;
+  }
   loadingReports.value = true;
+  listError.value = "";
   try {
-    const res = await http.get("/powerbi/reports", { params: { workspaceId } });
-    reports.value = unwrapData(res.data as ApiEnvelope<Report[]>);
-
-    if (selectedReport.value && !reports.value.find((r) => r.id === selectedReport.value!.id)) {
-      selectedReport.value = null;
-      resetEmbed();
+    const entries = await Promise.all(
+      workspaceList.map(async (w) => {
+        const id = (w.workspaceId ?? w.id) as string;
+        if (!id) return { id: "", rows: [] as Report[] };
+        try {
+          const res = await http.get("/powerbi/reports", { params: { workspaceId: id } });
+          const rows = [...unwrapData(res.data as ApiEnvelope<Report[]>)] as Report[];
+          return { id, rows: rows.map((r) => ({ ...r, workspaceId: id })) };
+        } catch {
+          return { id, rows: [] as Report[] };
+        }
+      }),
+    );
+    const map: Record<string, Report[]> = {};
+    for (const entry of entries) {
+      if (!entry.id) continue;
+      map[entry.id] = entry.rows;
     }
-  } catch (e: any) {
-    const message = await extractErrorMessage(e);
-    listError.value = `Falha ao listar reports: ${message}`;
+    reportsByWorkspace.value = map;
+    writeCache(REPORTS_CACHE_KEY, reportsByWorkspace.value);
+    if (selectedReport.value?.workspaceId) {
+      const keep = reportsByWorkspace.value[selectedReport.value.workspaceId]?.some(
+        (r) => r.id === selectedReport.value?.id,
+      );
+      if (!keep) {
+        selectedReport.value = null;
+        resetEmbed();
+      }
+    }
   } finally {
     loadingReports.value = false;
   }
@@ -950,13 +982,12 @@ async function selectWorkspace(w: Workspace) {
     selectedWorkspace.value = w;
     selectedWorkspaceId.value = id;
 
-    selectedReport.value = null;
-    reports.value = [];
     resetEmbed();
-
-    await loadReports(id);
+    if (selectedReport.value && selectedReport.value.workspaceId !== id) {
+      selectedReport.value = null;
+    }
   } else {
-    if (!sidebarOpen.value && reports.value.length === 0) await loadReports(id);
+    // reports are preloaded
   }
 }
 

@@ -6,8 +6,8 @@
            disabled:opacity-60 dark:border-slate-800"
     :class="
       modelValue
-        ? 'bg-emerald-100 text-emerald-900 hover:bg-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-100'
-        : 'bg-slate-100 text-slate-800 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-100'
+        ? 'border-emerald-300 bg-emerald-600 text-white hover:bg-emerald-500 dark:border-emerald-600 dark:bg-emerald-500 dark:text-emerald-950 dark:hover:bg-emerald-400'
+        : 'border-rose-300 bg-rose-600 text-white hover:bg-rose-500 dark:border-rose-600 dark:bg-rose-500 dark:text-rose-950 dark:hover:bg-rose-400'
     "
     :disabled="disabled || loading"
     :aria-pressed="modelValue"
@@ -22,7 +22,7 @@
     <span
       v-else
       class="inline-block h-2 w-2 rounded-full"
-      :class="modelValue ? 'bg-emerald-600 dark:bg-emerald-300' : 'bg-slate-500 dark:bg-slate-300'"
+      :class="modelValue ? 'bg-emerald-200 dark:bg-emerald-900' : 'bg-rose-200 dark:bg-rose-900'"
       aria-hidden="true"
     />
 

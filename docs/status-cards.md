@@ -36,8 +36,9 @@ Legenda:
 - [x] Milestone 4: Admin core (Customers/Users/Rls/Overview/Security)
 - [x] Milestone 5: Auth + Pending + Callback + modais globais
 - [x] Milestone 6: Power BI embeds e previews
-- [ ] Milestone 7: QA final (lint/test/build + regressao visual)
-- [ ] Milestone 8: Ajustes finais de UX/branding (HomeView + cards + skeletons + loading + 404)
+- [x] Milestone 7: QA final (lint/test/build + regressao visual)
+- [x] Milestone 8: Ajustes finais de UX/branding (HomeView + cards mobile + memberships simplificado + 404)
+- [x] P2 Cache persistente de listas (storage + refresh invisivel)
 
 ## EPIC-06 - CI/CD GitHub Actions (DEVOPS)
 - [x] P1 CI PR monorepo-aware (lint/type/test/build web+api + cache + paths-filter)

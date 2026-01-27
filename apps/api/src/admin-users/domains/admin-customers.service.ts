@@ -380,6 +380,39 @@ export class AdminCustomersService {
         update: { canView: canView, lastCanView: null },
       });
 
+      if (canView) {
+        const hasActiveGroups = await this.permissions
+          .client(tx)
+          .biCustomerPageGroup.findFirst({
+            where: {
+              customerId: customerId,
+              isActive: true,
+              group: { reportRefId: reportRefId },
+            },
+            select: { id: true },
+          });
+
+        if (!hasActiveGroups) {
+          const pages = await this.permissions
+            .client(tx)
+            .biReportPage.findMany({
+              where: { reportRefId: reportRefId, isActive: true },
+              select: { id: true },
+            });
+          if (pages.length) {
+            await this.permissions
+              .client(tx)
+              .biCustomerPageAllowlist.createMany({
+                data: pages.map((p) => ({
+                  customerId: customerId,
+                  pageId: p.id,
+                })),
+                skipDuplicates: true,
+              });
+          }
+        }
+      }
+
       await this.audit.create(tx, {
         actorUserId: actorUserId,
         action: 'CUSTOMER_REPORT_PERMISSION_UPDATED',
@@ -489,6 +522,40 @@ export class AdminCustomersService {
                 skipDuplicates: true,
               });
             reportsCreated = created.count;
+          }
+        }
+
+        if (reportIds.length) {
+          for (const reportRefId of reportIds) {
+            const hasActiveGroups = await this.permissions
+              .client(tx)
+              .biCustomerPageGroup.findFirst({
+                where: {
+                  customerId: customerId,
+                  isActive: true,
+                  group: { reportRefId: reportRefId },
+                },
+                select: { id: true },
+              });
+            if (hasActiveGroups) continue;
+
+            const pages = await this.permissions
+              .client(tx)
+              .biReportPage.findMany({
+                where: { reportRefId: reportRefId, isActive: true },
+                select: { id: true },
+              });
+            if (pages.length) {
+              await this.permissions
+                .client(tx)
+                .biCustomerPageAllowlist.createMany({
+                  data: pages.map((p) => ({
+                    customerId: customerId,
+                    pageId: p.id,
+                  })),
+                  skipDuplicates: true,
+                });
+            }
           }
         }
       } else {

@@ -132,7 +132,7 @@ Estrategia de execucao (branch unica + milestones internos):
 - Milestone 5: Auth + Pending + Callback + modais globais.
 - Milestone 6: Power BI embeds/previews (containers + estados vazios).
 - Milestone 7: QA final (lint/test/build + checklist manual 390/768/1280).
-- Milestone 8: Ajustes finais de UX/branding (HomeView, dark theme verde, loading global, 404, pending).
+- Milestone 8: Ajustes finais de UX/branding (HomeView, dark theme verde, loading global, 404, pending, tabelas mobile em cards, modal de memberships simplificado).
 
 Checklist de milestones (EPIC-05):
 - [x] Milestone 1: Infra + tokens
@@ -141,8 +141,8 @@ Checklist de milestones (EPIC-05):
 - [x] Milestone 4: Admin core
 - [x] Milestone 5: Auth + Pending + Callback + modais globais
 - [x] Milestone 6: Power BI embeds/previews
-- [ ] Milestone 7: QA final
-- [ ] Milestone 8: Ajustes finais de UX/branding
+- [x] Milestone 7: QA final (lint/test/build + checklist manual)
+- [x] Milestone 8: Ajustes finais de UX/branding (cards mobile + memberships simplificado)
 
 Card P2 - WEB | Fundacao Shadcn + tokens + infra (Tailwind v4)  
 Contexto: hoje a UI usa classes utilitarias diretas e componentes customizados, sem biblioteca padronizada.  
@@ -213,6 +213,8 @@ Estrategia:
 - Checklist por tela (desktop 1280, tablet 768, mobile 390).  
 Aceite:
 - Build, lint e testes ok; sem regressao visual detectada.
+Referencia:
+- `docs/qa-epic05.md`
 
 Card P2 - WEB | Ajustes finais de UX/branding (Shadcn)  
 Objetivo: padronizar UX minimalista e reduzir saltos visuais.  
@@ -230,6 +232,20 @@ Checklist:
 Aceite:
 - UX consistente em 390/768/1280, sem jumps perceptiveis.
 - Loading e empty states padronizados.
+
+Card P2 - WEB | Cache persistente de listas (storage + refresh invisivel)  
+Contexto: listas importantes (workspaces/reports/users/customers/memberships) recarregam do zero e causam vazios momentaneos.  
+Objetivo: manter cache persistente no storage e fazer refresh em background sem impactar o usuario.  
+Escopo: WEB (Home + Admin: Users/Customers/Memberships/Admins).  
+Estrategia:
+- Persistir listas chave em storage (localStorage/sessionStorage) com TTL simples.
+- Renderizar cache imediatamente e iniciar refresh silencioso em background.
+- Substituir dados apenas quando o refresh terminar, sem limpar UI.
+- Incluir mecanismo de invalidacao (ex: ao salvar/editar, limpar cache daquela lista).
+Aceite:
+- Home: sidebar abre com workspaces/reports do cache e atualiza silenciosamente.
+- Admin: listas mostram dados salvos e nao aparecem vazias durante refresh.
+- Refresh nao altera permissao/estado visual do usuario (sem jump).
 
 Ordem recomendada (para evitar retrabalho):
 1. Fundacao Shadcn + tokens + infra (Milestone 1)

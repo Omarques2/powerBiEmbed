@@ -135,3 +135,8 @@ export class ListActiveUsersQueryDto {
   @Max(100)
   pageSize?: number;
 }
+
+export class SetUserStatusDto {
+  @IsIn(['active', 'disabled'])
+  status!: 'active' | 'disabled';
+}

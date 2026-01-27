@@ -204,7 +204,9 @@ export class AdminUserLifecycleService {
     );
     const q = input.q?.trim();
 
-    const where: Prisma.UserWhereInput = { status: 'active' };
+    const where: Prisma.UserWhereInput = {
+      status: { in: ['active', 'disabled'] },
+    };
 
     if (q) {
       where.OR = [
@@ -243,5 +245,57 @@ export class AdminUserLifecycleService {
     }));
 
     return { page, pageSize, total, rows: enrichedRows };
+  }
+
+  async setUserStatus(
+    userId: string,
+    status: 'active' | 'disabled',
+    actorSub: string | null = null,
+  ) {
+    const user = await this.users.findForStatus(userId);
+    if (!user) throw new NotFoundException('User not found');
+
+    if (status === 'active' && user.status === 'pending') {
+      throw new BadRequestException(
+        'Pending users must be activated with customer and role.',
+      );
+    }
+
+    if (user.status === status) return { ok: true };
+
+    const actorUserId = await this.actors.resolveActorUserId(actorSub);
+
+    return this.permissions.root().$transaction(async (tx) => {
+      const before = {
+        user: {
+          id: userId,
+          status: user.status,
+          email: user.email ?? null,
+          displayName: user.displayName ?? null,
+        },
+      };
+
+      await this.users.updateStatus(tx, userId, status);
+
+      const after = {
+        user: {
+          id: userId,
+          status,
+          email: user.email ?? null,
+          displayName: user.displayName ?? null,
+        },
+      };
+
+      await this.audit.create(tx, {
+        actorUserId: actorUserId,
+        action: status === 'active' ? 'USER_ENABLED' : 'USER_DISABLED',
+        entityType: 'users',
+        entityId: userId,
+        beforeData: before,
+        afterData: after,
+      });
+
+      return { ok: true };
+    });
   }
 }

@@ -115,14 +115,13 @@ class="h-5 w-5" :class="loadingWorkspaces ? 'animate-spin' : ''" viewBox="0 0 24
 
       <!-- Workspaces -->
       <div class="space-y-1">
-        <button
-          v-for="w in workspaces"
-          :key="w.workspaceId ?? w.id"
-          class="group w-full rounded-xl px-2 py-2 text-left hover:bg-slate-50 dark:hover:bg-slate-800"
-          :class="(selectedWorkspaceId === (w.workspaceId ?? w.id)) ? 'bg-slate-100 dark:bg-slate-800' : ''"
-          :title="collapsed ? (w.name ?? w.workspaceId ?? w.id) : ''"
-          @click="handleSelectWorkspace(w)"
-        >
+        <template v-for="w in workspaces" :key="w.workspaceId ?? w.id">
+          <button
+            class="group w-full rounded-xl px-2 py-2 text-left hover:bg-slate-50 dark:hover:bg-slate-800"
+            :class="(selectedWorkspaceId === (w.workspaceId ?? w.id)) ? 'bg-slate-100 dark:bg-slate-800' : ''"
+            :title="collapsed ? (w.name ?? w.workspaceId ?? w.id) : ''"
+            @click="handleSelectWorkspace(w)"
+          >
           <div class="flex items-center justify-between gap-2">
             <div class="min-w-0">
               <div v-if="!collapsed" class="truncate text-sm font-medium">
@@ -145,61 +144,47 @@ class="h-5 w-5" :class="loadingWorkspaces ? 'animate-spin' : ''" viewBox="0 0 24
               {{ (selectedWorkspaceId === (w.workspaceId ?? w.id)) ? "▾" : "▸" }}
             </div>
           </div>
-        </button>
+          </button>
 
-        <!-- Reports under selected workspace (expanded) -->
-        <div v-if="!collapsed && selectedWorkspaceId" class="mt-2 space-y-1 px-1">
-          <div class="flex items-center justify-between px-2 py-2">
-            <div class="text-md font-semibold text-slate-800 dark:text-slate-200">Relatorios</div>
-
-            <UiButton
-              variant="outline"
-              size="icon"
-              class="h-8 w-8"
-              :disabled="loadingReports"
-              title="Recarregar reports"
-              :aria-busy="loadingReports ? 'true' : 'false'"
-              @click="loadReports(selectedWorkspaceId)"
+          <!-- Reports under selected workspace (expanded) -->
+          <transition name="sidebar-collapse">
+            <div
+              v-if="!collapsed && selectedWorkspaceId === (w.workspaceId ?? w.id)"
+              class="mt-3 space-y-2 px-2 pt-2 pb-3"
             >
-              <svg
-class="h-5 w-5" :class="loadingReports ? 'animate-spin' : ''"
-                   viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                   stroke-linecap="round" stroke-linejoin="round">
-                <path d="M21 12a9 9 0 0 1-9 9 9 9 0 0 1-6.36-2.64" />
-                <path d="M3 12a9 9 0 0 1 15.36-6.36" />
-                <path d="M21 3v6h-6" />
-                <path d="M3 21v-6h6" />
-              </svg>
-            </UiButton>
-          </div>
+              <div
+                v-if="reportsForWorkspace(w).length === 0"
+                class="px-2 pb-2 text-xs text-slate-500 dark:text-slate-400"
+              >
+                Nenhum report liberado neste workspace.
+              </div>
 
-          <div v-if="reports.length === 0 && !loadingReports" class="px-2 pb-2 text-xs text-slate-500 dark:text-slate-400">
-            Nenhum report liberado neste workspace.
-          </div>
-
-          <UiButton
-            v-for="r in reports"
-            :key="r.id"
-            variant="outline"
-            class="w-full justify-start rounded-xl border-border bg-background text-left text-sm hover:bg-accent hover:text-accent-foreground"
-            :class="selectedReport?.id === r.id
-              ? 'border-primary/50 bg-accent text-foreground'
-              : ''"
-            @click="handleOpenReport(r)"
-          >
-            <div class="min-w-0 text-left">
-              <div class="truncate font-medium">{{ r.name ?? r.id }}</div>
-              <div class="mt-0.5 truncate text-xs text-muted-foreground">{{ r.id }}</div>
+              <div class="space-y-2 border-l border-slate-200 pl-3 py-1 dark:border-slate-800">
+                <UiButton
+                  v-for="r in reportsForWorkspace(w)"
+                  :key="r.id"
+                  variant="outline"
+                  class="w-full justify-start rounded-xl border-border bg-background text-left text-sm hover:bg-accent hover:text-accent-foreground"
+                  :class="selectedReport?.id === r.id
+                    ? 'border-primary/50 bg-accent text-foreground'
+                    : ''"
+                  @click="handleOpenReport(r)"
+                >
+                  <div class="min-w-0 text-left">
+                    <div class="truncate font-medium">{{ r.name ?? r.id }}</div>
+                    <div class="mt-0.5 truncate text-xs text-muted-foreground">{{ r.id }}</div>
+                  </div>
+                </UiButton>
+              </div>
             </div>
-          </UiButton>
-        </div>
+          </transition>
 
-        <!-- Reports as icons when collapsed -->
-        <div v-if="collapsed && selectedWorkspaceId" class="mt-2 space-y-2 px-1">
-          <div class="mx-auto h-px w-10 bg-slate-200 dark:bg-slate-800" />
+          <!-- Reports as icons when collapsed -->
+          <div v-if="collapsed && selectedWorkspaceId === (w.workspaceId ?? w.id)" class="mt-3 space-y-2 px-1 pt-2 pb-3">
+            <div class="mx-auto h-px w-10 bg-slate-200 dark:bg-slate-800" />
 
           <UiButton
-            v-for="r in reports"
+            v-for="r in reportsForWorkspace(w)"
             :key="r.id"
             variant="outline"
             size="icon"
@@ -216,7 +201,8 @@ class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-wid
               <path d="M8 13h8M8 17h8M8 9h2" />
             </svg>
           </UiButton>
-        </div>
+          </div>
+        </template>
       </div>
     </div>
 
@@ -354,13 +340,12 @@ const props = defineProps<{
   collapsed: boolean;
 
   workspaces: Workspace[];
-  reports: Report[];
+  reportsByWorkspace: Record<string, Report[]>;
 
   selectedWorkspaceId: string | null;
   selectedReport: Report | null;
 
   loadingWorkspaces: boolean;
-  loadingReports: boolean;
   error: string;
 
   userName?: string | null;
@@ -370,7 +355,6 @@ const props = defineProps<{
   goAdmin?: () => void | Promise<void>;
 
   loadWorkspaces: () => void | Promise<void>;
-  loadReports: (workspaceId: string) => void | Promise<void>;
   selectWorkspace: (w: Workspace) => void | Promise<void>;
   openReport: (r: Report) => void | Promise<void>;
   onLogout: () => void | Promise<void>;
@@ -381,7 +365,7 @@ const emit = defineEmits<{
   (e: "close"): void;
 }>();
 
-const padHeader = computed(() => (props.mode === "mobile" ? "px-4" : "px-3"));
+const padHeader = computed(() => (props.mode === "mobile" ? "px-4 py-2" : "px-3 py-2"));
 const padSection = computed(() => (props.mode === "mobile" ? "px-4 py-3" : "px-3 py-3"));
 const padList = computed(() => (props.mode === "mobile" ? "px-2 pb-4" : "px-2 pb-4"));
 const isCollapsedDesktop = computed(() => props.mode === "desktop" && props.collapsed);
@@ -406,6 +390,12 @@ function workspaceInitials(label: string) {
   if (!s) return "WS";
   const parts = s.split(/\s+/).slice(0, 2);
   return parts.map((p) => p[0]?.toUpperCase() ?? "").join("") || "WS";
+}
+
+function reportsForWorkspace(w: Workspace) {
+  const id = w.workspaceId ?? w.id;
+  if (!id) return [];
+  return props.reportsByWorkspace[id] ?? [];
 }
 
 function onAccount() {
@@ -436,3 +426,23 @@ async function handleGoAdmin() {
   if (props.mode === "mobile") emit("close");
 }
 </script>
+
+<style scoped>
+.sidebar-collapse-enter-active,
+.sidebar-collapse-leave-active {
+  transition: max-height 0.18s ease, opacity 0.18s ease, transform 0.18s ease;
+  overflow: hidden;
+}
+.sidebar-collapse-enter-from,
+.sidebar-collapse-leave-to {
+  max-height: 0;
+  opacity: 0;
+  transform: translateY(-4px);
+}
+.sidebar-collapse-enter-to,
+.sidebar-collapse-leave-from {
+  max-height: 480px;
+  opacity: 1;
+  transform: translateY(0);
+}
+</style>

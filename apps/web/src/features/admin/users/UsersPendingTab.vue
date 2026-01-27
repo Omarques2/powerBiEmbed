@@ -55,7 +55,11 @@
         :class="selectedPending?.id === u.id ? 'ring-2 ring-emerald-400/50' : ''"
         @click="$emit('select', u)"
       >
-        <div class="min-w-0">
+        <div class="flex items-start gap-3">
+          <div class="mt-0.5 rounded-lg border border-slate-200 bg-slate-50 p-1 text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
+            <UserRound class="h-4 w-4" />
+          </div>
+          <div class="min-w-0">
           <div class="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
             {{ u.display_name ?? "—" }}
           </div>
@@ -64,6 +68,7 @@
           </div>
           <div class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
             criado: {{ formatDate(u.created_at) }}
+          </div>
           </div>
         </div>
       </button>
@@ -80,6 +85,7 @@
 
 <script setup lang="ts">
 import type { PendingUserRow } from "@/features/admin/api";
+import { UserRound } from "lucide-vue-next";
 
 defineProps<{
   pending: PendingUserRow[];

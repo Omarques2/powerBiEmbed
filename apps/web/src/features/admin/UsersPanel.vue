@@ -548,6 +548,7 @@
           v-if="userModalUser && userPerms"
           v-model:memberships="userPerms.memberships"
           :user-id="userModalUser.id"
+          :embedded="true"
           @changed="onMembershipsChanged"
         />
       </div>
@@ -572,6 +573,7 @@ import { useToast } from "@/ui/toast/useToast";
 import { useConfirm } from "@/ui/confirm/useConfirm";
 import { normalizeApiError } from "@/ui/ops";
 import { PermSwitch } from "@/ui/toggles";
+import { readCache, writeCache } from "@/ui/storage/cache";
 
 import UserMembershipEditor from "@/features/admin/UserMembershipEditor.vue";
 import {
@@ -581,6 +583,7 @@ import {
   getUserById,
   activateUser,
   disableUser,
+  setUserStatus,
   type CustomerRow,
   type PendingUserRow,
   type ActiveUserRow,
@@ -616,6 +619,10 @@ type UsersTabKey = typeof tabs[number]["key"];
 const activeTab = ref<UsersTabKey>("pending");
 
 const customers = ref<CustomerRow[]>([]);
+const CUSTOMERS_CACHE_KEY = "admin.cache.customers";
+const PENDING_CACHE_KEY = "admin.cache.pendingUsers";
+const ACTIVE_CACHE_PREFIX = "admin.cache.activeUsers:";
+const CACHE_TTL_MS = 5 * 60 * 1000;
 
 // Pending
 const pending = ref<PendingUserRow[]>([]);
@@ -700,7 +707,12 @@ function fmtDate(iso: string) {
 
 async function loadCustomers() {
   try {
+    const cached = readCache<CustomerRow[]>(CUSTOMERS_CACHE_KEY, CACHE_TTL_MS);
+    if (cached?.data?.length) {
+      customers.value = cached.data;
+    }
     customers.value = await listCustomers();
+    writeCache(CUSTOMERS_CACHE_KEY, customers.value);
   } catch (e: any) {
     const ne = normalizeApiError(e);
     push({ kind: "error", title: "Falha ao carregar customers", message: ne.message, details: ne.details });
@@ -708,10 +720,16 @@ async function loadCustomers() {
 }
 
 async function loadPending() {
-  pendingLoading.value = true;
+  const cached = readCache<PendingUserRow[]>(PENDING_CACHE_KEY, CACHE_TTL_MS);
+  const hasCached = Boolean(cached?.data?.length);
+  if (hasCached) {
+    pending.value = cached?.data ?? [];
+  }
+  pendingLoading.value = !hasCached;
   pendingError.value = "";
   try {
     pending.value = await listPendingUsers();
+    writeCache(PENDING_CACHE_KEY, pending.value);
   } catch (e: any) {
     const ne = normalizeApiError(e);
     pendingError.value = ne.message;
@@ -794,7 +812,19 @@ async function disableSelectedPending() {
 }
 
 async function loadActiveUsers(page = 1) {
-  activeLoading.value = true;
+  const cacheKey = `${ACTIVE_CACHE_PREFIX}${page}:${activeQuery.value}:${activeCustomerIds.value.join(",")}`;
+  const cached = readCache<{ page: number; pageSize: number; total: number; rows: ActiveUserRow[] }>(
+    cacheKey,
+    CACHE_TTL_MS,
+  );
+  const hasCached = Boolean(cached?.data?.rows?.length);
+  if (cached?.data) {
+    activeUsers.rows = cached.data.rows ?? [];
+    activeUsers.total = cached.data.total ?? 0;
+    activeUsers.page = cached.data.page ?? page;
+    activeUsers.pageSize = cached.data.pageSize ?? activeUsers.pageSize;
+  }
+  activeLoading.value = !hasCached;
   activeError.value = "";
   try {
     const res = await listActiveUsers(activeQuery.value, page, activeUsers.pageSize, activeCustomerIds.value);
@@ -802,6 +832,12 @@ async function loadActiveUsers(page = 1) {
     activeUsers.total = res.total ?? 0;
     activeUsers.page = res.page ?? page;
     activeUsers.pageSize = res.pageSize ?? activeUsers.pageSize;
+    writeCache(cacheKey, {
+      page: activeUsers.page,
+      pageSize: activeUsers.pageSize,
+      total: activeUsers.total,
+      rows: activeUsers.rows,
+    });
 
   } catch (e: any) {
     const ne = normalizeApiError(e);
@@ -814,25 +850,44 @@ async function loadActiveUsers(page = 1) {
 
 async function toggleUserStatus(user: ActiveUserRow) {
   if (user.isPlatformAdmin) return;
-  if (user.status !== "active") return;
 
-  const confirmed = await confirm({
-    title: "Desativar usuário",
-    message: "Este usuário perderá acesso imediatamente. Deseja continuar?",
-    confirmText: "Desativar",
-    danger: true,
-  });
+  const nextStatus = user.status === "active" ? "disabled" : "active";
 
-  if (!confirmed) return;
+  if (nextStatus === "disabled") {
+    const confirmed = await confirm({
+      title: "Desativar usuário",
+      message: "Este usuário perderá acesso imediatamente. Deseja continuar?",
+      confirmText: "Desativar",
+      danger: true,
+    });
+    if (!confirmed) return;
+  }
 
   statusBusy[user.id] = true;
   try {
-    await disableUser(user.id);
-    push({ kind: "success", title: "Usuário desativado", message: "O acesso foi revogado com sucesso." });
-    await loadActiveUsers(activeUsers.page || 1);
+    if (nextStatus === "disabled") {
+      await disableUser(user.id);
+    } else {
+      await setUserStatus(user.id, "active");
+    }
+    activeUsers.rows = activeUsers.rows.map((row) =>
+      row.id === user.id ? { ...row, status: nextStatus } : row,
+    );
+    const cacheKey = `${ACTIVE_CACHE_PREFIX}${activeUsers.page}:${activeQuery.value}:${activeCustomerIds.value.join(",")}`;
+    writeCache(cacheKey, {
+      page: activeUsers.page,
+      pageSize: activeUsers.pageSize,
+      total: activeUsers.total,
+      rows: activeUsers.rows,
+    });
+    push({
+      kind: "success",
+      title: nextStatus === "disabled" ? "Usuário desativado" : "Usuário reativado",
+      message: nextStatus === "disabled" ? "O acesso foi revogado." : "O acesso foi reativado.",
+    });
   } catch (e: any) {
     const ne = normalizeApiError(e);
-    push({ kind: "error", title: "Falha ao desativar usuário", message: ne.message, details: ne.details });
+    push({ kind: "error", title: "Falha ao atualizar usuário", message: ne.message, details: ne.details });
   } finally {
     statusBusy[user.id] = false;
   }

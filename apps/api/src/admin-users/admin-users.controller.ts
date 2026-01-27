@@ -18,6 +18,7 @@ import { AdminUsersService } from './admin-users.service';
 import type { AuthedRequest } from '../auth/authed-request.type';
 import {
   ActivateUserDto,
+  SetUserStatusDto,
   ListActiveUsersQueryDto,
   PatchMembershipDto,
   RemoveMembershipQueryDto,
@@ -59,6 +60,16 @@ export class AdminUsersController {
   ) {
     const actorSub = req.user?.sub ? String(req.user.sub) : null;
     return this.svc.disableUser(userId, actorSub);
+  }
+
+  @Post(':userId/status')
+  setStatus(
+    @Req() req: AuthedRequest,
+    @Param('userId', ParseUUIDPipe) userId: string,
+    @Body() body: SetUserStatusDto,
+  ) {
+    const actorSub = req.user?.sub ? String(req.user.sub) : null;
+    return this.svc.setUserStatus(userId, body.status, actorSub);
   }
 
   // -----------------------------

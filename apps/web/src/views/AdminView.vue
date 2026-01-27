@@ -112,6 +112,7 @@ import RlsPanel from "@/features/admin/RlsPanel.vue";
 
 import { useToast } from "@/ui/toast/useToast";
 import { normalizeApiError } from "@/ui/ops/normalizeApiError";
+import { readCache, writeCache } from "@/ui/storage/cache";
 
 const router = useRouter();
 const { push } = useToast();
@@ -180,12 +181,20 @@ const usersPanelRef = ref<{ refresh: () => Promise<void> | void } | null>(null);
 // ---------- CUSTOMERS ----------
 const loadingCustomers = ref(false);
 const customers = ref<CustomerRow[]>([]);
+const CUSTOMERS_CACHE_KEY = "admin.cache.customers";
+const CACHE_TTL_MS = 5 * 60 * 1000;
 
 async function loadCustomers() {
-  loadingCustomers.value = true;
+  const cached = readCache<CustomerRow[]>(CUSTOMERS_CACHE_KEY, CACHE_TTL_MS);
+  const hasCached = Boolean(cached?.data?.length);
+  if (hasCached) {
+    customers.value = cached?.data ?? [];
+  }
+  loadingCustomers.value = !hasCached;
   error.value = "";
   try {
     customers.value = await listCustomers();
+    writeCache(CUSTOMERS_CACHE_KEY, customers.value);
   } catch (e: any) {
     const ne = normalizeApiError(e);
     error.value = ne.message;

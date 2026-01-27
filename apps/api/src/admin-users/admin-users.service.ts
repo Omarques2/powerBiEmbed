@@ -46,6 +46,14 @@ export class AdminUsersService {
     return this.lifecycle.disableUser(userId, actorSub);
   }
 
+  setUserStatus(
+    userId: string,
+    status: 'active' | 'disabled',
+    actorSub: string | null = null,
+  ) {
+    return this.lifecycle.setUserStatus(userId, status, actorSub);
+  }
+
   getUserById(userId: string) {
     return this.lifecycle.getUserById(userId);
   }

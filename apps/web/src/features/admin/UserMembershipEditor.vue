@@ -1,11 +1,11 @@
 <!-- apps/web/src/admin/UserMembershipEditor.vue -->
 <template>
-  <section class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-    <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+  <div :class="embedded ? '' : 'rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900'">
+    <div v-if="!embedded" class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
       <div>
         <div class="text-sm font-semibold text-slate-900 dark:text-slate-100">Memberships</div>
         <div class="mt-1 text-xs text-slate-600 dark:text-slate-300">
-          Gerencie customer(s) e role(s) do usuário. Para segurança, ao desativar/remover, recomenda-se revogar permissões do customer.
+          Gerencie customers e roles do usuário diretamente pela lista.
         </div>
       </div>
 
@@ -15,20 +15,9 @@
           class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs hover:bg-slate-50
                  disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
           :disabled="loadingCustomers"
-          @click="refreshCustomers"
+          @click="refreshCustomers(true)"
         >
           {{ loadingCustomers ? "Recarregando..." : "Recarregar customers" }}
-        </button>
-
-        <button
-          type="button"
-          class="rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800
-                 disabled:opacity-60 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
-          :disabled="loadingCustomers"
-          title="Adicionar customer"
-          @click="addOpen = true"
-        >
-          + Adicionar
         </button>
       </div>
     </div>
@@ -41,45 +30,98 @@
       {{ error }}
     </div>
 
+    <div v-if="loadingCustomers && !customers.length" class="mt-3 space-y-3 animate-pulse">
+      <div class="h-14 rounded-xl border border-slate-200 bg-slate-100 dark:border-slate-800 dark:bg-slate-800"></div>
+      <div class="h-14 rounded-xl border border-slate-200 bg-slate-100 dark:border-slate-800 dark:bg-slate-800"></div>
+      <div class="h-14 rounded-xl border border-slate-200 bg-slate-100 dark:border-slate-800 dark:bg-slate-800"></div>
+    </div>
+
     <!-- Lista de memberships (compacta) -->
-    <div class="mt-4 overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-800">
+    <div class="mt-4 space-y-3 sm:hidden">
+        <div
+          v-for="row in membershipRows"
+          :key="row.customerId"
+          class="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-950"
+          :class="!effectiveAccessRow(row) ? 'opacity-70' : ''"
+        >
+        <div class="flex items-start justify-between gap-3">
+          <div class="flex min-w-0 items-start gap-3">
+            <div class="mt-0.5 rounded-lg border border-slate-200 bg-slate-50 p-1 text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
+              <Building2 class="h-4 w-4" />
+            </div>
+            <div class="min-w-0">
+              <div class="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
+                {{ row.customer.name }}
+              </div>
+              <div class="mt-1 truncate font-mono text-[11px] text-slate-500 dark:text-slate-400">
+                {{ row.customer.code }}
+              </div>
+            </div>
+          </div>
+          <span
+            class="inline-flex items-center justify-center rounded-full border p-1 text-[11px]"
+            :class="effectiveAccessRow(row)
+              ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/40 dark:text-emerald-200'
+              : 'border-slate-200 bg-slate-50 text-slate-500 dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-300'"
+            :title="effectiveAccessRow(row) ? 'Acesso permitido' : 'Acesso bloqueado'"
+          >
+            <Unlock v-if="effectiveAccessRow(row)" class="h-4 w-4" />
+            <Lock v-else class="h-4 w-4" />
+          </span>
+        </div>
+
+        <div class="mt-3 flex items-center justify-between gap-2">
+          <select
+            class="w-32 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs
+                   disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900"
+            :disabled="!!busy.map[row.customerId]"
+            :value="row.role"
+            @change="onChangeRole(row.customerId, ($event.target as HTMLSelectElement).value)"
+          >
+            <option value="viewer">viewer</option>
+            <option value="member">member</option>
+            <option value="admin">admin</option>
+            <option value="owner">owner</option>
+          </select>
+
+          <PermSwitch
+            :model-value="row.isActive"
+            :loading="!!busy.map[row.customerId]"
+            :disabled="!!busy.map[row.customerId] || (row.customer.status !== 'active' && !row.isActive)"
+            on-label="Ativo"
+            off-label="Inativo"
+            @toggle="toggleActive(row.customerId, row.isActive)"
+          />
+        </div>
+      </div>
+
+      <div v-if="!membershipRows.length" class="rounded-2xl border border-dashed border-slate-200 p-4 text-center text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400">
+        Nenhum customer encontrado.
+      </div>
+    </div>
+
+    <div class="hidden overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-800 sm:block">
       <table class="w-full table-fixed text-left text-sm">
         <thead class="bg-slate-50 text-xs text-slate-600 dark:bg-slate-950/40 dark:text-slate-300">
           <tr>
             <th class="px-4 py-3">Customer</th>
-            <th class="w-40 px-4 py-3">Acesso efetivo</th>
             <th class="w-44 px-4 py-3">Role</th>
             <th class="w-36 px-4 py-3">Ativo</th>
-            <th class="w-44 px-4 py-3 text-right">Ações</th>
           </tr>
         </thead>
 
         <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
           <tr
-            v-for="m in memberships"
-            :key="m.customerId"
+            v-for="row in membershipRows"
+            :key="row.customerId"
             class="hover:bg-slate-50/60 dark:hover:bg-slate-950/30"
           >
             <td class="px-4 py-3 text-slate-900 dark:text-slate-100">
               <div class="truncate font-medium">
-                {{ m.customer?.name ?? m.customerId }}
+                {{ row.customer.name }}
               </div>
               <div class="truncate font-mono text-xs text-slate-500 dark:text-slate-400">
-                {{ m.customer?.code ?? "" }}
-              </div>
-            </td>
-
-            <td class="px-4 py-3">
-              <span
-                class="inline-flex items-center rounded-full border px-2 py-1 text-[11px]"
-                :class="effectiveAccess(m)
-                  ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/40 dark:text-emerald-200'
-                  : 'border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-200'"
-              >
-                {{ effectiveAccess(m) ? "permitido" : "bloqueado" }}
-              </span>
-              <div class="mt-1 truncate text-[11px] text-slate-500 dark:text-slate-400">
-                customer: {{ m.customer?.status ?? "—" }}
+                {{ row.customer.code }}
               </div>
             </td>
 
@@ -87,9 +129,9 @@
               <select
                 class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs
                        disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900"
-                :disabled="!!busy.map[m.customerId]"
-                :value="m.role"
-                @change="onChangeRole(m.customerId, ($event.target as HTMLSelectElement).value)"
+                :disabled="!!busy.map[row.customerId]"
+                :value="row.role"
+                @change="onChangeRole(row.customerId, ($event.target as HTMLSelectElement).value)"
               >
                 <option value="viewer">viewer</option>
                 <option value="member">member</option>
@@ -101,89 +143,26 @@
             <td class="px-4 py-3 align-middle">
               <div class="inline-flex items-center">
                 <PermSwitch
-                  :model-value="m.isActive"
-                  :loading="!!busy.map[m.customerId]"
-                  :disabled="!!busy.map[m.customerId] || (m.customer?.status !== 'active' && !m.isActive)"
+                  :model-value="row.isActive"
+                  :loading="!!busy.map[row.customerId]"
+                  :disabled="!!busy.map[row.customerId] || (row.customer.status !== 'active' && !row.isActive)"
                   on-label="Ativo"
                   off-label="Inativo"
-                  @toggle="toggleActive(m.customerId, m.isActive)"
+                  @toggle="toggleActive(row.customerId, row.isActive)"
                 />
-              </div>
-            </td>
-
-            <td class="px-4 py-3">
-              <div class="flex items-center justify-end gap-2">
-                <button
-                  type="button"
-                  class="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700 hover:bg-rose-100
-                         disabled:opacity-60 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-200 dark:hover:bg-rose-950/50"
-                  :disabled="!!busy.map[m.customerId]"
-                  @click="openRemoveWizard(m.customerId)"
-                >
-                  Remover
-                </button>
-
-                <button
-                  type="button"
-                  class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs hover:bg-slate-50
-                         disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
-                  :disabled="!!busy.map[m.customerId]"
-                  @click="openTransferWizard(m.customerId)"
-                >
-                  Transferir
-                </button>
               </div>
             </td>
           </tr>
 
-          <tr v-if="!memberships.length">
-            <td colspan="5" class="px-4 py-6 text-center text-xs text-slate-500 dark:text-slate-400">
-              Nenhum membership encontrado para este usuário.
+          <tr v-if="!membershipRows.length">
+            <td colspan="3" class="px-4 py-6 text-center text-xs text-slate-500 dark:text-slate-400">
+              Nenhum customer encontrado.
             </td>
           </tr>
         </tbody>
       </table>
     </div>
-
-    <!-- Add Membership Modal -->
-    <AddMembershipModal
-      :open="addOpen"
-      :busy="addBusy"
-      :customers="customers"
-      :existing-customer-ids="existingCustomerIds"
-      :error="addError"
-      @close="addOpen = false"
-      @submit="handleAddSubmit"
-    />
-
-    <!-- Remove Wizard -->
-    <MembershipActionWizard
-      :open="removeOpen"
-      mode="remove"
-      :busy="wizardBusy"
-      :error="wizardError"
-      :customers="customers"
-      :memberships="memberships"
-      :initial-customer-id="wizardInitialCustomerId"
-      @close="closeWizard"
-      @submit-remove="handleRemoveSubmit"
-      @submit-transfer="noopTransfer"
-    />
-
-    <!-- Transfer Wizard -->
-    <MembershipActionWizard
-      :open="transferOpen"
-      mode="transfer"
-      :busy="wizardBusy"
-      :error="wizardError"
-      :customers="customers"
-      :memberships="memberships"
-      :initial-customer-id="wizardInitialCustomerId"
-      @close="closeWizard"
-      @submit-remove="noopRemove"
-      @submit-transfer="handleTransferSubmit"
-    />
-  </section>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -191,18 +170,15 @@ import { computed, onMounted, ref } from "vue";
 import {
   listCustomers,
   patchUserMembership,
-  removeUserMembership,
-  transferUserMembership,
   upsertUserMembership,
   type MembershipRole,
 } from "@/features/admin/api";
 import { useToast } from "@/ui/toast/useToast";
 import { useConfirm } from "@/ui/confirm/useConfirm";
 import { normalizeApiError, useBusyMap, useOptimisticMutation } from "@/ui/ops";
-
-import AddMembershipModal from "./components/AddMembershipModal.vue";
-import MembershipActionWizard from "./components/MembershipActionWizard.vue";
+import { readCache, writeCache } from "@/ui/storage/cache";
 import { PermSwitch } from "@/ui/toggles";
+import { Building2, Lock, Unlock } from "lucide-vue-next";
 
 const props = defineProps<{
   userId: string;
@@ -212,6 +188,7 @@ const props = defineProps<{
     isActive: boolean;
     customer?: { id: string; code: string; name: string; status: string };
   }>;
+  embedded?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -231,12 +208,19 @@ const error = ref<string>("");
 // customers cache
 const customers = ref<Array<{ id: string; code: string; name: string; status: string }>>([]);
 const loadingCustomers = ref(false);
+const CUSTOMERS_CACHE_KEY = "admin.cache.customers";
+const CACHE_TTL_MS = 5 * 60 * 1000;
 
-async function refreshCustomers() {
-  loadingCustomers.value = true;
+async function refreshCustomers(force = false) {
+  const cached = force ? null : readCache<typeof customers.value>(CUSTOMERS_CACHE_KEY, CACHE_TTL_MS);
+  if (cached?.data?.length && !customers.value.length) {
+    customers.value = cached.data;
+  }
+  loadingCustomers.value = force || !cached?.data?.length;
   error.value = "";
   try {
     customers.value = await listCustomers();
+    writeCache(CUSTOMERS_CACHE_KEY, customers.value);
   } catch (e: any) {
     const ne = normalizeApiError(e);
     error.value = ne.message;
@@ -246,55 +230,37 @@ async function refreshCustomers() {
   }
 }
 
-onMounted(refreshCustomers);
+onMounted(() => refreshCustomers(false));
 
 // helpers
-function effectiveAccess(m: { isActive: boolean; customer?: { status: string } }) {
-  return m.isActive && (m.customer?.status ?? "inactive") === "active";
-}
+const roleOverrides = ref<Record<string, MembershipRole>>({});
 
-const existingCustomerIds = computed(() => props.memberships.map((m) => m.customerId));
-
-// Add (modal)
-const addOpen = ref(false);
-const addBusy = ref(false);
-const addError = ref("");
-
-async function handleAddSubmit(payload: { customerId: string; role: MembershipRole; grantCustomerWorkspaces: boolean }) {
-  addBusy.value = true;
-  addError.value = "";
-  try {
-    await upsertUserMembership(props.userId, {
-      customerId: payload.customerId,
-      role: payload.role,
-      isActive: true,
-      grantCustomerWorkspaces: payload.grantCustomerWorkspaces,
-      revokeCustomerPermissions: false,
-      ensureUserActive: true,
-    });
-
-    // update local
-    const c = customers.value.find((x) => x.id === payload.customerId);
-    const next = [
-      ...props.memberships,
-      { customerId: payload.customerId, role: payload.role, isActive: true, customer: c },
-    ];
-    emit("update:memberships", next);
-    emit("changed");
-    addOpen.value = false;
-
-    push({ kind: "success", title: "Membership adicionada", message: c ? `${c.name} (${c.code})` : payload.customerId });
-  } catch (e: any) {
-    const ne = normalizeApiError(e);
-    addError.value = ne.message;
-    push({ kind: "error", title: "Falha ao adicionar membership", message: ne.message, details: ne.details });
-  } finally {
-    addBusy.value = false;
-  }
-}
+const membershipRows = computed(() =>
+  customers.value.map((c) => {
+    const m = props.memberships.find((x) => x.customerId === c.id);
+    const role = m?.role ?? roleOverrides.value[c.id] ?? "viewer";
+    return {
+      customerId: c.id,
+      customer: c,
+      membership: m ?? null,
+      role,
+      isActive: m?.isActive ?? false,
+    };
+  }),
+);
 
 function updateMembership(customerId: string, patch: Partial<{ role: MembershipRole; isActive: boolean }>) {
   const next = props.memberships.map((m) => (m.customerId === customerId ? { ...m, ...patch } : m));
+  emit("update:memberships", next);
+  emit("changed");
+}
+
+function addMembership(customerId: string, role: MembershipRole) {
+  const c = customers.value.find((x) => x.id === customerId);
+  const next = [
+    ...props.memberships,
+    { customerId, role, isActive: true, customer: c },
+  ];
   emit("update:memberships", next);
   emit("changed");
 }
@@ -305,15 +271,21 @@ function getMembership(customerId: string) {
 
 // Patch role
 async function onChangeRole(customerId: string, role: string) {
+  const targetRole = role as MembershipRole;
+  const current = getMembership(customerId);
+  if (!current) {
+    roleOverrides.value = { ...roleOverrides.value, [customerId]: targetRole };
+    return;
+  }
   await mutate<{ prevRole: MembershipRole | null }, PatchMembershipResult>({
     key: customerId,
     busy,
     optimistic: () => {
       const current = getMembership(customerId);
-      updateMembership(customerId, { role: role as MembershipRole });
+      updateMembership(customerId, { role: targetRole });
       return { prevRole: current?.role ?? null };
     },
-    request: () => patchUserMembership(props.userId, customerId, { role: role as MembershipRole }),
+    request: () => patchUserMembership(props.userId, customerId, { role: targetRole }),
     rollback: (snapshot) => {
       if (!snapshot.prevRole) return;
       updateMembership(customerId, { role: snapshot.prevRole });
@@ -327,11 +299,36 @@ async function onChangeRole(customerId: string, role: string) {
 
 // Toggle active
 async function onToggleActive(customerId: string, isActive: boolean) {
+  const current = getMembership(customerId);
+  if (!current && isActive) {
+    await mutate<null, PatchMembershipResult>({
+      key: customerId,
+      busy,
+      optimistic: () => null,
+      request: () =>
+        upsertUserMembership(props.userId, {
+          customerId,
+          role: roleOverrides.value[customerId] ?? "viewer",
+          isActive: true,
+          grantCustomerWorkspaces: true,
+          revokeCustomerPermissions: false,
+          ensureUserActive: true,
+        }),
+      rollback: () => null,
+      toast: {
+        success: { title: "Membership ativada" },
+        error: { title: "Falha ao ativar membership" },
+      },
+    });
+    addMembership(customerId, roleOverrides.value[customerId] ?? "viewer");
+    return;
+  }
+
+  if (!current) return;
   await mutate<{ prevIsActive: boolean | null }, PatchMembershipResult>({
     key: customerId,
     busy,
     optimistic: () => {
-      const current = getMembership(customerId);
       updateMembership(customerId, { isActive });
       return { prevIsActive: current?.isActive ?? null };
     },
@@ -349,33 +346,6 @@ async function onToggleActive(customerId: string, isActive: boolean) {
       error: { title: "Falha ao atualizar membership" },
     },
   });
-}
-
-// Wizards: remove/transfer
-const removeOpen = ref(false);
-const transferOpen = ref(false);
-const wizardBusy = ref(false);
-const wizardError = ref("");
-const wizardInitialCustomerId = ref<string | null>(null);
-
-function closeWizard() {
-  removeOpen.value = false;
-  transferOpen.value = false;
-  wizardBusy.value = false;
-  wizardError.value = "";
-  wizardInitialCustomerId.value = null;
-}
-
-function openRemoveWizard(customerId: string) {
-  wizardInitialCustomerId.value = customerId;
-  wizardError.value = "";
-  removeOpen.value = true;
-}
-
-function openTransferWizard(customerId: string) {
-  wizardInitialCustomerId.value = customerId;
-  wizardError.value = "";
-  transferOpen.value = true;
 }
 
 async function toggleActive(customerId: string, current: boolean) {
@@ -396,87 +366,7 @@ async function toggleActive(customerId: string, current: boolean) {
   onToggleActive(customerId, next);
 }
 
-function noopTransfer() {}
-function noopRemove() {}
-
-async function handleRemoveSubmit(payload: { customerId: string; revokeCustomerPermissions: boolean }) {
-  const customerId = payload.customerId;
-  const m = props.memberships.find((x) => x.customerId === customerId);
-  const label = m?.customer?.name ? `${m.customer.name} (${m.customer.code ?? ""})` : customerId;
-
-  const ok = await confirm({
-    title: "Remover membership?",
-    message: `Você está prestes a remover o membership de ${label}. Isso pode revogar o acesso do usuário ao customer.`,
-    confirmText: "Remover",
-    cancelText: "Cancelar",
-    danger: true,
-  });
-  if (!ok) return;
-
-  wizardBusy.value = true;
-  wizardError.value = "";
-  try {
-    await removeUserMembership(props.userId, customerId, payload.revokeCustomerPermissions);
-
-    const next = props.memberships.filter((x) => x.customerId !== customerId);
-    emit("update:memberships", next);
-    emit("changed");
-
-    push({ kind: "success", title: "Membership removida", message: label });
-    closeWizard();
-  } catch (e: any) {
-    const ne = normalizeApiError(e);
-    wizardError.value = ne.message;
-    push({ kind: "error", title: "Falha ao remover membership", message: ne.message, details: ne.details });
-  } finally {
-    wizardBusy.value = false;
-  }
-}
-
-async function handleTransferSubmit(payload: {
-  fromCustomerId: string;
-  toCustomerId: string;
-  toRole: MembershipRole;
-  revokeFromCustomerPermissions: boolean;
-  grantToCustomerWorkspaces: boolean;
-}) {
-  wizardBusy.value = true;
-  wizardError.value = "";
-  try {
-    await transferUserMembership(props.userId, {
-      fromCustomerId: payload.fromCustomerId,
-      toCustomerId: payload.toCustomerId,
-      toRole: payload.toRole,
-      deactivateFrom: true,
-      revokeFromCustomerPermissions: payload.revokeFromCustomerPermissions,
-      grantToCustomerWorkspaces: payload.grantToCustomerWorkspaces,
-      toIsActive: true,
-    });
-
-    const toCustomer = customers.value.find((x) => x.id === payload.toCustomerId);
-
-    const next = props.memberships
-      .map((m) => (m.customerId === payload.fromCustomerId ? { ...m, isActive: false } : m))
-      .concat([
-        {
-          customerId: payload.toCustomerId,
-          role: payload.toRole,
-          isActive: true,
-          customer: toCustomer,
-        },
-      ]);
-
-    emit("update:memberships", next);
-    emit("changed");
-
-    push({ kind: "success", title: "Transferência concluída" });
-    closeWizard();
-  } catch (e: any) {
-    const ne = normalizeApiError(e);
-    wizardError.value = ne.message;
-    push({ kind: "error", title: "Falha ao transferir membership", message: ne.message, details: ne.details });
-  } finally {
-    wizardBusy.value = false;
-  }
+function effectiveAccessRow(row: { isActive: boolean; customer: { status: string } }) {
+  return row.isActive && row.customer.status === "active";
 }
 </script>
