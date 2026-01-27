@@ -395,6 +395,13 @@ describe('Full API (e2e)', () => {
     expect(embed.status).toBe(200);
     expect(embed.body.data.embedToken).toBeTruthy();
 
+    const refresh = await request(app.getHttpServer())
+      .post('/powerbi/refresh')
+      .set('x-test-user', 'active')
+      .send({ workspaceId: seed.workspaceId, reportId: seed.reportId });
+    expect(refresh.status).toBe(200);
+    expect(refresh.body.data.ok).toBe(true);
+
     const pages = await request(app.getHttpServer())
       .get('/powerbi/pages')
       .set('x-test-user', 'active')

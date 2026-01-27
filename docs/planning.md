@@ -532,13 +532,13 @@ Status: concluido.
 
 
 ## Roadmap por fases
-Fase 1: EPIC-01 P0 (TLS + hardening bootstrap) + EPIC-02 P0 (DTO/envelope/logs).  
-Fase 2: EPIC-02 P1 env schema + EPIC-07 P1 healthcheck.  
-Fase 3: EPIC-03 P1 casing/migracao/reset (promover se snake_case dominar).  
-Fase 4: EPIC-04 P0 mobile-first core + EPIC-05 Shadcn (se ja iniciado).  
-Fase 5: EPIC-06 P1 CI PR -> CD main P1 (gates: CI verde + /health + migrate deploy).  
-Fase 6: EPIC-07 P2 testes (isolamento + bateria negativa); EPIC-08 P2 modularizacao.  
-Fase 7: EPIC-05 refactor completo do front-end com Shadcn (pos-producao).
+Fase 1 (concluida): EPIC-01 P0 + EPIC-02 P0 (TLS, hardening, DTO/envelope/logs).  
+Fase 2 (concluida): EPIC-02 P1 + EPIC-07 P1 (env schema + healthcheck/ready).  
+Fase 3 (concluida): EPIC-03 P1 (casing/migracao/reset).  
+Fase 4 (concluida): EPIC-04 P0 + EPIC-05 (Shadcn rebuild e ajustes UX).  
+Fase 5 (concluida): EPIC-06 P1 (CI PR -> CD main com gates).  
+Fase 6 (concluida): EPIC-07 P2 + EPIC-08 P2 (testes e modularizacao).  
+Proximas fases: novos cards de UX/operacao conforme backlog atualizado.
 
 ## Checklist de readiness de producao
 - TLS DB valido; flag dev documentada.

@@ -57,6 +57,22 @@ export class ExportReportDto {
   forceIdentity?: boolean;
 }
 
+export class RefreshReportDto {
+  @IsUUID()
+  workspaceId!: string;
+
+  @IsUUID()
+  reportId!: string;
+}
+
+export class RefreshStatusQueryDto {
+  @IsUUID()
+  workspaceId!: string;
+
+  @IsUUID()
+  reportId!: string;
+}
+
 export class AdminPowerBiSyncDto {
   @IsUUID()
   customerId!: string;

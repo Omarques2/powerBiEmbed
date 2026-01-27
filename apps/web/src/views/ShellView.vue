@@ -1,12 +1,15 @@
 <!-- src/views/ShellView.vue -->
 <template>
   <div
-    class="h-screen w-screen overflow-hidden bg-background text-foreground [--topbar-h:72px]"
+    class="app-shell h-screen w-screen overflow-hidden bg-background text-foreground"
+    :class="{ 'has-report': !!selectedReport }"
+    :style="{ '--topbar-h': isFullscreen ? '0px' : '72px' }"
   >
     <div class="flex h-screen overflow-hidden">
       <!-- Desktop sidebar (collapsible) -->
       <aside
-        class="hidden shrink-0 border-r border-border bg-card lg:flex lg:flex-col transition-[width] duration-200"
+        v-if="!isFullscreen"
+        class="app-sidebar hidden shrink-0 border-r border-border bg-card lg:flex lg:flex-col transition-[width] duration-200"
         :class="sidebarOpen ? 'w-80' : 'w-[72px]'"
       >
         <SidebarContent
@@ -32,10 +35,12 @@
 
       <!-- Mobile drawer -->
       <UiSheet
+        v-if="!isFullscreen"
         :open="drawerOpen"
         overlay-class="lg:hidden"
         panel-class="lg:hidden"
         @close="drawerOpen = false"
+        class="app-drawer"
       >
         <SidebarContent
           mode="mobile"
@@ -59,14 +64,19 @@
       </UiSheet>
 
       <!-- Main viewer -->
-      <main class="flex min-w-0 flex-1 flex-col overflow-hidden">
+      <main
+        class="app-main flex min-w-0 flex-1 flex-col overflow-hidden"
+        :class="isFullscreen ? 'fixed inset-0 z-50 bg-background' : ''"
+      >
         <!-- Top bar -->
         <div
-          class="border-b border-border bg-card px-4 h-[var(--topbar-h)] flex items-center"
+          v-if="!isFullscreen"
+          class="app-topbar border-b border-border bg-card px-4 h-[var(--topbar-h)] flex items-center"
         >
           <div class="flex w-full items-center gap-3">
             <!-- Hamburger (mobile only) -->
             <UiButton
+              v-if="!isFullscreen"
               class="shrink-0 lg:hidden"
               variant="outline"
               size="icon"
@@ -143,82 +153,86 @@
         </div>
 
         <!-- Viewer area (centralizado + sem scroll) -->
-        <div class="flex-1 min-h-0 overflow-hidden bg-background p-2 sm:p-3 lg:p-4">
-<div ref="hostEl" class="h-full w-full overflow-hidden flex items-center justify-center">
-  <div
-    ref="frameEl"
-    class="print-bi-area relative overflow-hidden rounded-2xl border border-border bg-card shadow-sm
-           mx-auto aspect-[16/9]
-           w-[min(96vw,calc(100dvw-2rem))]
-           max-h-[min(70vh,calc(100dvh-var(--topbar-h)-1.5rem))]
-           md:w-auto md:h-auto"
-  >
-              <div class="flex h-full flex-col">
-                <div ref="stageEl" class="relative flex-1 overflow-hidden">
-                  <div ref="containerEl" class="absolute inset-0" />
-
-                  <div v-if="!selectedReport" class="absolute inset-0 grid place-items-center p-6">
-                    <div class="w-[min(760px,94%)]">
-                      <div class="mb-4">
-                      <div class="text-sm font-medium text-foreground">
-                        Selecione um relatório
-                      </div>
-                      <div class="mt-1 text-xs text-muted-foreground">
-                        Escolha um workspace e um report no menu lateral para renderizar o Power BI.
-                      </div>
-                      </div>
-
-                      <ReportSkeletonCard>
-                        <template #footer>
-                          Dica: use “Recarregar workspaces” se não aparecer nada.
-                        </template>
-                      </ReportSkeletonCard>
-                    </div>
-                  </div>
-
-                  <div
-                    v-if="selectedReport && loadingEmbed"
-                    class="absolute inset-0 z-10 grid place-items-center bg-background/70 backdrop-blur-sm"
+        <div
+          class="print-stage flex-1 min-h-0 overflow-hidden bg-background"
+          :class="isFullscreen ? 'p-2 sm:p-3' : 'p-2 sm:p-3 lg:p-4'"
+        >
+          <div ref="hostEl" class="print-host h-full w-full overflow-hidden flex flex-col pb-1">
+            <div
+              ref="topChromeEl"
+              :key="frameWidthStyle.width || 'menu'"
+              :style="frameWidthStyle"
+              class="embed-menu-bar shrink-0 border border-border border-b-0 bg-background/90 px-2 py-1 text-[11px] text-foreground
+                     rounded-t-2xl rounded-b-none mx-auto transition-[width] duration-200 ease-out shadow-sm"
+            >
+              <div class="flex items-center gap-2">
+                <div
+                  v-if="!selectedReport"
+                  class="mr-2 hidden sm:block text-xs text-muted-foreground"
+                >
+                  Selecione um relatório
+                </div>
+                <div class="embed-actions flex items-center gap-2">
+                  <UiButton
+                    variant="outline"
+                    size="sm"
+                    class="h-9 w-9"
+                    :disabled="!selectedReport"
+                    :title="isFullscreen ? 'Sair da tela cheia' : 'Tela cheia'"
+                    :aria-label="isFullscreen ? 'Sair da tela cheia' : 'Tela cheia'"
+                    @click="toggleFullscreen"
                   >
-                    <div class="w-[min(760px,94%)]">
-                      <div class="mb-4 flex items-center gap-3">
-                        <div
-                          class="h-5 w-5 animate-spin rounded-full border-2 border-muted border-t-foreground"
-                        />
-                        <div class="text-sm font-medium text-foreground">
-                          Carregando relatório…
-                        </div>
-                      </div>
+                    <svg
+                      class="h-5 w-5"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.8"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path
+                        v-if="!isFullscreen"
+                        d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"
+                      />
+                      <path
+                        v-else
+                        d="M4 14h6v6M20 10h-6V4M14 10l7-7M10 14l-7 7"
+                      />
+                    </svg>
+                  </UiButton>
 
-                      <ReportSkeletonCard>
-                        <template #footer>
-                          Gerando embed token e inicializando o Power BI…
-                        </template>
-                      </ReportSkeletonCard>
-                    </div>
-                  </div>
-
-                  <div
-                    v-if="embedError && selectedReport"
-                    class="absolute bottom-3 left-3 right-3 z-20 rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive shadow"
+                  <UiButton
+                    variant="outline"
+                    size="sm"
+                    class="h-9 w-9"
+                    :disabled="!selectedReport || loadingEmbed || refreshingModel"
+                    :title="refreshingModel ? 'Atualizando...' : 'Atualizar modelo'"
+                    :aria-label="refreshingModel ? 'Atualizando...' : 'Atualizar modelo'"
+                    @click="refreshModel"
                   >
-                    {{ embedError }}
-                  </div>
-
-                  <div
-                    v-if="allowedPagesError && selectedReport"
-                    class="absolute bottom-16 left-3 right-3 z-20 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 shadow
-                           dark:border-amber-900/40 dark:bg-amber-950/40 dark:text-amber-200"
-                  >
-                    {{ allowedPagesError }}
-                  </div>
+                    <svg
+                      class="h-5 w-5"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.8"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      aria-hidden="true"
+                      :class="refreshingModel ? 'animate-spin' : ''"
+                    >
+                      <path d="M3 12a9 9 0 1 0 3-6.7" />
+                      <path d="M3 3v6h6" />
+                    </svg>
+                  </UiButton>
                 </div>
 
-                <div
-                  v-if="selectedReport && allowedPages.length"
-                  class="shrink-0 border-t border-border bg-background/90 px-2 py-1 text-[11px] text-foreground"
-                >
-                  <div class="flex items-center gap-1 overflow-x-auto">
+                <div class="mx-1 h-6 w-px shrink-0 bg-border/70" aria-hidden="true" />
+
+                <div class="flex-1 overflow-hidden">
+                  <div class="no-scrollbar flex items-center gap-1 overflow-x-auto">
                     <button
                       v-for="p in allowedPages"
                       :key="p.pageName"
@@ -232,6 +246,110 @@
                     >
                       {{ p.displayName || p.pageName }}
                     </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="flex-1 w-full flex items-start justify-center">
+              <div
+                ref="frameEl"
+                class="print-bi-area relative overflow-hidden rounded-b-2xl rounded-t-none border border-border border-t-0 bg-card shadow-sm max-w-full max-h-full
+                       transition-[width,height] duration-200 ease-out shadow-md"
+              >
+                <div class="flex h-full flex-col">
+                  <div ref="stageEl" class="relative flex-1 overflow-hidden">
+                    <div ref="containerEl" class="absolute inset-0" />
+                    <div class="print-warning absolute inset-0 hidden items-center justify-center p-6">
+                      <div class="w-[min(520px,92%)] rounded-2xl border border-slate-200 bg-white p-5 text-center text-slate-900 shadow-sm">
+                        <div class="text-sm font-semibold">Selecione um relatório</div>
+                        <div class="mt-1 text-xs text-slate-600">
+                          Para imprimir, escolha um workspace e um relatório no menu lateral.
+                        </div>
+                      </div>
+                    </div>
+                    <div class="print-fallback absolute inset-0 hidden items-center justify-center p-6">
+                      <div class="w-[min(720px,92%)] rounded-2xl border border-slate-200 bg-white p-6 text-slate-900 shadow-sm">
+                        <div class="text-base font-semibold">Impressao do Power BI</div>
+                        <div class="mt-2 text-sm text-slate-700">
+                          Seu navegador nao consegue imprimir conteudo embutido do Power BI.
+                          Use o botao <strong>Exportar</strong> para gerar PDF/PNG com as paginas permitidas.
+                        </div>
+                        <div class="mt-3 text-xs text-slate-500">
+                          Report: {{ selectedReport?.name ?? "Sem relatorio selecionado" }}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div v-if="!selectedReport" class="absolute inset-0 grid place-items-center p-6">
+                      <div class="w-[min(760px,94%)]">
+                        <div class="mb-4">
+                        <div class="text-sm font-medium text-foreground">
+                          Selecione um relatório
+                        </div>
+                        <div class="mt-1 text-xs text-muted-foreground">
+                          Escolha um workspace e um report no menu lateral para renderizar o Power BI.
+                        </div>
+                        </div>
+
+                        <ReportSkeletonCard>
+                          <template #footer>
+                            Dica: use “Recarregar workspaces” se não aparecer nada.
+                          </template>
+                        </ReportSkeletonCard>
+                      </div>
+                    </div>
+
+                    <div
+                      v-if="selectedReport && loadingEmbed"
+                      class="absolute inset-0 z-10 grid place-items-center bg-background/70 backdrop-blur-sm"
+                    >
+                      <div class="w-[min(760px,94%)]">
+                        <div class="mb-4 flex items-center gap-3">
+                          <div
+                            class="h-5 w-5 animate-spin rounded-full border-2 border-muted border-t-foreground"
+                          />
+                          <div class="text-sm font-medium text-foreground">
+                            Carregando relatório…
+                          </div>
+                        </div>
+
+                        <ReportSkeletonCard>
+                          <template #footer>
+                            Gerando embed token e inicializando o Power BI…
+                          </template>
+                        </ReportSkeletonCard>
+                      </div>
+                    </div>
+
+                  <div
+                    v-if="embedError && selectedReport"
+                    class="absolute bottom-3 left-3 right-3 z-20 rounded-xl border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive shadow"
+                  >
+                    {{ embedError }}
+                  </div>
+
+                  <div
+                    v-if="allowedPagesError && selectedReport"
+                    class="absolute bottom-16 left-3 right-3 z-20 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 shadow
+                             dark:border-amber-900/40 dark:bg-amber-950/40 dark:text-amber-200"
+                  >
+                    {{ allowedPagesError }}
+                  </div>
+
+                  <div
+                    v-if="noPagesAvailable && selectedReport && !loadingEmbed"
+                    class="absolute inset-0 z-10 grid place-items-center bg-background/80 backdrop-blur-sm"
+                  >
+                    <div class="w-[min(520px,90%)] rounded-2xl border border-border bg-card p-4 text-center shadow-sm">
+                      <div class="text-sm font-semibold text-foreground">
+                        Sem páginas disponíveis
+                      </div>
+                      <div class="mt-1 text-xs text-muted-foreground">
+                        Este relatório não possui páginas sincronizadas ou você não tem permissão para vê-las.
+                      </div>
+                    </div>
+                  </div>
                   </div>
                 </div>
               </div>
@@ -309,7 +427,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, onBeforeUnmount, ref, watch } from "vue";
+import { computed, onMounted, onBeforeUnmount, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import * as pbi from "powerbi-client";
 
@@ -353,6 +471,8 @@ const isAdmin = ref(false);
 
 const drawerOpen = ref(false);
 const sidebarOpen = ref(true);
+const isFullscreen = ref(false);
+const lastSidebarOpen = ref(true);
 
 const workspaces = ref<Workspace[]>([]);
 const reportsByWorkspace = ref<Record<string, Report[]>>({});
@@ -364,16 +484,21 @@ const selectedReport = ref<Report | null>(null);
 const loadingWorkspaces = ref(false);
 const loadingReports = ref(false);
 const loadingEmbed = ref(false);
+const refreshingModel = ref(false);
 const listError = ref("");
 const embedError = ref("");
 const embedErrorLocked = ref(false);
 const loadingPages = ref(false);
 const allowedPages = ref<AllowedPage[]>([]);
 const allowedPagesError = ref("");
+const noPagesAvailable = ref(false);
 const activePageName = ref<string | null>(null);
+const printBlocked = ref(false);
 const hostEl = ref<HTMLDivElement | null>(null);
 const frameEl = ref<HTMLDivElement | null>(null);
 const containerEl = ref<HTMLDivElement | null>(null);
+const topChromeEl = ref<HTMLDivElement | null>(null);
+const frameWidth = ref<number | null>(null);
 const printing = ref(false);
 const reportReady = ref(false);
 const lastRenderAt = ref(0);
@@ -397,14 +522,10 @@ function fitFrame() {
   const frame = frameEl.value;
   if (!host || !frame) return;
 
-  if (!window.matchMedia("(min-width: 768px)").matches) {
-    frame.style.removeProperty("width");
-    frame.style.removeProperty("height");
-    return;
-  }
-
+  const chromeH = topChromeEl.value?.offsetHeight ?? 0;
   const availW = host.clientWidth;
-  const availH = host.clientHeight;
+  const availH = Math.max(0, host.clientHeight - chromeH);
+  if (!availW || !availH) return;
 
   let w = availW;
   let h = w / ASPECT;
@@ -414,15 +535,23 @@ function fitFrame() {
     w = h * ASPECT;
   }
 
-  const pad = 8;
+  const pad = isFullscreen.value ? 0 : 8;
   w = Math.max(0, w - pad);
   h = Math.max(0, h - pad);
 
-  frame.style.width = `${Math.floor(w)}px`;
-  frame.style.height = `${Math.floor(h)}px`;
+  const width = Math.floor(w);
+  const height = Math.floor(h);
+  frame.style.width = `${width}px`;
+  frame.style.height = `${height}px`;
+  frameWidth.value = width;
 
   window.requestAnimationFrame(() => resizeEmbedded());
 }
+
+const frameWidthStyle = computed(() => {
+  if (!frameWidth.value) return {};
+  return { width: `${frameWidth.value}px` };
+});
 
 function loadExportPref<T extends string>(key: string, fallback: T, allowed: T[]): T {
   if (typeof window === "undefined") return fallback;
@@ -465,6 +594,10 @@ let powerbiService: pbi.service.Service | null = null;
 let resizeObs: ResizeObserver | null = null;
 let embeddedReport: pbi.Report | null = null;
 let guardRedirecting = false;
+let refreshPollTimer: number | null = null;
+let refreshPollAttempts = 0;
+const REFRESH_POLL_INTERVAL = 6000;
+const REFRESH_POLL_MAX_ATTEMPTS = 30;
 
 function createPowerBiService() {
   return new pbi.service.Service(
@@ -529,6 +662,8 @@ function resizeEmbedded() {
 }
 
 let onWinResize: (() => void) | null = null;
+let onBeforePrint: (() => void) | null = null;
+let onAfterPrint: (() => void) | null = null;
 
 function addResizeHandlers() {
   onWinResize = () => {
@@ -555,6 +690,24 @@ function addResizeHandlers() {
     fitFrame();
     resizeEmbedded();
   });
+
+  onBeforePrint = () => {
+    document.documentElement.classList.add("print-clean");
+    const blocked = !selectedReport.value;
+    printBlocked.value = blocked;
+    if (blocked) {
+      document.documentElement.classList.add("print-block");
+    } else {
+      document.documentElement.classList.remove("print-block");
+    }
+  };
+  onAfterPrint = () => {
+    document.documentElement.classList.remove("print-clean");
+    document.documentElement.classList.remove("print-block");
+    printBlocked.value = false;
+  };
+  window.addEventListener("beforeprint", onBeforePrint);
+  window.addEventListener("afterprint", onAfterPrint);
 }
 
 function removeResizeHandlers() {
@@ -569,6 +722,12 @@ function removeResizeHandlers() {
     fitObs.disconnect();
     fitObs = null;
   }
+
+  if (onBeforePrint) window.removeEventListener("beforeprint", onBeforePrint);
+  if (onAfterPrint) window.removeEventListener("afterprint", onAfterPrint);
+  onBeforePrint = null;
+  onAfterPrint = null;
+
 }
 
 function waitForReportRender(timeoutMs = 8000): Promise<boolean> {
@@ -892,12 +1051,33 @@ watch(drawerOpen, () => {
   }, 80);
 });
 
+watch(isFullscreen, (value) => {
+  if (value) {
+    lastSidebarOpen.value = sidebarOpen.value;
+    sidebarOpen.value = false;
+    drawerOpen.value = false;
+  } else {
+    sidebarOpen.value = lastSidebarOpen.value;
+  }
+  window.setTimeout(() => {
+    fitFrame();
+    resizeEmbedded();
+  }, 120);
+});
+
 watch(exportFormat, (value) => {
   saveExportPref(EXPORT_FORMAT_KEY, value);
 });
 
 watch(exportScope, (value) => {
   saveExportPref(EXPORT_SCOPE_KEY, value);
+});
+
+watch(allowedPages, () => {
+  window.setTimeout(() => {
+    fitFrame();
+    resizeEmbedded();
+  }, 0);
 });
 
 async function loadWorkspaces() {
@@ -930,6 +1110,14 @@ async function loadWorkspaces() {
   } finally {
     loadingWorkspaces.value = false;
   }
+}
+
+function stopRefreshPolling() {
+  if (refreshPollTimer) {
+    window.clearInterval(refreshPollTimer);
+    refreshPollTimer = null;
+  }
+  refreshPollAttempts = 0;
 }
 
 async function loadAllReports(workspaceList: Workspace[]) {
@@ -997,6 +1185,7 @@ async function openReport(r: Report) {
   selectedReport.value = r;
   loadingEmbed.value = true;
   reportReady.value = false;
+  noPagesAvailable.value = false;
 
   try {
     resetEmbed();
@@ -1019,6 +1208,9 @@ async function openReport(r: Report) {
     } catch (e: any) {
       const message = await extractErrorMessage(e);
       allowedPagesError.value = message;
+      if (message.toLowerCase().includes("pages not synced")) {
+        noPagesAvailable.value = true;
+      }
       throw new Error(message);
     } finally {
       loadingPages.value = false;
@@ -1103,7 +1295,12 @@ async function openReport(r: Report) {
     });
   } catch (e: any) {
     const message = await extractErrorMessage(e);
-    embedError.value = `Falha ao embutir report: ${message}`;
+    if (message.toLowerCase().includes("pages not synced")) {
+      noPagesAvailable.value = true;
+      embedError.value = "";
+    } else {
+      embedError.value = `Falha ao embutir report: ${message}`;
+    }
     loadingEmbed.value = false;
     reportReady.value = false;
   }
@@ -1121,6 +1318,107 @@ async function setActivePage(pageName: string) {
     // ignore set page failures
   } finally {
     guardRedirecting = false;
+  }
+}
+
+function toggleFullscreen() {
+  isFullscreen.value = !isFullscreen.value;
+}
+
+async function refreshModel() {
+  if (!selectedReport.value || !selectedWorkspaceId.value) return;
+  if (refreshingModel.value) return;
+  refreshingModel.value = true;
+  stopRefreshPolling();
+  try {
+    const res = await http.post("/powerbi/refresh", {
+      workspaceId: selectedWorkspaceId.value,
+      reportId: selectedReport.value.id,
+    });
+    unwrapData(res.data as ApiEnvelope<{ ok: boolean }>);
+    push({
+      kind: "info",
+      title: "Atualização iniciada",
+      message: "Vamos avisar quando o modelo terminar de atualizar.",
+      timeoutMs: 4000,
+    });
+
+    refreshPollTimer = window.setInterval(async () => {
+      if (!selectedReport.value || !selectedWorkspaceId.value) {
+        stopRefreshPolling();
+        refreshingModel.value = false;
+        return;
+      }
+
+      refreshPollAttempts += 1;
+      try {
+        const statusRes = await http.get("/powerbi/refresh/status", {
+          params: {
+            workspaceId: selectedWorkspaceId.value,
+            reportId: selectedReport.value.id,
+          },
+        });
+        const payload = unwrapData(
+          statusRes.data as ApiEnvelope<{ status?: string }>,
+        );
+        const statusText = (payload?.status ?? "unknown").toString().toLowerCase();
+
+        if (["completed", "succeeded"].some((s) => statusText.includes(s))) {
+          stopRefreshPolling();
+          refreshingModel.value = false;
+          push({
+            kind: "success",
+            title: "Modelo atualizado",
+            message: "A atualização do modelo semântico foi concluída.",
+            timeoutMs: 5000,
+          });
+          return;
+        }
+
+        if (["failed", "error", "cancelled"].some((s) => statusText.includes(s))) {
+          stopRefreshPolling();
+          refreshingModel.value = false;
+          push({
+            kind: "error",
+            title: "Falha na atualização",
+            message: "O Power BI informou falha ao atualizar o modelo.",
+            timeoutMs: 8000,
+          });
+          return;
+        }
+
+        if (refreshPollAttempts >= REFRESH_POLL_MAX_ATTEMPTS) {
+          stopRefreshPolling();
+          refreshingModel.value = false;
+          push({
+            kind: "info",
+            title: "Atualização em andamento",
+            message: "A atualização ainda está em progresso. Verifique novamente em instantes.",
+            timeoutMs: 6000,
+          });
+        }
+      } catch {
+        stopRefreshPolling();
+        refreshingModel.value = false;
+        push({
+          kind: "error",
+          title: "Falha ao verificar status",
+          message: "Não foi possível confirmar o status do refresh.",
+          timeoutMs: 6000,
+        });
+      }
+    }, REFRESH_POLL_INTERVAL);
+  } catch (e: any) {
+    const message = await extractErrorMessage(e);
+    push({
+      kind: "error",
+      title: "Falha ao atualizar modelo",
+      message,
+      timeoutMs: 8000,
+    });
+    refreshingModel.value = false;
+  } finally {
+    // polling handles the final state
   }
 }
 
@@ -1179,5 +1477,86 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   removeResizeHandlers();
   resetEmbed();
+  stopRefreshPolling();
 });
 </script>
+
+<style scoped>
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+@media print {
+  html,
+  body {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+  }
+
+  .print-clean .app-sidebar,
+  .print-clean .app-topbar,
+  .print-clean .app-drawer,
+  .print-clean .embed-actions,
+  .print-clean .export-modal {
+    display: none !important;
+  }
+
+  .print-clean .app-main {
+    position: static !important;
+    inset: auto !important;
+    width: 100% !important;
+    height: auto !important;
+  }
+
+  .print-clean .print-stage,
+  .print-clean .print-host {
+    padding: 0 !important;
+    gap: 0 !important;
+    align-items: flex-start !important;
+    justify-content: flex-start !important;
+  }
+
+  .print-clean .embed-menu-bar {
+    display: none !important;
+  }
+
+  .print-clean .embed-menu-bar,
+  .print-clean .print-bi-area {
+    margin: 0 auto !important;
+    border-radius: 0 !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  .print-clean .print-bi-area {
+    height: auto !important;
+    aspect-ratio: 16 / 9 !important;
+    background: #fff !important;
+    border: 0 !important;
+    outline: 1px solid #0f172a !important;
+    outline-offset: -1px !important;
+    overflow: visible !important;
+  }
+
+  .print-block .print-bi-area {
+    display: none !important;
+  }
+  .print-block .print-warning {
+    display: flex !important;
+  }
+
+  .app-shell:not(.has-report) .print-bi-area {
+    display: none !important;
+  }
+  .app-shell:not(.has-report) .print-warning {
+    display: flex !important;
+  }
+
+}
+</style>

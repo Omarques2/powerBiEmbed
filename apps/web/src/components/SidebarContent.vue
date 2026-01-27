@@ -164,7 +164,7 @@ class="h-5 w-5" :class="loadingWorkspaces ? 'animate-spin' : ''" viewBox="0 0 24
                   v-for="r in reportsForWorkspace(w)"
                   :key="r.id"
                   variant="outline"
-                  class="w-full justify-start rounded-xl border-border bg-background text-left text-sm hover:bg-accent hover:text-accent-foreground"
+                  class="w-full justify-start rounded-xl border-border bg-background p-6 text-left text-sm hover:bg-accent hover:text-accent-foreground"
                   :class="selectedReport?.id === r.id
                     ? 'border-primary/50 bg-accent text-foreground'
                     : ''"

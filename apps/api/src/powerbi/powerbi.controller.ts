@@ -23,6 +23,8 @@ import { ActiveUserGuard } from '../auth/active-user.guard';
 import {
   EmbedConfigQueryDto,
   ExportReportDto,
+  RefreshReportDto,
+  RefreshStatusQueryDto,
   WorkspaceQueryDto,
 } from './dto/powerbi.dto';
 
@@ -159,5 +161,66 @@ export class PowerBiController {
     });
 
     return new StreamableFile(result.buffer);
+  }
+
+  @UseGuards(AuthGuard, ActiveUserGuard)
+  @Post('refresh')
+  @HttpCode(200)
+  async refreshReport(
+    @Req() req: AuthedRequest,
+    @Body() body: RefreshReportDto,
+  ) {
+    const workspaceId = body?.workspaceId;
+    const reportId = body?.reportId;
+
+    if (!workspaceId || !reportId) {
+      throw new BadRequestException('workspaceId and reportId are required');
+    }
+
+    if (!req.user) throw new BadRequestException('Missing user claims');
+    const user = await this.usersService.upsertFromClaims(req.user);
+    const access = await this.biAuthz.resolveReportAccess(
+      user.id,
+      workspaceId,
+      reportId,
+    );
+
+    if (!access.datasetId) {
+      throw new BadRequestException('Report sem datasetId');
+    }
+
+    const refresh = await this.svc.refreshDatasetInGroup(
+      workspaceId,
+      access.datasetId,
+    );
+
+    return { ok: true, status: 'queued', refresh };
+  }
+
+  @UseGuards(AuthGuard, ActiveUserGuard)
+  @Get('refresh/status')
+  async refreshStatus(
+    @Req() req: AuthedRequest,
+    @Query() query: RefreshStatusQueryDto,
+  ) {
+    if (!req.user) throw new BadRequestException('Missing user claims');
+    const user = await this.usersService.upsertFromClaims(req.user);
+    const access = await this.biAuthz.resolveReportAccess(
+      user.id,
+      query.workspaceId,
+      query.reportId,
+    );
+
+    if (!access.datasetId) {
+      throw new BadRequestException('Report sem datasetId');
+    }
+
+    const refreshes = await this.svc.listDatasetRefreshesInGroup(
+      query.workspaceId,
+      access.datasetId,
+    );
+    const latest = refreshes[0] ?? null;
+
+    return { status: latest?.status ?? 'unknown', refreshes };
   }
 }
