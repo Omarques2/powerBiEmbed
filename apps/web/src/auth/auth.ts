@@ -8,8 +8,8 @@ import {
 const clientId = import.meta.env.VITE_ENTRA_SPA_CLIENT_ID as string;
 const authority = import.meta.env.VITE_ENTRA_AUTHORITY as string;
 
-const redirectUri = import.meta.env.VITE_ENTRA_REDIRECT_URI as string;
-const postLogoutRedirectUri = import.meta.env.VITE_ENTRA_POST_LOGOUT_REDIRECT_URI as string;
+const envRedirectUri = import.meta.env.VITE_ENTRA_REDIRECT_URI as string | undefined;
+const envPostLogoutRedirectUri = import.meta.env.VITE_ENTRA_POST_LOGOUT_REDIRECT_URI as string | undefined;
 
 const apiScope = import.meta.env.VITE_ENTRA_API_SCOPE as string;
 
@@ -18,7 +18,24 @@ const knownAuthority = (import.meta.env.VITE_ENTRA_KNOWN_AUTHORITY as string | u
 
 if (!clientId) throw new Error("Missing VITE_ENTRA_SPA_CLIENT_ID");
 if (!authority) throw new Error("Missing VITE_ENTRA_AUTHORITY");
-if (!redirectUri) throw new Error("Missing VITE_ENTRA_REDIRECT_URI");
+const redirectUri = resolveRedirectUri();
+const postLogoutRedirectUri = resolvePostLogoutRedirectUri();
+
+function resolveRedirectUri(): string {
+  if (typeof window !== "undefined" && window.location?.origin) {
+    return `${window.location.origin}/auth/callback`;
+  }
+  if (envRedirectUri) return envRedirectUri;
+  throw new Error("Missing redirectUri (window origin unavailable)");
+}
+
+function resolvePostLogoutRedirectUri(): string {
+  if (typeof window !== "undefined" && window.location?.origin) {
+    return `${window.location.origin}/`;
+  }
+  if (envPostLogoutRedirectUri) return envPostLogoutRedirectUri;
+  throw new Error("Missing postLogoutRedirectUri (window origin unavailable)");
+}
 if (!apiScope) throw new Error("Missing VITE_ENTRA_API_SCOPE");
 
 const isCiamLike =
