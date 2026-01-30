@@ -16,6 +16,7 @@ describe("SidebarContent", () => {
           ws1: [{ id: "r1", name: "Report A", workspaceId: "ws1" }],
         },
         selectedWorkspaceId: "ws1",
+        expandedWorkspaceId: "ws1",
         selectedReport: null,
         loadingWorkspaces: false,
         error: "",

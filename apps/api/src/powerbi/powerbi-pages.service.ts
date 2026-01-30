@@ -86,6 +86,10 @@ export class PowerBiPagesService {
       }
     });
 
+    if (remotePages.length > 0) {
+      await this.backfillDefaultAccessForReport(report.id);
+    }
+
     return {
       ok: true,
       reportRefId: report.id,
@@ -93,6 +97,128 @@ export class PowerBiPagesService {
       pagesDeactivated: deactivated,
       remoteCount: remotePages.length,
     };
+  }
+
+  async syncAllReportPages() {
+    const reports = await this.prisma.biReport.findMany({
+      select: { id: true, reportName: true },
+      orderBy: [{ createdAt: 'asc' }],
+    });
+
+    let success = 0;
+    let failed = 0;
+    const errors: { reportRefId: string; reportName?: string | null; message: string }[] = [];
+
+    for (const report of reports) {
+      try {
+        await this.syncReportPages(report.id);
+        success += 1;
+      } catch (err) {
+        failed += 1;
+        const message = err instanceof Error ? err.message : String(err);
+        errors.push({ reportRefId: report.id, reportName: report.reportName ?? null, message });
+      }
+    }
+
+    return {
+      ok: failed === 0,
+      total: reports.length,
+      success,
+      failed,
+      errors,
+    };
+  }
+
+  private async backfillDefaultAccessForReport(reportRefId: string) {
+    const pages = await this.prisma.biReportPage.findMany({
+      where: { reportRefId: reportRefId, isActive: true },
+      select: { id: true },
+    });
+    if (!pages.length) return;
+
+    const customers = await this.prisma.biCustomerReportPermission.findMany({
+      where: {
+        reportRefId: reportRefId,
+        canView: true,
+        customer: { status: 'active' },
+      },
+      select: { customerId: true },
+    });
+    if (!customers.length) return;
+
+    for (const { customerId } of customers) {
+      const [activeGroups, allowExists] = await Promise.all([
+        this.prisma.biCustomerPageGroup.findMany({
+          where: {
+            customerId: customerId,
+            isActive: true,
+            group: { reportRefId: reportRefId, isActive: true },
+          },
+          select: { groupId: true },
+        }),
+        this.prisma.biCustomerPageAllowlist.findFirst({
+          where: { customerId: customerId, page: { reportRefId: reportRefId } },
+          select: { id: true },
+        }),
+      ]);
+
+      const groupIds = Array.from(new Set(activeGroups.map((g) => g.groupId)));
+      const hasGroups = groupIds.length > 0;
+
+      if (!hasGroups && !allowExists) {
+        await this.prisma.biCustomerPageAllowlist.createMany({
+          data: pages.map((p) => ({ customerId: customerId, pageId: p.id })),
+          skipDuplicates: true,
+        });
+      }
+
+      const memberships = await this.prisma.userCustomerMembership.findMany({
+        where: {
+          customerId: customerId,
+          isActive: true,
+          user: { status: 'active' },
+        },
+        select: { userId: true },
+      });
+      if (!memberships.length) continue;
+
+      const userIds = memberships.map((m) => m.userId);
+      const [userAllow, userGroups] = await Promise.all([
+        this.prisma.biUserPageAllowlist.findMany({
+          where: { userId: { in: userIds }, page: { reportRefId: reportRefId } },
+          select: { userId: true },
+        }),
+        this.prisma.biUserPageGroup.findMany({
+          where: { userId: { in: userIds }, group: { reportRefId: reportRefId } },
+          select: { userId: true },
+        }),
+      ]);
+
+      const assignedUsers = new Set([
+        ...userAllow.map((u) => u.userId),
+        ...userGroups.map((u) => u.userId),
+      ]);
+      const targetUserIds = userIds.filter((id) => !assignedUsers.has(id));
+      if (!targetUserIds.length) continue;
+
+      if (hasGroups) {
+        const rows = targetUserIds.flatMap((userId) =>
+          groupIds.map((groupId) => ({ userId, groupId, isActive: true })),
+        );
+        await this.prisma.biUserPageGroup.createMany({
+          data: rows,
+          skipDuplicates: true,
+        });
+      } else {
+        const rows = targetUserIds.flatMap((userId) =>
+          pages.map((p) => ({ userId, pageId: p.id })),
+        );
+        await this.prisma.biUserPageAllowlist.createMany({
+          data: rows,
+          skipDuplicates: true,
+        });
+      }
+    }
   }
 
   listReportPages(reportRefId: string) {

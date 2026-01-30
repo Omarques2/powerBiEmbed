@@ -39,6 +39,7 @@ const envSchema = z
     PBI_CLIENT_ID: z.string().min(1, 'PBI_CLIENT_ID is required'),
     PBI_CLIENT_SECRET: z.string().min(1, 'PBI_CLIENT_SECRET is required'),
     PBI_ALLOW_EMBED_WITHOUT_RLS: booleanSchema.default(false),
+    PBI_SYNC_JOB_TOKEN: z.string().optional(),
 
     BOOTSTRAP_TOKEN: z.string().optional(),
 

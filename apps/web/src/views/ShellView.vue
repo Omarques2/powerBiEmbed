@@ -18,6 +18,7 @@
           :workspaces="workspaces"
           :reports-by-workspace="reportsByWorkspace"
           :selected-workspace-id="selectedWorkspaceId"
+          :expanded-workspace-id="expandedWorkspaceId"
           :selected-report="selectedReport"
           :loading-workspaces="loadingWorkspaces"
           :error="listError"
@@ -48,6 +49,7 @@
           :workspaces="workspaces"
           :reports-by-workspace="reportsByWorkspace"
           :selected-workspace-id="selectedWorkspaceId"
+          :expanded-workspace-id="expandedWorkspaceId"
           :selected-report="selectedReport"
           :loading-workspaces="loadingWorkspaces"
           :error="listError"
@@ -479,6 +481,7 @@ const reportsByWorkspace = ref<Record<string, Report[]>>({});
 
 const selectedWorkspace = ref<Workspace | null>(null);
 const selectedWorkspaceId = ref<string | null>(null);
+const expandedWorkspaceId = ref<string | null>(null);
 const selectedReport = ref<Report | null>(null);
 
 const loadingWorkspaces = ref(false);
@@ -1166,17 +1169,14 @@ async function selectWorkspace(w: Workspace) {
   const id = (w.workspaceId ?? w.id) as string;
   if (!id) return;
 
-  if (selectedWorkspaceId.value !== id) {
-    selectedWorkspace.value = w;
-    selectedWorkspaceId.value = id;
-
-    resetEmbed();
-    if (selectedReport.value && selectedReport.value.workspaceId !== id) {
-      selectedReport.value = null;
-    }
-  } else {
-    // reports are preloaded
+  if (selectedReport.value && selectedReport.value.workspaceId !== id) {
+    expandedWorkspaceId.value = expandedWorkspaceId.value === id ? null : id;
+    return;
   }
+
+  selectedWorkspace.value = w;
+  selectedWorkspaceId.value = id;
+  expandedWorkspaceId.value = expandedWorkspaceId.value === id ? null : id;
 }
 
 async function openReport(r: Report) {
@@ -1192,6 +1192,12 @@ async function openReport(r: Report) {
 
     const workspaceId = r.workspaceId ?? selectedWorkspaceId.value;
     if (!workspaceId) throw new Error("Workspace não selecionado.");
+    if (selectedWorkspaceId.value !== workspaceId) {
+      selectedWorkspaceId.value = workspaceId;
+      selectedWorkspace.value =
+        workspaces.value.find((w) => (w.workspaceId ?? w.id) === workspaceId) ?? null;
+    }
+    expandedWorkspaceId.value = workspaceId;
 
     loadingPages.value = true;
     allowedPagesError.value = "";

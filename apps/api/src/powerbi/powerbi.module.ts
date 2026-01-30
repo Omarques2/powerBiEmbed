@@ -9,6 +9,7 @@ import { AdminPowerBiPagesController } from './admin-powerbi-pages.controller';
 import { PowerBiCatalogSyncService } from './powerbi-catalog-sync.service';
 import { PowerBiBootstrapSyncService } from './powerbi-bootstrap-sync.service';
 import { PowerBiPagesService } from './powerbi-pages.service';
+import { PowerBiSyncJobController } from './powerbi-sync-job.controller';
 
 @Module({
   imports: [AuthModule, UsersModule, BiAuthzModule],
@@ -16,6 +17,7 @@ import { PowerBiPagesService } from './powerbi-pages.service';
     PowerBiController,
     AdminPowerBiController,
     AdminPowerBiPagesController,
+    PowerBiSyncJobController,
   ],
   providers: [
     PowerBiService,

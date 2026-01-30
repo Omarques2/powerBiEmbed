@@ -27,6 +27,102 @@ export class AdminCustomersService {
     private readonly actors: AdminActorService,
   ) {}
 
+  private async seedDefaultPagesForCustomerReportTx(
+    tx: Prisma.TransactionClient,
+    customerId: string,
+    reportRefId: string,
+  ) {
+    const pages = await this.permissions.client(tx).biReportPage.findMany({
+      where: { reportRefId: reportRefId, isActive: true },
+      select: { id: true },
+    });
+    if (!pages.length) {
+      return { pagesSeeded: 0, usersSeeded: 0, skipped: true };
+    }
+
+    const customerGroups = await this.permissions
+      .client(tx)
+      .biCustomerPageGroup.findMany({
+        where: {
+          customerId: customerId,
+          isActive: true,
+          group: { reportRefId: reportRefId, isActive: true },
+        },
+        select: { groupId: true },
+      });
+    const groupIds = Array.from(new Set(customerGroups.map((g) => g.groupId)));
+    const hasActiveGroups = groupIds.length > 0;
+
+    if (!hasActiveGroups) {
+      await this.permissions.client(tx).biCustomerPageAllowlist.createMany({
+        data: pages.map((p) => ({ customerId: customerId, pageId: p.id })),
+        skipDuplicates: true,
+      });
+    }
+
+    const memberships = await this.permissions
+      .client(tx)
+      .userCustomerMembership.findMany({
+        where: {
+          customerId: customerId,
+          isActive: true,
+          user: { status: 'active' },
+        },
+        select: { userId: true },
+      });
+    const userIds = memberships.map((m) => m.userId);
+    if (!userIds.length) {
+      return {
+        pagesSeeded: pages.length,
+        usersSeeded: 0,
+        skipped: false,
+      };
+    }
+
+    const [userAllow, userGroups] = await Promise.all([
+      this.permissions.client(tx).biUserPageAllowlist.findMany({
+        where: { userId: { in: userIds }, page: { reportRefId: reportRefId } },
+        select: { userId: true },
+      }),
+      this.permissions.client(tx).biUserPageGroup.findMany({
+        where: { userId: { in: userIds }, group: { reportRefId: reportRefId } },
+        select: { userId: true },
+      }),
+    ]);
+    const assignedUsers = new Set([
+      ...userAllow.map((u) => u.userId),
+      ...userGroups.map((u) => u.userId),
+    ]);
+    const targetUserIds = userIds.filter((id) => !assignedUsers.has(id));
+
+    if (!targetUserIds.length) {
+      return { pagesSeeded: pages.length, usersSeeded: 0, skipped: false };
+    }
+
+    if (hasActiveGroups) {
+      const userGroupRows = targetUserIds.flatMap((userId) =>
+        groupIds.map((groupId) => ({ userId, groupId, isActive: true })),
+      );
+      if (userGroupRows.length) {
+        await this.permissions.client(tx).biUserPageGroup.createMany({
+          data: userGroupRows,
+          skipDuplicates: true,
+        });
+      }
+      return { pagesSeeded: 0, usersSeeded: targetUserIds.length, skipped: false };
+    }
+
+    const userAllowRows = targetUserIds.flatMap((userId) =>
+      pages.map((p) => ({ userId, pageId: p.id })),
+    );
+    await this.permissions.client(tx).biUserPageAllowlist.createMany({
+      data: userAllowRows,
+      skipDuplicates: true,
+    });
+
+    return { pagesSeeded: pages.length, usersSeeded: targetUserIds.length, skipped: false };
+  }
+
   listCustomers() {
     return this.customers.list();
   }
@@ -381,36 +477,11 @@ export class AdminCustomersService {
       });
 
       if (canView) {
-        const hasActiveGroups = await this.permissions
-          .client(tx)
-          .biCustomerPageGroup.findFirst({
-            where: {
-              customerId: customerId,
-              isActive: true,
-              group: { reportRefId: reportRefId },
-            },
-            select: { id: true },
-          });
-
-        if (!hasActiveGroups) {
-          const pages = await this.permissions
-            .client(tx)
-            .biReportPage.findMany({
-              where: { reportRefId: reportRefId, isActive: true },
-              select: { id: true },
-            });
-          if (pages.length) {
-            await this.permissions
-              .client(tx)
-              .biCustomerPageAllowlist.createMany({
-                data: pages.map((p) => ({
-                  customerId: customerId,
-                  pageId: p.id,
-                })),
-                skipDuplicates: true,
-              });
-          }
-        }
+        await this.seedDefaultPagesForCustomerReportTx(
+          tx,
+          customerId,
+          reportRefId,
+        );
       }
 
       await this.audit.create(tx, {
@@ -527,35 +598,11 @@ export class AdminCustomersService {
 
         if (reportIds.length) {
           for (const reportRefId of reportIds) {
-            const hasActiveGroups = await this.permissions
-              .client(tx)
-              .biCustomerPageGroup.findFirst({
-                where: {
-                  customerId: customerId,
-                  isActive: true,
-                  group: { reportRefId: reportRefId },
-                },
-                select: { id: true },
-              });
-            if (hasActiveGroups) continue;
-
-            const pages = await this.permissions
-              .client(tx)
-              .biReportPage.findMany({
-                where: { reportRefId: reportRefId, isActive: true },
-                select: { id: true },
-              });
-            if (pages.length) {
-              await this.permissions
-                .client(tx)
-                .biCustomerPageAllowlist.createMany({
-                  data: pages.map((p) => ({
-                    customerId: customerId,
-                    pageId: p.id,
-                  })),
-                  skipDuplicates: true,
-                });
-            }
+            await this.seedDefaultPagesForCustomerReportTx(
+              tx,
+              customerId,
+              reportRefId,
+            );
           }
         }
       } else {

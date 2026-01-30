@@ -1,0 +1,47 @@
+name: Cron - Sync Power BI Pages
+
+on:
+  schedule:
+    - cron: "0 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: cron-sync-pages
+  cancel-in-progress: false
+
+jobs:
+  sync-pages:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call sync all pages (staging)
+        env:
+          API_BASE_URL: ${{ secrets.STAGING_API_BASE_URL }}
+          JOB_TOKEN: ${{ secrets.PBI_SYNC_JOB_TOKEN_STAGING }}
+        run: |
+          if [ -z "$API_BASE_URL" ]; then
+            echo "Missing STAGING_API_BASE_URL secret" >&2
+            exit 1
+          fi
+          if [ -z "$JOB_TOKEN" ]; then
+            echo "Missing PBI_SYNC_JOB_TOKEN_STAGING secret" >&2
+            exit 1
+          fi
+          curl -fsSL -X POST "$API_BASE_URL/internal/powerbi/pages/sync-all" \
+            -H "x-job-token: $JOB_TOKEN" \
+            -H "Content-Type: application/json"
+      - name: Call sync all pages (prod)
+        env:
+          API_BASE_URL: ${{ secrets.PROD_API_BASE_URL }}
+          JOB_TOKEN: ${{ secrets.PBI_SYNC_JOB_TOKEN_PROD }}
+        run: |
+          if [ -z "$API_BASE_URL" ]; then
+            echo "Missing PROD_API_BASE_URL secret" >&2
+            exit 1
+          fi
+          if [ -z "$JOB_TOKEN" ]; then
+            echo "Missing PBI_SYNC_JOB_TOKEN_PROD secret" >&2
+            exit 1
+          fi
+          curl -fsSL -X POST "$API_BASE_URL/internal/powerbi/pages/sync-all" \
+            -H "x-job-token: $JOB_TOKEN" \
+            -H "Content-Type: application/json"
