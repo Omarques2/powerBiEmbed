@@ -1,9 +1,4 @@
-import {
-  Controller,
-  ForbiddenException,
-  Headers,
-  Post,
-} from '@nestjs/common';
+import { Controller, ForbiddenException, Headers, Post } from '@nestjs/common';
 import { PowerBiPagesService } from './powerbi-pages.service';
 
 @Controller('internal/powerbi')

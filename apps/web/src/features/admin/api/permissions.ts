@@ -18,6 +18,7 @@ export type UserPermissionsResponse = {
     workspaceId: string;
     name: string;
     canView: boolean;
+    isActive?: boolean;
     reports: Array<{
       reportRefId: string;
       reportId: string;

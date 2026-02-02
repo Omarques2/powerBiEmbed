@@ -237,7 +237,15 @@ export async function setCustomerPageAllow(customerId: string, pageId: string, c
   return unwrapData(res.data as ApiEnvelope<{ ok: boolean }>);
 }
 
-export async function setUserPageAllow(userId: string, pageId: string, canView: boolean) {
-  const res = await http.put(`/admin/powerbi/users/${userId}/pages/${pageId}`, { canView });
+export async function setUserPageAllow(
+  userId: string,
+  pageId: string,
+  canView: boolean,
+  customerId?: string,
+) {
+  const res = await http.put(`/admin/powerbi/users/${userId}/pages/${pageId}`, {
+    canView,
+    customerId,
+  });
   return unwrapData(res.data as ApiEnvelope<{ ok: boolean }>);
 }

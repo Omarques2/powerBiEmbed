@@ -80,6 +80,15 @@
         >
           Buscar
         </button>
+        <button
+          type="button"
+          class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm hover:bg-slate-50
+                 disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
+          :disabled="activeLoading"
+          @click="$emit('pre-register')"
+        >
+          Pré-cadastrar
+        </button>
       </div>
     </div>
 
@@ -252,6 +261,7 @@ const emit = defineEmits<{
   (e: "update:customerIds", value: string[]): void;
   (e: "update:customerFilterOpen", value: boolean): void;
   (e: "search"): void;
+  (e: "pre-register"): void;
   (e: "edit", value: ActiveUserRow): void;
   (e: "toggle-status", value: ActiveUserRow): void;
   (e: "page", value: number): void;

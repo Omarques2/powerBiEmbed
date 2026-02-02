@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { PowerBiService } from './powerbi.service';
 
@@ -40,7 +41,10 @@ export class PowerBiPagesService {
       .map((p, idx) => ({
         pageName: String(p.name ?? '').trim(),
         displayName: p.displayName ?? p.name ?? null,
-        pageOrder: idx,
+        pageOrder:
+          typeof (p as { order?: number | null }).order === 'number'
+            ? ((p as { order?: number | null }).order ?? idx)
+            : idx,
       }))
       .filter((p) => p.pageName);
 
@@ -107,7 +111,11 @@ export class PowerBiPagesService {
 
     let success = 0;
     let failed = 0;
-    const errors: { reportRefId: string; reportName?: string | null; message: string }[] = [];
+    const errors: {
+      reportRefId: string;
+      reportName?: string | null;
+      message: string;
+    }[] = [];
 
     for (const report of reports) {
       try {
@@ -116,7 +124,11 @@ export class PowerBiPagesService {
       } catch (err) {
         failed += 1;
         const message = err instanceof Error ? err.message : String(err);
-        errors.push({ reportRefId: report.id, reportName: report.reportName ?? null, message });
+        errors.push({
+          reportRefId: report.id,
+          reportName: report.reportName ?? null,
+          message,
+        });
       }
     }
 
@@ -185,11 +197,17 @@ export class PowerBiPagesService {
       const userIds = memberships.map((m) => m.userId);
       const [userAllow, userGroups] = await Promise.all([
         this.prisma.biUserPageAllowlist.findMany({
-          where: { userId: { in: userIds }, page: { reportRefId: reportRefId } },
+          where: {
+            userId: { in: userIds },
+            page: { reportRefId: reportRefId },
+          },
           select: { userId: true },
         }),
         this.prisma.biUserPageGroup.findMany({
-          where: { userId: { in: userIds }, group: { reportRefId: reportRefId } },
+          where: {
+            userId: { in: userIds },
+            group: { reportRefId: reportRefId },
+          },
           select: { userId: true },
         }),
       ]);
@@ -219,6 +237,206 @@ export class PowerBiPagesService {
         });
       }
     }
+  }
+
+  private async getReportGroupPageMap(
+    tx: Prisma.TransactionClient,
+    reportRefId: string,
+  ) {
+    const groups = await tx.biPageGroup.findMany({
+      where: { reportRefId: reportRefId, isActive: true },
+      select: { id: true, pages: { select: { pageId: true } } },
+    });
+    return new Map(groups.map((g) => [g.id, g.pages.map((p) => p.pageId)]));
+  }
+
+  private collectGroupPageIds(
+    groupMap: Map<string, string[]>,
+    groupIds: Iterable<string>,
+  ) {
+    const pageIds: string[] = [];
+    for (const groupId of groupIds) {
+      const pages = groupMap.get(groupId);
+      if (pages?.length) pageIds.push(...pages);
+    }
+    return pageIds;
+  }
+
+  private async getCustomerEffectivePageSet(
+    tx: Prisma.TransactionClient,
+    reportRefId: string,
+    customerId: string,
+    groupMap: Map<string, string[]>,
+  ) {
+    const [groupLinks, allow] = await Promise.all([
+      tx.biCustomerPageGroup.findMany({
+        where: {
+          customerId: customerId,
+          isActive: true,
+          group: { reportRefId: reportRefId, isActive: true },
+        },
+        select: { groupId: true },
+      }),
+      tx.biCustomerPageAllowlist.findMany({
+        where: {
+          customerId: customerId,
+          page: { reportRefId: reportRefId, isActive: true },
+        },
+        select: { pageId: true },
+      }),
+    ]);
+
+    const activeGroupIds = new Set(groupLinks.map((g) => g.groupId));
+    const hasGroups = activeGroupIds.size > 0;
+    const allowIds = allow.map((p) => p.pageId);
+    const pageIds = hasGroups
+      ? this.collectGroupPageIds(groupMap, activeGroupIds)
+      : allowIds;
+
+    return {
+      hasGroups,
+      activeGroupIds,
+      pageSet: new Set(pageIds),
+    };
+  }
+
+  private async getUserEffectivePageSet(
+    tx: Prisma.TransactionClient,
+    reportRefId: string,
+    userId: string,
+    groupMap: Map<string, string[]>,
+  ) {
+    const [groupLinks, allow] = await Promise.all([
+      tx.biUserPageGroup.findMany({
+        where: {
+          userId: userId,
+          isActive: true,
+          group: { reportRefId: reportRefId, isActive: true },
+        },
+        select: { groupId: true },
+      }),
+      tx.biUserPageAllowlist.findMany({
+        where: { userId: userId, page: { reportRefId: reportRefId } },
+        select: { pageId: true },
+      }),
+    ]);
+
+    const hasGroups = groupLinks.length > 0;
+    const allowIds = allow.map((p) => p.pageId);
+    const pageIds = hasGroups
+      ? this.collectGroupPageIds(
+          groupMap,
+          groupLinks.map((g) => g.groupId),
+        )
+      : allowIds;
+
+    return {
+      hasGroups,
+      hasAllow: allowIds.length > 0,
+      pageSet: new Set(pageIds),
+    };
+  }
+
+  private setsEqual(a: Set<string>, b: Set<string>) {
+    if (a.size !== b.size) return false;
+    for (const value of a) {
+      if (!b.has(value)) return false;
+    }
+    return true;
+  }
+
+  private async syncUserPageAccessForCustomerReport(
+    tx: Prisma.TransactionClient,
+    reportRefId: string,
+    customerId: string,
+    beforeCustomerSet: Set<string>,
+    afterCustomer: {
+      hasGroups: boolean;
+      activeGroupIds: Set<string>;
+      pageSet: Set<string>;
+    },
+    groupMap: Map<string, string[]>,
+  ) {
+    const memberships = await tx.userCustomerMembership.findMany({
+      where: {
+        customerId: customerId,
+        isActive: true,
+        user: { status: 'active' },
+      },
+      select: { userId: true },
+    });
+    if (!memberships.length) return { usersSynced: 0 };
+
+    const userIds = memberships.map((m) => m.userId);
+    let usersSynced = 0;
+
+    for (const userId of userIds) {
+      const userState = await this.getUserEffectivePageSet(
+        tx,
+        reportRefId,
+        userId,
+        groupMap,
+      );
+
+      const userHasAssignments = userState.hasGroups || userState.hasAllow;
+      const shouldSync =
+        !userHasAssignments ||
+        this.setsEqual(userState.pageSet, beforeCustomerSet);
+
+      if (!shouldSync) continue;
+
+      if (afterCustomer.hasGroups) {
+        const groupIds = Array.from(afterCustomer.activeGroupIds);
+
+        await tx.biUserPageAllowlist.deleteMany({
+          where: { userId: userId, page: { reportRefId: reportRefId } },
+        });
+
+        if (groupIds.length) {
+          await tx.biUserPageGroup.createMany({
+            data: groupIds.map((groupId) => ({
+              userId: userId,
+              groupId,
+              isActive: true,
+            })),
+            skipDuplicates: true,
+          });
+        }
+
+        await tx.biUserPageGroup.deleteMany({
+          where: {
+            userId: userId,
+            group: { reportRefId: reportRefId },
+            ...(groupIds.length ? { groupId: { notIn: groupIds } } : {}),
+          },
+        });
+      } else {
+        const pageIds = Array.from(afterCustomer.pageSet);
+
+        await tx.biUserPageGroup.deleteMany({
+          where: { userId: userId, group: { reportRefId: reportRefId } },
+        });
+
+        if (pageIds.length) {
+          await tx.biUserPageAllowlist.createMany({
+            data: pageIds.map((pageId) => ({ userId: userId, pageId })),
+            skipDuplicates: true,
+          });
+        }
+
+        await tx.biUserPageAllowlist.deleteMany({
+          where: {
+            userId: userId,
+            page: { reportRefId: reportRefId },
+            ...(pageIds.length ? { pageId: { notIn: pageIds } } : {}),
+          },
+        });
+      }
+
+      usersSynced += 1;
+    }
+
+    return { usersSynced };
   }
 
   listReportPages(reportRefId: string) {
@@ -432,6 +650,14 @@ export class PowerBiPagesService {
     if (!group) throw new NotFoundException('Group not found');
 
     return this.prisma.$transaction(async (tx) => {
+      const groupMap = await this.getReportGroupPageMap(tx, group.reportRefId);
+      const beforeCustomer = await this.getCustomerEffectivePageSet(
+        tx,
+        group.reportRefId,
+        customerId,
+        groupMap,
+      );
+
       await tx.biCustomerPageGroup.upsert({
         where: { customerId_groupId: { customerId, groupId } },
         create: { customerId, groupId, isActive },
@@ -449,7 +675,22 @@ export class PowerBiPagesService {
         clearedAllowlist = res.count;
       }
 
-      return { ok: true, clearedAllowlist };
+      const afterCustomer = await this.getCustomerEffectivePageSet(
+        tx,
+        group.reportRefId,
+        customerId,
+        groupMap,
+      );
+      const synced = await this.syncUserPageAccessForCustomerReport(
+        tx,
+        group.reportRefId,
+        customerId,
+        beforeCustomer.pageSet,
+        afterCustomer,
+        groupMap,
+      );
+
+      return { ok: true, clearedAllowlist, usersSynced: synced.usersSynced };
     });
   }
 
@@ -473,46 +714,104 @@ export class PowerBiPagesService {
     });
     if (!page) throw new NotFoundException('Page not found');
 
-    const hasActiveGroups = await this.prisma.biCustomerPageGroup.findFirst({
-      where: {
-        customerId: customerId,
-        isActive: true,
-        group: { reportRefId: page.reportRefId },
-      },
-      select: { id: true },
-    });
-    if (hasActiveGroups) {
-      throw new BadRequestException(
-        'Individual pages are disabled while groups are active',
+    return this.prisma.$transaction(async (tx) => {
+      const groupMap = await this.getReportGroupPageMap(tx, page.reportRefId);
+      const beforeCustomer = await this.getCustomerEffectivePageSet(
+        tx,
+        page.reportRefId,
+        customerId,
+        groupMap,
       );
-    }
 
-    if (canView) {
-      await this.prisma.biCustomerPageAllowlist.upsert({
-        where: { customerId_pageId: { customerId, pageId } },
-        create: { customerId, pageId },
-        update: {},
-      });
-    } else {
-      await this.prisma.biCustomerPageAllowlist.deleteMany({
-        where: { customerId, pageId },
-      });
-    }
-    return { ok: true };
+      if (beforeCustomer.hasGroups) {
+        throw new BadRequestException(
+          'Individual pages are disabled while groups are active',
+        );
+      }
+
+      if (canView) {
+        await tx.biCustomerPageAllowlist.upsert({
+          where: { customerId_pageId: { customerId, pageId } },
+          create: { customerId, pageId },
+          update: {},
+        });
+      } else {
+        await tx.biCustomerPageAllowlist.deleteMany({
+          where: { customerId, pageId },
+        });
+      }
+
+      const afterCustomer = await this.getCustomerEffectivePageSet(
+        tx,
+        page.reportRefId,
+        customerId,
+        groupMap,
+      );
+      const synced = await this.syncUserPageAccessForCustomerReport(
+        tx,
+        page.reportRefId,
+        customerId,
+        beforeCustomer.pageSet,
+        afterCustomer,
+        groupMap,
+      );
+
+      return { ok: true, usersSynced: synced.usersSynced };
+    });
   }
 
-  async setUserPageAllow(userId: string, pageId: string, canView: boolean) {
-    if (canView) {
-      await this.prisma.biUserPageAllowlist.upsert({
-        where: { userId_pageId: { userId, pageId } },
-        create: { userId, pageId },
-        update: {},
-      });
-    } else {
-      await this.prisma.biUserPageAllowlist.deleteMany({
-        where: { userId, pageId },
-      });
-    }
-    return { ok: true };
+  async setUserPageAllow(
+    userId: string,
+    pageId: string,
+    canView: boolean,
+    customerId?: string | null,
+  ) {
+    const page = await this.prisma.biReportPage.findUnique({
+      where: { id: pageId },
+      select: { reportRefId: true },
+    });
+    if (!page) throw new NotFoundException('Page not found');
+
+    return this.prisma.$transaction(async (tx) => {
+      if (customerId) {
+        const groupMap = await this.getReportGroupPageMap(tx, page.reportRefId);
+        const userState = await this.getUserEffectivePageSet(
+          tx,
+          page.reportRefId,
+          userId,
+          groupMap,
+        );
+        const userHasAssignments = userState.hasGroups || userState.hasAllow;
+        if (!userHasAssignments) {
+          const customerState = await this.getCustomerEffectivePageSet(
+            tx,
+            page.reportRefId,
+            customerId,
+            groupMap,
+          );
+          const seedIds = Array.from(customerState.pageSet);
+          if (seedIds.length) {
+            await tx.biUserPageAllowlist.createMany({
+              data: seedIds.map((id) => ({ userId, pageId: id })),
+              skipDuplicates: true,
+            });
+          }
+        }
+      }
+
+      if (canView) {
+        await tx.biUserPageAllowlist.upsert({
+          where: { userId_pageId: { userId, pageId } },
+          create: { userId, pageId },
+          update: {},
+        });
+      } else {
+        await tx.biUserPageAllowlist.deleteMany({
+          where: { userId, pageId },
+        });
+      }
+
+      return { ok: true };
+    });
   }
 }

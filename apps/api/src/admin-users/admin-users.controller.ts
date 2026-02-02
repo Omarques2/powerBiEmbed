@@ -24,6 +24,7 @@ import {
   RemoveMembershipQueryDto,
   TransferMembershipDto,
   UpsertMembershipDto,
+  PreRegisterUserDto,
 } from './dto/admin-users.dto';
 
 @Controller('admin/users')
@@ -34,6 +35,12 @@ export class AdminUsersController {
   @Get('pending')
   listPending() {
     return this.svc.listPending();
+  }
+
+  @Post('pre-register')
+  preRegister(@Req() req: AuthedRequest, @Body() body: PreRegisterUserDto) {
+    const actorSub = req.user?.sub ? String(req.user.sub) : null;
+    return this.svc.preRegisterUser(body, actorSub);
   }
 
   @Post(':userId/activate')

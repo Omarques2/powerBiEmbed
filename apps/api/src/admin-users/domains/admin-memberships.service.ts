@@ -126,23 +126,6 @@ export class AdminMembershipsService {
     userId: string,
     customerId: string,
   ) {
-    const existingAllow = await this.permissions
-      .client(tx)
-      .biUserPageAllowlist.findFirst({
-        where: { userId: userId },
-        select: { id: true },
-      });
-    const existingGroup = await this.permissions
-      .client(tx)
-      .biUserPageGroup.findFirst({
-        where: { userId: userId },
-        select: { id: true },
-      });
-
-    if (existingAllow || existingGroup) {
-      return { groupsSeeded: 0, pagesSeeded: 0, skipped: true };
-    }
-
     const customerGroups = await this.permissions
       .client(tx)
       .biCustomerPageGroup.findMany({
@@ -157,53 +140,110 @@ export class AdminMembershipsService {
         },
       });
 
-    const groupIds = Array.from(new Set(customerGroups.map((g) => g.groupId)));
-    const reportsWithGroups = new Set(
-      customerGroups.map((g) => g.group.reportRefId),
-    );
-
-    const pageFilter: Prisma.BiReportPageWhereInput = { isActive: true };
-    if (reportsWithGroups.size > 0) {
-      pageFilter.reportRefId = { notIn: Array.from(reportsWithGroups) };
+    const groupsByReport = new Map<string, string[]>();
+    for (const row of customerGroups) {
+      const reportRefId = row.group?.reportRefId;
+      if (!reportRefId) continue;
+      const list = groupsByReport.get(reportRefId) ?? [];
+      list.push(row.groupId);
+      groupsByReport.set(reportRefId, list);
     }
+
+    const reportsWithGroups = new Set(groupsByReport.keys());
+
     const allowWhere: Prisma.BiCustomerPageAllowlistWhereInput = {
       customerId: customerId,
-      page: pageFilter,
+      page: { isActive: true },
     };
 
     const customerAllow = await this.permissions
       .client(tx)
       .biCustomerPageAllowlist.findMany({
         where: allowWhere,
-        select: { pageId: true },
+        select: { pageId: true, page: { select: { reportRefId: true } } },
       });
-    const pageIds = Array.from(new Set(customerAllow.map((p) => p.pageId)));
 
-    if (groupIds.length) {
-      await this.permissions.client(tx).biUserPageGroup.createMany({
-        data: groupIds.map((groupId) => ({
+    const allowByReport = new Map<string, string[]>();
+    for (const row of customerAllow) {
+      const reportRefId = row.page?.reportRefId;
+      if (!reportRefId || reportsWithGroups.has(reportRefId)) continue;
+      const list = allowByReport.get(reportRefId) ?? [];
+      list.push(row.pageId);
+      allowByReport.set(reportRefId, list);
+    }
+
+    const reportRefIds = new Set<string>([
+      ...groupsByReport.keys(),
+      ...allowByReport.keys(),
+    ]);
+
+    if (!reportRefIds.size) {
+      return { groupsSeeded: 0, pagesSeeded: 0, skipped: true };
+    }
+
+    const [existingGroups, existingAllow] = await Promise.all([
+      this.permissions.client(tx).biUserPageGroup.findMany({
+        where: {
           userId: userId,
-          groupId,
-          isActive: true,
-        })),
+          group: { reportRefId: { in: Array.from(reportRefIds) } },
+        },
+        select: { group: { select: { reportRefId: true } } },
+      }),
+      this.permissions.client(tx).biUserPageAllowlist.findMany({
+        where: {
+          userId: userId,
+          page: { reportRefId: { in: Array.from(reportRefIds) } },
+        },
+        select: { page: { select: { reportRefId: true } } },
+      }),
+    ]);
+
+    const assignedReports = new Set<string>();
+    for (const row of existingGroups) {
+      if (row.group?.reportRefId) assignedReports.add(row.group.reportRefId);
+    }
+    for (const row of existingAllow) {
+      if (row.page?.reportRefId) assignedReports.add(row.page.reportRefId);
+    }
+
+    const userGroupRows: Array<{
+      userId: string;
+      groupId: string;
+      isActive: boolean;
+    }> = [];
+    for (const [reportRefId, groupIds] of groupsByReport) {
+      if (assignedReports.has(reportRefId)) continue;
+      for (const groupId of groupIds) {
+        userGroupRows.push({ userId, groupId, isActive: true });
+      }
+    }
+
+    const userAllowRows: Array<{ userId: string; pageId: string }> = [];
+    for (const [reportRefId, pageIds] of allowByReport) {
+      if (assignedReports.has(reportRefId)) continue;
+      for (const pageId of pageIds) {
+        userAllowRows.push({ userId, pageId });
+      }
+    }
+
+    if (userGroupRows.length) {
+      await this.permissions.client(tx).biUserPageGroup.createMany({
+        data: userGroupRows,
         skipDuplicates: true,
       });
     }
 
-    if (pageIds.length) {
+    if (userAllowRows.length) {
       await this.permissions.client(tx).biUserPageAllowlist.createMany({
-        data: pageIds.map((pageId) => ({
-          userId: userId,
-          pageId,
-        })),
+        data: userAllowRows,
         skipDuplicates: true,
       });
     }
 
     return {
-      groupsSeeded: groupIds.length,
-      pagesSeeded: pageIds.length,
-      skipped: false,
+      groupsSeeded: userGroupRows.length,
+      pagesSeeded: userAllowRows.length,
+      skipped: userGroupRows.length === 0 && userAllowRows.length === 0,
     };
   }
 

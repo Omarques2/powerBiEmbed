@@ -40,8 +40,8 @@
         :open="drawerOpen"
         overlay-class="lg:hidden"
         panel-class="lg:hidden"
-        @close="drawerOpen = false"
         class="app-drawer"
+        @close="drawerOpen = false"
       >
         <SidebarContent
           mode="mobile"
@@ -445,7 +445,6 @@ import HamburgerIcon from "../components/icons/HamburgerIcon.vue";
 import SidebarContent from "../components/SidebarContent.vue";
 import ReportSkeletonCard from "../components/ReportSkeletonCard.vue";
 import IconRefresh from "../components/icons/IconRefresh.vue";
-import { readCache, writeCache } from "@/ui/storage/cache";
 
 type Workspace = { id?: string; workspaceId?: string; name?: string };
 type Report = { id: string; name?: string; workspaceId?: string };
@@ -508,9 +507,6 @@ const lastRenderAt = ref(0);
 
 const exportModalOpen = ref(false);
 
-const WORKSPACES_CACHE_KEY = "pbi.cache.workspaces";
-const REPORTS_CACHE_KEY = "pbi.cache.reportsByWorkspace";
-const CACHE_TTL_MS = 5 * 60 * 1000;
 
 
 const ASPECT = 16 / 9;
@@ -598,6 +594,9 @@ let resizeObs: ResizeObserver | null = null;
 let embeddedReport: pbi.Report | null = null;
 let guardRedirecting = false;
 let refreshPollTimer: number | null = null;
+let tokenRefreshTimer: number | null = null;
+const tokenRefreshInFlight = ref(false);
+const embedTokenExpiresAt = ref<number | null>(null);
 let refreshPollAttempts = 0;
 const REFRESH_POLL_INTERVAL = 6000;
 const REFRESH_POLL_MAX_ATTEMPTS = 30;
@@ -622,6 +621,7 @@ function resetEmbed() {
   allowedPages.value = [];
   allowedPagesError.value = "";
   activePageName.value = null;
+  stopTokenRefreshTimer();
 }
 
 function openExportModal() {
@@ -831,6 +831,16 @@ function collectPowerBiErrorText(detail: any): string {
 function isCapacityError(detail: any): boolean {
   const text = collectPowerBiErrorText(detail).toLowerCase();
   return CAPACITY_ERROR_SIGNATURES.some((signature) => text.includes(signature));
+}
+
+function isTokenExpiredError(detail: any): boolean {
+  const text = collectPowerBiErrorText(detail).toLowerCase();
+  return (
+    text.includes("tokenexpired") ||
+    text.includes("token expired") ||
+    text.includes("clienterror_tokenexpired") ||
+    text.includes("token has expired")
+  );
 }
 
 function formatPowerBiError(detail: any): { message: string; lock: boolean } {
@@ -1084,20 +1094,11 @@ watch(allowedPages, () => {
 });
 
 async function loadWorkspaces() {
-  const cached = readCache<Workspace[]>(WORKSPACES_CACHE_KEY, CACHE_TTL_MS);
-  const hasCached = Boolean(cached?.data?.length);
-  if (hasCached) {
-    workspaces.value = cached?.data ?? [];
-    if (workspaces.value.length > 0 && !selectedWorkspaceId.value) {
-      await selectWorkspace(workspaces.value[0]!);
-    }
-  }
   listError.value = "";
-  loadingWorkspaces.value = !hasCached;
+  loadingWorkspaces.value = true;
   try {
     const res = await http.get("/powerbi/workspaces");
     workspaces.value = unwrapData(res.data as ApiEnvelope<Workspace[]>);
-    writeCache(WORKSPACES_CACHE_KEY, workspaces.value);
 
     if (workspaces.value.length > 0 && !selectedWorkspaceId.value) {
       await selectWorkspace(workspaces.value[0]!);
@@ -1123,11 +1124,62 @@ function stopRefreshPolling() {
   refreshPollAttempts = 0;
 }
 
-async function loadAllReports(workspaceList: Workspace[]) {
-  const cached = readCache<Record<string, Report[]>>(REPORTS_CACHE_KEY, CACHE_TTL_MS);
-  if (cached?.data && Object.keys(reportsByWorkspace.value).length === 0) {
-    reportsByWorkspace.value = cached.data;
+function stopTokenRefreshTimer() {
+  if (tokenRefreshTimer) {
+    window.clearTimeout(tokenRefreshTimer);
+    tokenRefreshTimer = null;
   }
+  embedTokenExpiresAt.value = null;
+}
+
+function scheduleTokenRefresh(expiresOn?: string) {
+  stopTokenRefreshTimer();
+  if (!expiresOn) return;
+  const expiresAt = Date.parse(expiresOn);
+  if (!Number.isFinite(expiresAt)) return;
+  embedTokenExpiresAt.value = expiresAt;
+  const leadMs = 2 * 60 * 1000;
+  const delay = Math.max(expiresAt - Date.now() - leadMs, 10_000);
+  tokenRefreshTimer = window.setTimeout(() => {
+    void refreshEmbedToken("auto");
+  }, delay);
+}
+
+async function refreshEmbedToken(reason = "manual") {
+  if (tokenRefreshInFlight.value) return;
+  if (!selectedReport.value || !selectedWorkspaceId.value) return;
+  tokenRefreshInFlight.value = true;
+  try {
+    const cfgRes = await http.get("/powerbi/embed-config", {
+      params: { workspaceId: selectedWorkspaceId.value, reportId: selectedReport.value.id },
+    });
+    const cfg = unwrapData(cfgRes.data as ApiEnvelope<EmbedConfigResponse>);
+    scheduleTokenRefresh(cfg.expiresOn);
+    scheduleTokenRefresh(cfg.expiresOn);
+    if (embeddedReport?.setAccessToken) {
+      await embeddedReport.setAccessToken(cfg.embedToken);
+      embedError.value = "";
+      embedErrorLocked.value = false;
+      if (reason === "token-expired") {
+        push({
+          kind: "info",
+          title: "Token renovado",
+          message: "Atualizamos o token do Power BI automaticamente.",
+          timeoutMs: 3000,
+        });
+      }
+      return;
+    }
+    await openReport(selectedReport.value);
+  } catch (e: any) {
+    const message = await extractErrorMessage(e);
+    embedError.value = `Falha ao renovar token: ${message}`;
+  } finally {
+    tokenRefreshInFlight.value = false;
+  }
+}
+
+async function loadAllReports(workspaceList: Workspace[]) {
   loadingReports.value = true;
   listError.value = "";
   try {
@@ -1150,7 +1202,6 @@ async function loadAllReports(workspaceList: Workspace[]) {
       map[entry.id] = entry.rows;
     }
     reportsByWorkspace.value = map;
-    writeCache(REPORTS_CACHE_KEY, reportsByWorkspace.value);
     if (selectedReport.value?.workspaceId) {
       const keep = reportsByWorkspace.value[selectedReport.value.workspaceId]?.some(
         (r) => r.id === selectedReport.value?.id,
@@ -1292,6 +1343,13 @@ async function openReport(r: Report) {
     report.on("error", (event: any) => {
       const detail = event?.detail ?? event;
       console.error("Power BI error:", detail);
+      if (isTokenExpiredError(detail)) {
+        if (!tokenRefreshInFlight.value) {
+          embedError.value = "Token expirado. Renovando…";
+          void refreshEmbedToken("token-expired");
+        }
+        return;
+      }
       if (embedErrorLocked.value) return;
       const normalized = formatPowerBiError(detail);
       embedError.value = normalized.message;

@@ -52,6 +52,7 @@ type PbiReport = {
 type PbiPage = {
   name?: string;
   displayName?: string;
+  order?: number;
 };
 
 type PbiDatasetInfo = {
@@ -378,6 +379,7 @@ export class PowerBiService {
     return res.value.map((p) => ({
       name: p.name ?? '',
       displayName: p.displayName ?? null,
+      order: typeof p.order === 'number' ? p.order : null,
     }));
   }
 

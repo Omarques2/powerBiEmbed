@@ -52,6 +52,11 @@ describe('Full API (e2e)', () => {
         email: seed.activeUser.email ?? undefined,
         name: 'Active User',
       },
+      pre: {
+        sub: `test-pre-${seed.runId}`,
+        email: `pre-${seed.runId}@example.com`,
+        name: 'Pre User',
+      },
       pending: {
         sub: seed.pendingUser.entraSub,
         email: seed.pendingUser.email ?? undefined,
@@ -200,6 +205,33 @@ describe('Full API (e2e)', () => {
       .query({ revokeCustomerPermissions: true });
     expect(remove.status).toBe(200);
     expect(remove.body.data.ok).toBe(true);
+  });
+
+  it('pre-registers user and links on first login', async () => {
+    const email = `pre-${seed.runId}@example.com`;
+
+    const preRegister = await request(app.getHttpServer())
+      .post('/admin/users/pre-register')
+      .set('x-test-user', 'admin')
+      .send({
+        email,
+        customerId: seed.customerA.id,
+        role: 'viewer',
+        grantCustomerWorkspaces: true,
+      });
+    expect(preRegister.status).toBe(201);
+    expect(preRegister.body.data.ok).toBe(true);
+
+    const me = await request(app.getHttpServer())
+      .get('/users/me')
+      .set('x-test-user', 'pre');
+    expect(me.status).toBe(200);
+    expect(me.body.data.status).toBe('active');
+    expect(
+      me.body.data.memberships.some(
+        (m: any) => m.customerId === seed.customerA.id && m.isActive === true,
+      ),
+    ).toBe(true);
   });
 
   it('lists active users and fetches user detail', async () => {
@@ -407,10 +439,15 @@ describe('Full API (e2e)', () => {
       .set('x-test-user', 'active')
       .query({ workspaceId: seed.workspaceId, reportId: seed.reportId });
     expect(pages.status).toBe(200);
-    expect(pages.body.data.pages.length).toBe(3);
+    expect(pages.body.data.pages.length).toBe(2);
     expect(
       pages.body.data.pages.some(
         (p: any) => p.pageName === seed.pageD.pageName,
+      ),
+    ).toBe(false);
+    expect(
+      pages.body.data.pages.some(
+        (p: any) => p.pageName === seed.pageC.pageName,
       ),
     ).toBe(false);
 

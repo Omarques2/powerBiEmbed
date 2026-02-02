@@ -530,9 +530,19 @@
                               size="sm"
                               class="h-7 px-2 text-[11px]"
                               :disabled="pagesLoading || hasActiveGroupAssignments || !pageAccessPages.length"
-                              @click="selectAllPages"
+                              @click="setAllPages(true)"
                             >
-                              Selecionar todas
+                              Ativar todas
+                            </UiButton>
+                            <UiButton
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              class="h-7 px-2 text-[11px]"
+                              :disabled="pagesLoading || hasActiveGroupAssignments || !pageAccessPages.length"
+                              @click="setAllPages(false)"
+                            >
+                              Desativar todas
                             </UiButton>
                             <span>{{ pageAccessPages.length }} paginas</span>
                           </div>
@@ -1394,7 +1404,16 @@ async function loadPageConfig() {
       getCustomerPageAccess(modalCustomer.value.id, pageReportRefId.value),
     ]);
 
-    const activePages = pagesRes.filter((p) => p.isActive);
+    const activePages = pagesRes
+      .filter((p) => p.isActive)
+      .sort((a, b) => {
+        const orderA = a.pageOrder ?? 0;
+        const orderB = b.pageOrder ?? 0;
+        if (orderA !== orderB) return orderA - orderB;
+        const nameA = (a.displayName ?? a.pageName ?? "").toLowerCase();
+        const nameB = (b.displayName ?? b.pageName ?? "").toLowerCase();
+        return nameA.localeCompare(nameB);
+      });
     pageAccessPages.value = activePages.map((p) => {
       const match = accessRes.pages.find((x) => x.id === p.id);
       return { ...p, canView: match?.canView ?? false };
@@ -1474,39 +1493,37 @@ async function togglePageAllow(page: ReportPage & { canView?: boolean }) {
       return null;
     },
     request: async () => setCustomerPageAllow(modalCustomer.value!.id, page.id, nextCanView),
-    toast: {
-      success: { title: "Pagina atualizada", message: nextCanView ? "ON" : "OFF" },
-      error: { title: "Falha ao atualizar pagina" },
-    },
     rollback: () => {
       pageAccessPages.value = pageAccessPages.value.map((p) =>
         p.id === page.id ? { ...p, canView: !!page.canView } : p,
       );
     },
-    });
-  }
+  });
+}
 
-  async function selectAllPages() {
-    if (!modalCustomer.value || hasActiveGroupAssignments.value) return;
-    const toEnable = pageAccessPages.value.filter((p) => !p.canView);
-    if (!toEnable.length) return;
+async function setAllPages(canView: boolean) {
+  if (!modalCustomer.value || hasActiveGroupAssignments.value) return;
+  const targets = pageAccessPages.value.filter((p) => p.canView !== canView);
+  if (!targets.length) return;
 
-    pageAccessPages.value = pageAccessPages.value.map((p) => ({ ...p, canView: true }));
-    toEnable.forEach((p) => busyPageAllow.setBusy(p.id, true));
+  pageAccessPages.value = pageAccessPages.value.map((p) => ({
+    ...p,
+    canView: canView,
+  }));
+  targets.forEach((p) => busyPageAllow.setBusy(p.id, true));
 
-    try {
-      await Promise.all(
-        toEnable.map((p) => setCustomerPageAllow(modalCustomer.value!.id, p.id, true)),
-      );
-      push({ kind: "success", title: "Paginas ativadas", message: "Todas as paginas foram liberadas." });
-    } catch (e: any) {
-      const ne = normalizeApiError(e);
-      push({ kind: "error", title: "Falha ao ativar paginas", message: ne.message, details: ne.details });
-      await loadPageConfig();
-    } finally {
-      toEnable.forEach((p) => busyPageAllow.clear(p.id));
+  try {
+    for (const p of targets) {
+      await setCustomerPageAllow(modalCustomer.value!.id, p.id, canView);
     }
+  } catch (e: any) {
+    const ne = normalizeApiError(e);
+    push({ kind: "error", title: "Falha ao atualizar paginas", message: ne.message, details: ne.details });
+    await loadPageConfig();
+  } finally {
+    targets.forEach((p) => busyPageAllow.clear(p.id));
   }
+}
 
 async function toggleGroupAssign(group: PageGroup & { assigned?: boolean }) {
   if (!modalCustomer.value) return;
@@ -1529,7 +1546,6 @@ async function toggleGroupAssign(group: PageGroup & { assigned?: boolean }) {
     },
     request: async () => setCustomerPageGroup(modalCustomer.value!.id, group.id, nextAssigned),
     toast: {
-      success: { title: "Grupo aplicado", message: nextAssigned ? "ON" : "OFF" },
       error: { title: "Falha ao aplicar grupo" },
     },
     rollback: () => {

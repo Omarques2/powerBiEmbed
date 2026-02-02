@@ -109,7 +109,11 @@ export class AdminCustomersService {
           skipDuplicates: true,
         });
       }
-      return { pagesSeeded: 0, usersSeeded: targetUserIds.length, skipped: false };
+      return {
+        pagesSeeded: 0,
+        usersSeeded: targetUserIds.length,
+        skipped: false,
+      };
     }
 
     const userAllowRows = targetUserIds.flatMap((userId) =>
@@ -120,7 +124,11 @@ export class AdminCustomersService {
       skipDuplicates: true,
     });
 
-    return { pagesSeeded: pages.length, usersSeeded: targetUserIds.length, skipped: false };
+    return {
+      pagesSeeded: pages.length,
+      usersSeeded: targetUserIds.length,
+      skipped: false,
+    };
   }
 
   listCustomers() {

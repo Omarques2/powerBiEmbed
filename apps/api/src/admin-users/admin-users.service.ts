@@ -26,6 +26,18 @@ export class AdminUsersService {
     return this.lifecycle.listPending();
   }
 
+  preRegisterUser(
+    input: {
+      email: string;
+      customerId: string;
+      role: MembershipRole;
+      grantCustomerWorkspaces?: boolean;
+    },
+    actorSub: string | null,
+  ) {
+    return this.lifecycle.preRegisterUser(input, actorSub);
+  }
+
   activateUser(
     userId: string,
     customerId: string,

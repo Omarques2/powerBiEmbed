@@ -1,3 +1,6 @@
+-- Enable extensions
+CREATE EXTENSION IF NOT EXISTS "citext";
+
 -- CreateEnum
 CREATE TYPE "user_status" AS ENUM ('pending', 'active', 'disabled');
 

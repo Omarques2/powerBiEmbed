@@ -60,6 +60,75 @@ export class UserRepository {
     });
   }
 
+  findByEmailForLink(email: string, tx?: Prisma.TransactionClient) {
+    return this.client(tx).user.findFirst({
+      where: { email: { equals: email, mode: 'insensitive' } },
+      select: {
+        id: true,
+        email: true,
+        status: true,
+        entraSub: true,
+        displayName: true,
+      },
+    });
+  }
+
+  createPreRegistered(
+    tx: Prisma.TransactionClient,
+    input: {
+      entraSub: string;
+      email: string;
+      displayName?: string | null;
+      status?: UserStatus;
+    },
+  ) {
+    return this.client(tx).user.create({
+      data: {
+        entraSub: input.entraSub,
+        email: input.email,
+        displayName: input.displayName ?? undefined,
+        status: input.status ?? 'active',
+      },
+      select: {
+        id: true,
+        email: true,
+        displayName: true,
+        status: true,
+        entraSub: true,
+      },
+    });
+  }
+
+  updateIdentity(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    input: {
+      entraSub?: string;
+      entraOid?: string | null;
+      email?: string | null;
+      displayName?: string | null;
+      lastLoginAt?: Date;
+    },
+  ) {
+    return this.client(tx).user.update({
+      where: { id: userId },
+      data: {
+        entraSub: input.entraSub ?? undefined,
+        entraOid: input.entraOid ?? undefined,
+        email: input.email ?? undefined,
+        displayName: input.displayName ?? undefined,
+        lastLoginAt: input.lastLoginAt ?? undefined,
+      },
+      select: {
+        id: true,
+        email: true,
+        displayName: true,
+        status: true,
+        entraSub: true,
+      },
+    });
+  }
+
   updateStatus(
     tx: Prisma.TransactionClient,
     userId: string,
@@ -75,6 +144,13 @@ export class UserRepository {
     return this.client(tx).userCustomerMembership.updateMany({
       where: { userId },
       data: { isActive: false },
+    });
+  }
+
+  enableMemberships(tx: Prisma.TransactionClient, userId: string) {
+    return this.client(tx).userCustomerMembership.updateMany({
+      where: { userId },
+      data: { isActive: true },
     });
   }
 

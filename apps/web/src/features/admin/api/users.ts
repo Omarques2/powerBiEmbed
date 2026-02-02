@@ -28,6 +28,13 @@ export type ActivatePayload = {
   grantCustomerWorkspaces?: boolean;
 };
 
+export type PreRegisterPayload = {
+  email: string;
+  customerId: string;
+  role: MembershipRole;
+  grantCustomerWorkspaces?: boolean;
+};
+
 export async function adminMe() {
   const res = await http.get("/admin/me");
   return unwrapData(res.data as ApiEnvelope<{ ok: boolean }>);
@@ -48,6 +55,11 @@ export async function listActiveUsers(
     params: { q, page, pageSize, customerIds: customerIds?.join(",") },
   });
   return unwrapPaged(res.data as ApiEnvelope<ActiveUserRow[]>);
+}
+
+export async function preRegisterUser(payload: PreRegisterPayload) {
+  const res = await http.post("/admin/users/pre-register", payload);
+  return unwrapData(res.data as ApiEnvelope<{ ok: boolean; user: ActiveUserRow }>);
 }
 
 export async function getUserById(userId: string) {

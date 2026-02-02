@@ -286,29 +286,32 @@ export class BiAuthzService {
     const customerAllowIds = customerAllow.map((p) => p.pageId);
     const userAllowIds = userAllow.map((p) => p.pageId);
 
-    const userHasAssignments = userGroupIds.length + userAllowIds.length > 0;
-    const groupPageIds = userHasAssignments ? userGroupIds : customerGroupIds;
-    const allowIds = userHasAssignments ? userAllowIds : customerAllowIds;
+    const customerHasGroups = customerGroupIds.length > 0;
+    const customerSet = new Set(
+      customerHasGroups ? customerGroupIds : customerAllowIds,
+    );
 
-    const hasRestrictions = groupPageIds.length + allowIds.length > 0;
-
-    if (!hasRestrictions) {
-      return {
-        customerId: input.customerId,
-        reportRefId: input.reportRefId,
-        pages: pages.map((p) => ({
-          pageName: p.pageName,
-          displayName: p.displayName ?? p.pageName,
-        })),
-      };
-    }
-
-    const allowed = new Set([...groupPageIds, ...allowIds]);
-    const filtered = pages.filter((p) => allowed.has(p.id));
-
-    if (!filtered.length) {
+    if (!customerSet.size) {
       throw new ForbiddenException('No access to report pages');
     }
+
+    const userHasGroups = userGroups.length > 0;
+    const userHasAllow = userAllowIds.length > 0;
+    const userHasAssignments = userHasGroups || userHasAllow;
+
+    const userSet = userHasAssignments
+      ? new Set(userHasGroups ? userGroupIds : userAllowIds)
+      : customerSet;
+
+    const effective = new Set(
+      Array.from(customerSet).filter((id) => userSet.has(id)),
+    );
+
+    if (!effective.size) {
+      throw new ForbiddenException('No access to report pages');
+    }
+
+    const filtered = pages.filter((p) => effective.has(p.id));
 
     return {
       customerId: input.customerId,

@@ -45,4 +45,8 @@ export class PageAllowDto {
   @Transform(toBoolean)
   @IsBoolean()
   canView!: boolean;
+
+  @IsOptional()
+  @IsUUID()
+  customerId?: string;
 }

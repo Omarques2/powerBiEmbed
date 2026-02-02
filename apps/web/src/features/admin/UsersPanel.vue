@@ -29,6 +29,7 @@
       :active-error="activeError"
       :status-busy="statusBusy"
       @search="loadActiveUsers(1)"
+      @pre-register="openPreRegisterModal"
       @edit="openUserModal"
       @toggle-status="toggleUserStatus"
       @page="loadActiveUsers"
@@ -109,6 +110,90 @@
           @click="approvePending"
         >
           {{ pendingSaving ? "Salvando..." : "Ativar" }}
+        </UiButton>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pre-register modal -->
+  <div v-if="preRegisterModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+    <div class="w-full max-w-md rounded-2xl border border-border bg-card p-5 shadow-xl">
+      <div class="flex items-start justify-between gap-3">
+        <div>
+          <div class="text-sm font-semibold text-foreground">Pré-cadastrar usuário</div>
+          <div class="mt-1 text-xs text-muted-foreground">
+            Informe o email e o customer para liberar acesso imediato no 1º login.
+          </div>
+        </div>
+        <UiButton
+          type="button"
+          variant="outline"
+          size="sm"
+          class="h-8 px-3 text-xs"
+          :disabled="preRegisterSaving"
+          @click="closePreRegisterModal"
+        >
+          Fechar
+        </UiButton>
+      </div>
+
+      <div class="mt-4 space-y-3">
+        <div>
+          <label class="text-xs font-medium text-muted-foreground">Email</label>
+          <input
+            v-model.trim="preRegisterEmail"
+            type="email"
+            class="mt-1 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
+            placeholder="email@empresa.com"
+          />
+        </div>
+
+        <div>
+          <label class="text-xs font-medium text-muted-foreground">Customer</label>
+          <UiSelect v-model="preRegisterCustomerId" class="mt-1 w-full">
+            <option value="">-- selecione --</option>
+            <option v-for="c in customers" :key="c.id" :value="c.id">
+              {{ c.name }} ({{ c.code }})
+            </option>
+          </UiSelect>
+        </div>
+
+        <div>
+          <label class="text-xs font-medium text-muted-foreground">Role</label>
+          <UiSelect v-model="preRegisterRole" class="mt-1 w-full">
+            <option value="viewer">viewer</option>
+            <option value="member">member</option>
+            <option value="admin">admin</option>
+            <option value="owner">owner</option>
+          </UiSelect>
+        </div>
+
+        <div v-if="preRegisterError" class="text-xs text-rose-600 dark:text-rose-300">
+          {{ preRegisterError }}
+        </div>
+      </div>
+
+      <div class="mt-5 flex items-center justify-end gap-2">
+        <UiButton
+          type="button"
+          variant="outline"
+          size="md"
+          class="h-9 px-3 text-sm"
+          :disabled="preRegisterSaving"
+          @click="closePreRegisterModal"
+        >
+          Cancelar
+        </UiButton>
+        <UiButton
+          type="button"
+          variant="default"
+          size="md"
+          class="h-9 px-4 text-sm"
+          :class="'bg-emerald-600 hover:bg-emerald-500 text-white'"
+          :disabled="preRegisterSaving || !preRegisterEmail || !preRegisterCustomerId"
+          @click="submitPreRegister"
+        >
+          {{ preRegisterSaving ? "Salvando..." : "Pré-cadastrar" }}
         </UiButton>
       </div>
     </div>
@@ -283,7 +368,7 @@
                       <PermSwitch
                         :model-value="r.canView"
                         :loading="!!reportBusy[r.reportRefId]"
-                        :disabled="userPermsSaving || (!ws.canView && !r.canView)"
+                        :disabled="userPermsSaving"
                         on-label="ON"
                         off-label="OFF"
                         @toggle="toggleUserReport(ws.workspaceRefId, r.reportRefId)"
@@ -368,19 +453,38 @@
                 </div>
 
                 <div>
-                    <div class="flex items-center justify-between gap-2">
-                      <div class="text-[11px] font-semibold text-slate-700 dark:text-slate-300">Páginas permitidas</div>
+                  <div class="flex items-center justify-between gap-2">
+                    <div class="text-[11px] font-semibold text-slate-700 dark:text-slate-300">Páginas permitidas</div>
+                    <div class="flex items-center gap-2">
                       <UiButton
                         type="button"
                         variant="outline"
                         size="sm"
                         class="h-7 px-2 text-[11px]"
-                        :disabled="pageAccessLoading || !pageAccess.pages.length"
-                        @click="selectAllUserPages"
+                        :disabled="pageAccessLoading || !pageAccess.pages.length || userHasActiveGroupAssignments"
+                        @click="setAllUserPages(true)"
                       >
-                        Selecionar todas
+                        Ativar todas
+                      </UiButton>
+                      <UiButton
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        class="h-7 px-2 text-[11px]"
+                        :disabled="pageAccessLoading || !pageAccess.pages.length || userHasActiveGroupAssignments"
+                        @click="setAllUserPages(false)"
+                      >
+                        Desativar todas
                       </UiButton>
                     </div>
+                  </div>
+                  <div
+                    v-if="userHasActiveGroupAssignments"
+                    class="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-2 text-[11px] text-amber-700
+                           dark:border-amber-900/40 dark:bg-amber-950/40 dark:text-amber-200"
+                  >
+                    Existem grupos ativos para este usuário. As páginas individuais ficam somente leitura.
+                  </div>
                   <div class="mt-2 space-y-2">
                     <div
                       v-for="p in pageAccess.pages"
@@ -397,6 +501,7 @@
                       <PermSwitch
                         :model-value="!!p.canView"
                         :loading="!!pageAllowBusy[p.id]"
+                        :disabled="userHasActiveGroupAssignments"
                         on-label="ON"
                         off-label="OFF"
                         @toggle="toggleUserPageAllow(p)"
@@ -573,13 +678,13 @@ import { useToast } from "@/ui/toast/useToast";
 import { useConfirm } from "@/ui/confirm/useConfirm";
 import { normalizeApiError } from "@/ui/ops";
 import { PermSwitch } from "@/ui/toggles";
-import { readCache, writeCache } from "@/ui/storage/cache";
 
 import UserMembershipEditor from "@/features/admin/UserMembershipEditor.vue";
 import {
   listCustomers,
   listPendingUsers,
   listActiveUsers,
+  preRegisterUser,
   getUserById,
   activateUser,
   disableUser,
@@ -619,10 +724,6 @@ type UsersTabKey = typeof tabs[number]["key"];
 const activeTab = ref<UsersTabKey>("pending");
 
 const customers = ref<CustomerRow[]>([]);
-const CUSTOMERS_CACHE_KEY = "admin.cache.customers";
-const PENDING_CACHE_KEY = "admin.cache.pendingUsers";
-const ACTIVE_CACHE_PREFIX = "admin.cache.activeUsers:";
-const CACHE_TTL_MS = 5 * 60 * 1000;
 
 // Pending
 const pending = ref<PendingUserRow[]>([]);
@@ -635,6 +736,14 @@ const pendingActionMsg = ref("");
 const activateModalOpen = ref(false);
 const activateCustomerId = ref("");
 const activateRole = ref<MembershipRole>("viewer");
+
+// Pre-register
+const preRegisterModalOpen = ref(false);
+const preRegisterEmail = ref("");
+const preRegisterCustomerId = ref("");
+const preRegisterRole = ref<MembershipRole>("viewer");
+const preRegisterSaving = ref(false);
+const preRegisterError = ref("");
 
 // Active users
 const activeQuery = ref("");
@@ -686,6 +795,9 @@ const pageReportRefId = ref("");
 const pageAccess = ref<{ pages: ReportPage[]; groups: PageGroup[] } | null>(null);
 const pageAccessLoading = ref(false);
 const pageAccessError = ref("");
+const userHasActiveGroupAssignments = computed(() =>
+  pageAccess.value ? pageAccess.value.groups.some((g) => g.assigned) : false,
+);
 const pageGroupBusy = reactive<Record<string, boolean>>({});
 const pageAllowBusy = reactive<Record<string, boolean>>({});
 
@@ -707,29 +819,18 @@ function fmtDate(iso: string) {
 
 async function loadCustomers() {
   try {
-    const cached = readCache<CustomerRow[]>(CUSTOMERS_CACHE_KEY, CACHE_TTL_MS);
-    if (cached?.data?.length) {
-      customers.value = cached.data;
-    }
     customers.value = await listCustomers();
-    writeCache(CUSTOMERS_CACHE_KEY, customers.value);
-  } catch (e: any) {
+  } catch {
     const ne = normalizeApiError(e);
     push({ kind: "error", title: "Falha ao carregar customers", message: ne.message, details: ne.details });
   }
 }
 
 async function loadPending() {
-  const cached = readCache<PendingUserRow[]>(PENDING_CACHE_KEY, CACHE_TTL_MS);
-  const hasCached = Boolean(cached?.data?.length);
-  if (hasCached) {
-    pending.value = cached?.data ?? [];
-  }
-  pendingLoading.value = !hasCached;
+  pendingLoading.value = true;
   pendingError.value = "";
   try {
     pending.value = await listPendingUsers();
-    writeCache(PENDING_CACHE_KEY, pending.value);
   } catch (e: any) {
     const ne = normalizeApiError(e);
     pendingError.value = ne.message;
@@ -754,6 +855,53 @@ function openRejectModal() {
 function closeActivateModal() {
   if (pendingSaving.value) return;
   activateModalOpen.value = false;
+}
+
+function openPreRegisterModal() {
+  preRegisterEmail.value = "";
+  preRegisterCustomerId.value = "";
+  preRegisterRole.value = "viewer";
+  preRegisterError.value = "";
+  preRegisterModalOpen.value = true;
+}
+
+function closePreRegisterModal() {
+  if (preRegisterSaving.value) return;
+  preRegisterModalOpen.value = false;
+  preRegisterError.value = "";
+}
+
+async function submitPreRegister() {
+  if (!preRegisterEmail.value || !preRegisterCustomerId.value) return;
+  preRegisterSaving.value = true;
+  preRegisterError.value = "";
+  try {
+    const res = await preRegisterUser({
+      email: preRegisterEmail.value,
+      customerId: preRegisterCustomerId.value,
+      role: preRegisterRole.value,
+      grantCustomerWorkspaces: true,
+    });
+
+    push({
+      kind: "success",
+      title: "Usuário pré-cadastrado",
+      message: preRegisterEmail.value,
+    });
+
+    preRegisterModalOpen.value = false;
+
+    await loadActiveUsers(1);
+    if (res.user?.id) {
+      const detail = await getUserById(res.user.id);
+      await openUserModal(detail);
+    }
+  } catch (e: any) {
+    const ne = normalizeApiError(e);
+    preRegisterError.value = ne.message;
+  } finally {
+    preRegisterSaving.value = false;
+  }
 }
 
 async function approvePending() {
@@ -812,19 +960,7 @@ async function disableSelectedPending() {
 }
 
 async function loadActiveUsers(page = 1) {
-  const cacheKey = `${ACTIVE_CACHE_PREFIX}${page}:${activeQuery.value}:${activeCustomerIds.value.join(",")}`;
-  const cached = readCache<{ page: number; pageSize: number; total: number; rows: ActiveUserRow[] }>(
-    cacheKey,
-    CACHE_TTL_MS,
-  );
-  const hasCached = Boolean(cached?.data?.rows?.length);
-  if (cached?.data) {
-    activeUsers.rows = cached.data.rows ?? [];
-    activeUsers.total = cached.data.total ?? 0;
-    activeUsers.page = cached.data.page ?? page;
-    activeUsers.pageSize = cached.data.pageSize ?? activeUsers.pageSize;
-  }
-  activeLoading.value = !hasCached;
+  activeLoading.value = true;
   activeError.value = "";
   try {
     const res = await listActiveUsers(activeQuery.value, page, activeUsers.pageSize, activeCustomerIds.value);
@@ -832,13 +968,6 @@ async function loadActiveUsers(page = 1) {
     activeUsers.total = res.total ?? 0;
     activeUsers.page = res.page ?? page;
     activeUsers.pageSize = res.pageSize ?? activeUsers.pageSize;
-    writeCache(cacheKey, {
-      page: activeUsers.page,
-      pageSize: activeUsers.pageSize,
-      total: activeUsers.total,
-      rows: activeUsers.rows,
-    });
-
   } catch (e: any) {
     const ne = normalizeApiError(e);
     activeError.value = ne.message;
@@ -873,13 +1002,6 @@ async function toggleUserStatus(user: ActiveUserRow) {
     activeUsers.rows = activeUsers.rows.map((row) =>
       row.id === user.id ? { ...row, status: nextStatus } : row,
     );
-    const cacheKey = `${ACTIVE_CACHE_PREFIX}${activeUsers.page}:${activeQuery.value}:${activeCustomerIds.value.join(",")}`;
-    writeCache(cacheKey, {
-      page: activeUsers.page,
-      pageSize: activeUsers.pageSize,
-      total: activeUsers.total,
-      rows: activeUsers.rows,
-    });
     push({
       kind: "success",
       title: nextStatus === "disabled" ? "Usuário desativado" : "Usuário reativado",
@@ -960,14 +1082,31 @@ async function loadUserPreview() {
   userPreviewEmpty.value = false;
   clearUserPreviewEmbed();
   try {
-    const access = await getUserPageAccess(userModalUser.value.id, userPreviewReportRefId.value);
-    const allowIds = new Set(access.pages.filter((p) => p.canView).map((p) => p.id));
-    const groupIds = access.groups
-      .filter((g) => g.assigned ?? g.isActive)
-      .flatMap((g) => g.pageIds ?? []);
-    groupIds.forEach((id) => allowIds.add(id));
+    const [customerAccess, userAccess] = await Promise.all([
+      getCustomerPageAccess(userModalCustomerId.value, userPreviewReportRefId.value),
+      getUserPageAccess(userModalUser.value.id, userPreviewReportRefId.value),
+    ]);
+    const allowedPageIds = new Set(
+      customerAccess.pages.filter((p) => p.canView).map((p) => p.id),
+    );
+    const userHasAssignments =
+      userAccess.groups.some((g) => g.assigned) ||
+      userAccess.pages.some((p) => p.canView);
+    let effectiveIds = allowedPageIds;
+    if (userHasAssignments) {
+      const userAllowIds = new Set(
+        userAccess.pages.filter((p) => p.canView).map((p) => p.id),
+      );
+      userAccess.groups
+        .filter((g) => g.assigned ?? g.isActive)
+        .flatMap((g) => g.pageIds ?? [])
+        .forEach((id) => userAllowIds.add(id));
+      effectiveIds = new Set(
+        Array.from(allowedPageIds).filter((id) => userAllowIds.has(id)),
+      );
+    }
 
-    const allowed = access.pages.filter((p) => allowIds.has(p.id));
+    const allowed = customerAccess.pages.filter((p) => effectiveIds.has(p.id));
     userPreviewPages.value = allowed;
     userPreviewActivePageName.value = allowed[0]?.pageName ?? null;
 
@@ -1049,6 +1188,9 @@ function pickDefaultCustomerId() {
 
 function normalizeWorkspaceVisibility(workspaces: UserPermissionsResponse["workspaces"]) {
   for (const ws of workspaces) {
+    if (typeof ws.canView !== "boolean") {
+      ws.canView = typeof ws.isActive === "boolean" ? ws.isActive : false;
+    }
     if (!ws.canView && ws.reports.some((r) => r.canView)) {
       ws.canView = true;
     }
@@ -1182,10 +1324,26 @@ async function loadUserPageAccess() {
         .filter((g) => g.assigned ?? g.isActive)
         .map((g) => g.id),
     );
-    pageAccess.value = {
-      pages: userAccess.pages.filter((p) => allowedPageIds.has(p.id)),
-      groups: userAccess.groups.filter((g) => allowedGroupIds.has(g.id)),
-    };
+    const userHasAssignments =
+      userAccess.groups.some((g) => g.assigned) ||
+      userAccess.pages.some((p) => p.canView);
+
+    const pages = userAccess.pages
+      .filter((p) => allowedPageIds.has(p.id))
+      .map((p) =>
+        userHasAssignments ? p : { ...p, canView: allowedPageIds.has(p.id) },
+      )
+      .sort((a, b) => {
+        const orderA = a.pageOrder ?? 0;
+        const orderB = b.pageOrder ?? 0;
+        if (orderA !== orderB) return orderA - orderB;
+        const nameA = ((a.displayName ?? a.pageName) || "").toLowerCase();
+        const nameB = ((b.displayName ?? b.pageName) || "").toLowerCase();
+        return nameA.localeCompare(nameB);
+      });
+    const groups = userAccess.groups.filter((g) => allowedGroupIds.has(g.id));
+
+    pageAccess.value = { pages, groups };
   } catch (e: any) {
     const ne = normalizeApiError(e);
     pageAccessError.value = ne.message;
@@ -1220,15 +1378,24 @@ async function toggleUserWorkspace(wsRefId: string) {
 
   const next = !ws.canView;
   const prev = ws.canView;
+  const prevReports = ws.reports.map((r) => ({ id: r.reportRefId, canView: r.canView }));
   wsBusy[wsRefId] = true;
   userPermsSaving.value = true;
 
   ws.canView = next;
+  ws.reports.forEach((r) => {
+    r.canView = next;
+  });
 
   try {
     await setWorkspacePermission(userModalUser.value.id, userModalCustomerId.value, wsRefId, next, true);
   } catch (e: any) {
     ws.canView = prev;
+    const prevMap = new Map(prevReports.map((r) => [r.id, r.canView]));
+    ws.reports.forEach((r) => {
+      const restored = prevMap.get(r.reportRefId);
+      if (typeof restored === "boolean") r.canView = restored;
+    });
     const ne = normalizeApiError(e);
     push({ kind: "error", title: "Falha ao atualizar workspace", message: ne.message, details: ne.details });
   } finally {
@@ -1239,8 +1406,9 @@ async function toggleUserWorkspace(wsRefId: string) {
 
 async function toggleUserReport(wsRefId: string, reportRefId: string) {
   if (!userModalUser.value || !userModalCustomerId.value) return;
+  const ws = findWorkspace(wsRefId);
   const report = findReport(wsRefId, reportRefId);
-  if (!report) return;
+  if (!ws || !report) return;
 
   const next = !report.canView;
   const prev = report.canView;
@@ -1248,6 +1416,9 @@ async function toggleUserReport(wsRefId: string, reportRefId: string) {
   userPermsSaving.value = true;
 
   report.canView = next;
+  if (next && !ws.canView) {
+    ws.canView = true;
+  }
 
   try {
     await setReportPermission(userModalUser.value.id, userModalCustomerId.value, reportRefId, next);
@@ -1269,6 +1440,7 @@ async function toggleUserGroup(group: PageGroup) {
   group.assigned = next;
   try {
     await setUserPageGroup(userModalUser.value.id, group.id, next);
+    await loadUserPageAccess();
   } catch (e: any) {
     group.assigned = prev;
     const ne = normalizeApiError(e);
@@ -1279,45 +1451,53 @@ async function toggleUserGroup(group: PageGroup) {
 }
 
 async function toggleUserPageAllow(page: ReportPage) {
-  if (!userModalUser.value) return;
+  if (!userModalUser.value || userHasActiveGroupAssignments.value) return;
   const next = !page.canView;
   const prev = page.canView;
   pageAllowBusy[page.id] = true;
   page.canView = next;
   try {
-    await setUserPageAllow(userModalUser.value.id, page.id, next);
-  } catch (e: any) {
+    await setUserPageAllow(
+      userModalUser.value.id,
+      page.id,
+      next,
+      userModalCustomerId.value || undefined,
+    );
+  } catch {
     page.canView = prev;
-    const ne = normalizeApiError(e);
-    push({ kind: "error", title: "Falha ao atualizar página", message: ne.message, details: ne.details });
+    await loadUserPageAccess();
   } finally {
     pageAllowBusy[page.id] = false;
   }
 }
 
-async function selectAllUserPages() {
-  if (!userModalUser.value || !pageAccess.value) return;
-  const toEnable = pageAccess.value.pages.filter((p) => !p.canView);
-  if (!toEnable.length) return;
+async function setAllUserPages(canView: boolean) {
+  if (!userModalUser.value || !pageAccess.value || userHasActiveGroupAssignments.value) return;
+  const targets = pageAccess.value.pages.filter((p) => p.canView !== canView);
+  if (!targets.length) return;
 
   pageAccess.value = {
     ...pageAccess.value,
-    pages: pageAccess.value.pages.map((p) => ({ ...p, canView: true })),
+    pages: pageAccess.value.pages.map((p) => ({ ...p, canView: canView })),
   };
 
-  toEnable.forEach((p) => {
+  targets.forEach((p) => {
     pageAllowBusy[p.id] = true;
   });
 
   try {
-    await Promise.all(toEnable.map((p) => setUserPageAllow(userModalUser.value!.id, p.id, true)));
-    push({ kind: "success", title: "Paginas ativadas", message: "Todas as paginas foram liberadas." });
-  } catch (e: any) {
-    const ne = normalizeApiError(e);
-    push({ kind: "error", title: "Falha ao ativar paginas", message: ne.message, details: ne.details });
+    for (const p of targets) {
+      await setUserPageAllow(
+        userModalUser.value!.id,
+        p.id,
+        canView,
+        userModalCustomerId.value || undefined,
+      );
+    }
+  } catch {
     await loadUserPageAccess();
   } finally {
-    toEnable.forEach((p) => {
+    targets.forEach((p) => {
       pageAllowBusy[p.id] = false;
     });
   }

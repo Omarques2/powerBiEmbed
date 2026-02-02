@@ -125,6 +125,11 @@ export class AdminPowerBiPagesController {
     @Param('pageId', ParseUUIDPipe) pageId: string,
     @Body() body: PageAllowDto,
   ) {
-    return this.pages.setUserPageAllow(userId, pageId, body.canView);
+    return this.pages.setUserPageAllow(
+      userId,
+      pageId,
+      body.canView,
+      body.customerId ?? null,
+    );
   }
 }

@@ -4,6 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 import type { MembershipRole, Prisma } from '@prisma/client';
 import { ALLOWED_ROLES } from '../admin-users.utils';
 import { AuditRepository } from '../repositories/audit.repository';
@@ -28,6 +29,111 @@ export class AdminUserLifecycleService {
 
   listPending() {
     return this.users.listPending();
+  }
+
+  async preRegisterUser(
+    input: {
+      email: string;
+      customerId: string;
+      role: MembershipRole;
+      grantCustomerWorkspaces?: boolean;
+    },
+    actorSub: string | null = null,
+  ) {
+    const email = (input.email ?? '').trim();
+    const customerId = (input.customerId ?? '').trim();
+    const role = (input.role ?? '').trim() as MembershipRole;
+
+    if (!email) throw new BadRequestException('email is required');
+    if (!customerId) throw new BadRequestException('customerId is required');
+    if (!ALLOWED_ROLES.has(role))
+      throw new BadRequestException(`Invalid role: ${role}`);
+
+    const customer = await this.customers.findById(customerId);
+    if (!customer) throw new NotFoundException('Customer not found');
+    if (customer.status !== 'active')
+      throw new BadRequestException('Customer is not active');
+
+    const actorUserId = await this.actors.resolveActorUserId(actorSub);
+
+    return this.permissions.root().$transaction(async (tx) => {
+      let user = await this.users.findByEmailForLink(email, tx);
+      let created = false;
+
+      if (!user) {
+        const entraSub = `pre_${randomUUID()}`;
+        user = await this.users.createPreRegistered(tx, {
+          entraSub,
+          email,
+          status: 'active',
+        });
+        created = true;
+      } else if (user.status !== 'active') {
+        await this.users.updateStatus(tx, user.id, 'active');
+        user = await this.users.updateIdentity(tx, user.id, {
+          email,
+        });
+      }
+
+      const membership = await this.memberships.upsert(
+        tx,
+        user.id,
+        customerId,
+        role,
+        true,
+      );
+
+      const grantCustomerWorkspaces =
+        input.grantCustomerWorkspaces === undefined
+          ? true
+          : Boolean(input.grantCustomerWorkspaces);
+
+      const seededPages = grantCustomerWorkspaces
+        ? await this.membershipActions.seedUserPageAccessFromCustomerTx(
+            tx,
+            user.id,
+            customerId,
+          )
+        : { groupsSeeded: 0, pagesSeeded: 0, skipped: true };
+
+      await this.audit.create(tx, {
+        actorUserId,
+        action: 'USER_PRE_REGISTERED',
+        entityType: 'users',
+        entityId: user.id,
+        beforeData: {
+          created,
+          email,
+        },
+        afterData: {
+          user: {
+            id: user.id,
+            email: user.email ?? email,
+            status: 'active',
+          },
+          membership: {
+            customerId,
+            role,
+            isActive: true,
+          },
+          seededPages,
+        },
+      });
+
+      return {
+        ok: true,
+        user: {
+          id: user.id,
+          email: user.email ?? email,
+          status: 'active',
+        },
+        membership: {
+          customerId,
+          role,
+          isActive: true,
+        },
+      };
+    });
   }
 
   async activateUser(
@@ -276,6 +382,9 @@ export class AdminUserLifecycleService {
       };
 
       await this.users.updateStatus(tx, userId, status);
+      if (status === 'active') {
+        await this.users.enableMemberships(tx, userId);
+      }
 
       const after = {
         user: {

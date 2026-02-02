@@ -176,7 +176,6 @@ import {
 import { useToast } from "@/ui/toast/useToast";
 import { useConfirm } from "@/ui/confirm/useConfirm";
 import { normalizeApiError, useBusyMap, useOptimisticMutation } from "@/ui/ops";
-import { readCache, writeCache } from "@/ui/storage/cache";
 import { PermSwitch } from "@/ui/toggles";
 import { Building2, Lock, Unlock } from "lucide-vue-next";
 
@@ -205,22 +204,14 @@ type PatchMembershipResult = Awaited<ReturnType<typeof patchUserMembership>>;
 
 const error = ref<string>("");
 
-// customers cache
+// customers
 const customers = ref<Array<{ id: string; code: string; name: string; status: string }>>([]);
 const loadingCustomers = ref(false);
-const CUSTOMERS_CACHE_KEY = "admin.cache.customers";
-const CACHE_TTL_MS = 5 * 60 * 1000;
-
-async function refreshCustomers(force = false) {
-  const cached = force ? null : readCache<typeof customers.value>(CUSTOMERS_CACHE_KEY, CACHE_TTL_MS);
-  if (cached?.data?.length && !customers.value.length) {
-    customers.value = cached.data;
-  }
-  loadingCustomers.value = force || !cached?.data?.length;
+async function refreshCustomers() {
+  loadingCustomers.value = true;
   error.value = "";
   try {
     customers.value = await listCustomers();
-    writeCache(CUSTOMERS_CACHE_KEY, customers.value);
   } catch (e: any) {
     const ne = normalizeApiError(e);
     error.value = ne.message;
@@ -230,7 +221,7 @@ async function refreshCustomers(force = false) {
   }
 }
 
-onMounted(() => refreshCustomers(false));
+onMounted(() => refreshCustomers());
 
 // helpers
 const roleOverrides = ref<Record<string, MembershipRole>>({});

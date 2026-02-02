@@ -1,5 +1,6 @@
 import {
   IsBoolean,
+  IsEmail,
   IsIn,
   IsInt,
   IsOptional,
@@ -139,4 +140,20 @@ export class ListActiveUsersQueryDto {
 export class SetUserStatusDto {
   @IsIn(['active', 'disabled'])
   status!: 'active' | 'disabled';
+}
+
+export class PreRegisterUserDto {
+  @IsEmail()
+  email!: string;
+
+  @IsUUID()
+  customerId!: string;
+
+  @IsIn(MEMBERSHIP_ROLES)
+  role!: (typeof MEMBERSHIP_ROLES)[number];
+
+  @IsOptional()
+  @Transform(toBoolean)
+  @IsBoolean()
+  grantCustomerWorkspaces?: boolean;
 }

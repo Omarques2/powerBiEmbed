@@ -168,7 +168,6 @@ import { useConfirm } from "@/ui/confirm/useConfirm";
 import { useBusyMap } from "@/ui/ops/useBusyMap";
 import { useOptimisticMutation } from "@/ui/ops/useOptimisticMutation";
 import { normalizeApiError } from "@/ui/ops/normalizeApiError";
-import { readCache, writeCache } from "@/ui/storage/cache";
 import { Button as UiButton, Input as UiInput } from "@/components/ui";
 import { Shield } from "lucide-vue-next";
 
@@ -187,8 +186,6 @@ const newEmail = ref("");
 const granting = ref(false);
 
 const isLastAdmin = computed(() => rows.value.length <= 1);
-const CACHE_TTL_MS = 5 * 60 * 1000;
-const CACHE_KEY = "admin.cache.platformAdmins";
 
 const canGrant = computed(() => {
   const email = newEmail.value.trim();
@@ -214,19 +211,13 @@ function upsertLocal(row: PlatformAdminRow) {
   } else {
     rows.value = [row, ...rows.value];
   }
-  writeCache(CACHE_KEY, rows.value);
 }
 
 async function load() {
-  const cached = readCache<PlatformAdminRow[]>(CACHE_KEY, CACHE_TTL_MS);
-  if (cached?.data?.length && !rows.value.length) {
-    rows.value = cached.data;
-  }
-  loading.value = !cached?.data?.length;
+  loading.value = true;
   error.value = "";
   try {
     rows.value = await listPlatformAdmins(appKey);
-    writeCache(CACHE_KEY, rows.value);
   } catch (e: any) {
     const ne = normalizeApiError(e);
     error.value = ne.message;
@@ -308,7 +299,6 @@ async function onRevoke(row: PlatformAdminRow) {
     optimistic: () => {
       const snap = [...rows.value];
       rows.value = rows.value.filter((x) => x.userId !== row.userId);
-      writeCache(CACHE_KEY, rows.value);
       return snap;
     },
     request: async () => {
@@ -316,14 +306,12 @@ async function onRevoke(row: PlatformAdminRow) {
     },
     rollback: (snap) => {
       rows.value = snap;
-      writeCache(CACHE_KEY, rows.value);
     },
     toast: {
       success: { title: "Platform Admin revogado", message: label },
       error: { title: "Falha ao revogar Platform Admin" },
     },
   });
-  writeCache(CACHE_KEY, rows.value);
 }
 
 onMounted(load);
