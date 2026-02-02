@@ -96,6 +96,63 @@ export async function logout(): Promise<void> {
   await msal.logoutRedirect();
 }
 
+async function clearIndexedDbSafely(): Promise<void> {
+  if (typeof window === "undefined" || !("indexedDB" in window)) return;
+  try {
+    const dbs = await (indexedDB as any).databases?.();
+    if (!Array.isArray(dbs)) return;
+    await Promise.all(
+      dbs
+        .map((db: any) => db?.name)
+        .filter(Boolean)
+        .map(
+          (name: string) =>
+            new Promise<void>((resolve) => {
+              const req = indexedDB.deleteDatabase(name);
+              req.onsuccess = () => resolve();
+              req.onerror = () => resolve();
+              req.onblocked = () => resolve();
+            }),
+        ),
+    );
+  } catch {
+    // best effort only
+  }
+}
+
+export async function hardResetAuthState(): Promise<void> {
+  try {
+    const cache = msal.getTokenCache() as unknown as {
+      removeAccount?: (account: AccountInfo) => Promise<void> | void;
+    };
+    const accounts = msal.getAllAccounts();
+    await Promise.all(
+      accounts.map(async (account) => {
+        try {
+          await cache.removeAccount?.(account);
+        } catch {
+          // best effort only
+        }
+      }),
+    );
+  } catch {
+    // best effort only
+  }
+  try {
+    const anyMsal = msal as unknown as { clearCache?: () => Promise<void> | void };
+    await anyMsal.clearCache?.();
+  } catch {
+    // best effort only
+  }
+  try {
+    localStorage.clear();
+    sessionStorage.clear();
+  } catch {
+    // best effort only
+  }
+  await clearIndexedDbSafely();
+}
+
 export async function acquireApiToken(): Promise<string> {
   await initAuthOnce();
 
@@ -118,6 +175,9 @@ export async function acquireApiToken(): Promise<string> {
         prompt: "select_account",
       });
       throw new Error("Interaction required (redirecting).");
+    }
+    if (typeof window !== "undefined") {
+      await hardResetAuthState();
     }
     throw err;
   }

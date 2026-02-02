@@ -75,13 +75,7 @@ export class AdminUserLifecycleService {
         });
       }
 
-      const membership = await this.memberships.upsert(
-        tx,
-        user.id,
-        customerId,
-        role,
-        true,
-      );
+      await this.memberships.upsert(tx, user.id, customerId, role, true);
 
       const grantCustomerWorkspaces =
         input.grantCustomerWorkspaces === undefined

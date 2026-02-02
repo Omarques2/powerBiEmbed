@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory } from "vue-router";
-import { getActiveAccount, initAuthOnce } from "../auth/auth";
+import { getActiveAccount, hardResetAuthState, initAuthOnce } from "../auth/auth";
 import { getMeCached } from "../auth/me";
 import { resetRouteLoading, startRouteLoading, stopRouteLoading } from "../ui/loading/routeLoading";
 
@@ -46,7 +46,12 @@ router.beforeEach(async (to, from) => {
   }
 
   // Sempre garanta MSAL inicializado antes de qualquer decisão
-  await initAuthOnce();
+  try {
+    await initAuthOnce();
+  } catch {
+    await hardResetAuthState();
+    return "/login";
+  }
   const acc = getActiveAccount();
 
   // Se já estiver logado e tentar ir pra /login, redireciona

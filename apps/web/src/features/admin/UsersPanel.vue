@@ -820,7 +820,7 @@ function fmtDate(iso: string) {
 async function loadCustomers() {
   try {
     customers.value = await listCustomers();
-  } catch {
+  } catch (e: any) {
     const ne = normalizeApiError(e);
     push({ kind: "error", title: "Falha ao carregar customers", message: ne.message, details: ne.details });
   }

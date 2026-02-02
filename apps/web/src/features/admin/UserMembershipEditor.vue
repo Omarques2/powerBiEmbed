@@ -15,7 +15,7 @@
           class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs hover:bg-slate-50
                  disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
           :disabled="loadingCustomers"
-          @click="refreshCustomers(true)"
+          @click="refreshCustomers"
         >
           {{ loadingCustomers ? "Recarregando..." : "Recarregar customers" }}
         </button>

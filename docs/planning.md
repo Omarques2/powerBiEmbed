@@ -133,6 +133,7 @@ Estrategia de execucao (branch unica + milestones internos):
 - Milestone 6: Power BI embeds/previews (containers + estados vazios).
 - Milestone 7: QA final (lint/test/build + checklist manual 390/768/1280).
 - Milestone 8: Ajustes finais de UX/branding (HomeView, dark theme verde, loading global, 404, pending, tabelas mobile em cards, modal de memberships simplificado).
+ - Nota adicional: resiliencia de Auth (hard reset do cache/IndexedDB quando MSAL corromper).
 
 Checklist de milestones (EPIC-05):
 - [x] Milestone 1: Infra + tokens
@@ -246,6 +247,7 @@ Aceite:
 - Home: sidebar abre com workspaces/reports do cache e atualiza silenciosamente.
 - Admin: listas mostram dados salvos e nao aparecem vazias durante refresh.
 - Refresh nao altera permissao/estado visual do usuario (sem jump).
+Status: descopado (UX preferiu dados sempre do BD para evitar confusao de cache).
 
 Ordem recomendada (para evitar retrabalho):
 1. Fundacao Shadcn + tokens + infra (Milestone 1)
@@ -461,6 +463,8 @@ Estrategia:
 - Opcional: interceptar `pageChanged` e reverter se nao permitido.
 Aceite:
 - Usuario ve apenas paginas permitidas.
+- Regras de acesso efetivo: interseccao customer x usuario; allowlist vazia nunca significa "all pages".
+- Ordenacao de paginas segue `pageOrder` do Power BI (fallback por nome).
 
 Card P1 - API | Exportacao PDF com whitelist no backend  
 Contexto: export precisa respeitar permissao por pagina.  
@@ -472,6 +476,16 @@ Estrategia:
 - Frontend pode pedir "pagina atual" ou "todas permitidas".
 Aceite:
 - PDF inclui somente paginas permitidas.
+
+Card P1 - DEVOPS/API | Sync automatico de paginas (cron)  
+Contexto: garantir catalogo de paginas atualizado sem acao manual.  
+Objetivo: agendar job para sincronizar todas as paginas periodicamente.  
+Escopo: GH Actions + endpoint interno protegido por token.  
+Estrategia:
+- Workflow `cron-sync-pages.yml` chama `/internal/powerbi/pages/sync-all` (staging/prod).
+- Tokens separados por ambiente.  
+Aceite:
+- Sync executa com sucesso em cron e pode ser disparado manualmente.
 
 ### EPIC-13: Reestrutura do painel Admin focado em Customer (WEB + API)
 Card P1 - WEB | Modal de Customer com abas e UX simplificado  
@@ -490,6 +504,14 @@ Aceite:
 - Paginas individuais ficam read-only quando ha grupo ativo e refletem o acesso efetivo.
 Notas:
 - Permissoes do customer devem refletir nos usuarios, mas a tela de usuarios sera tratada em card separado.
+
+Card P1 — WEB/API | Pre-cadastro de usuarios por email  
+Contexto: permitir liberar acesso antes do 1º login.  
+Objetivo: criar usuario ativo com email e membership, e vincular automaticamente no 1º login.  
+Escopo: API (endpoint + lifecycle) + WEB (modal de pre-cadastro).  
+Aceite:
+- Admin cria pre-cadastro (email + customer + role).
+- 1º login vincula conta e entra direto como ativo.
 
 ### EPIC-14: Componentizacao Vue e manutenibilidade (WEB)
 Card P2 — WEB | Quebrar telas grandes em componentes menores  

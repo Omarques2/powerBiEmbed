@@ -38,7 +38,7 @@ Legenda:
 - [x] Milestone 6: Power BI embeds e previews
 - [x] Milestone 7: QA final (lint/test/build + regressao visual)
 - [x] Milestone 8: Ajustes finais de UX/branding (HomeView + cards mobile + memberships simplificado + 404)
-- [x] P2 Cache persistente de listas (storage + refresh invisivel)
+- [~] P2 Cache persistente de listas (storage + refresh invisivel) — descopado (dados sempre do BD)
 
 ## EPIC-06 - CI/CD GitHub Actions (DEVOPS)
 - [x] P1 CI PR monorepo-aware (lint/type/test/build web+api + cache + paths-filter)
@@ -76,10 +76,13 @@ Legenda:
 - [x] P1 Grupos de permissoes por report (UI + API)
 - [x] P1 Vincular grupos/paginas a customers e usuarios
 - [x] P1 Embed com navegacao controlada pelo app
+- [x] P1 Acesso efetivo por interseccao (customer x usuario) + ordenacao por pageOrder
 - [x] P1 Exportacao PDF com whitelist no backend
+- [x] P1 Sync automatico de paginas (cron GH Actions + endpoint interno)
 
 ## EPIC-13 - Reestrutura do painel Admin focado em Customer (WEB + API)
 - [x] P1 Modal de Customer com abas (Resumo/Relatorios/Permissoes de paginas)
 - [x] P1 Tree view de workspaces + reports com toggles imediatos
 - [x] P1 Permissoes de paginas no modal (grupos + preview multi-pagina)
 - [x] P1 Reestrutura da aba Users (Pendentes/Usuarios/Admins unificados)
+- [x] P1 Pre-cadastro de usuarios (email + membership + auto-link no 1º login)
