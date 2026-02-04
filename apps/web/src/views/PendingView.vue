@@ -50,7 +50,7 @@ import { onBeforeUnmount, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { http } from "@/api/http";
 import { unwrapData, type ApiEnvelope } from "@/api/envelope";
-import { logout } from "../auth/auth";
+import { hardResetAuthState, logout } from "../auth/auth";
 import { Button as UiButton } from "@/components/ui";
 
 type MeResponse = {
@@ -76,7 +76,12 @@ async function fetchMe(): Promise<MeResponse | null> {
 
     // Se perdeu sessão / token inválido, volta para login
     if (status === 401) {
-      await logout();
+      await hardResetAuthState();
+      if (typeof window !== "undefined") {
+        window.location.assign("/login");
+      } else {
+        await logout();
+      }
       return null;
     }
 

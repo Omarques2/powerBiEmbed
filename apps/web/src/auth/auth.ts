@@ -58,6 +58,19 @@ export const msal = new PublicClientApplication({
 });
 
 let initPromise: Promise<void> | null = null;
+let resetInProgress = false;
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  let timer: number | null = null;
+  const timeout = new Promise<T>((_, reject) => {
+    timer = window.setTimeout(() => {
+      reject(new Error(`${label} timed out after ${ms}ms`));
+    }, ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => {
+    if (timer) window.clearTimeout(timer);
+  });
+}
 
 /**
  * Inicializa MSAL + processa redirect exatamente 1x (robusto para produção).
@@ -68,17 +81,22 @@ export function initAuthOnce(): Promise<void> {
 }
 
 export async function initAuth(): Promise<void> {
-  await msal.initialize();
+  try {
+    await msal.initialize();
 
-  const result = await msal.handleRedirectPromise();
-  if (result?.account) {
-    msal.setActiveAccount(result.account);
-    return;
+    const result = await msal.handleRedirectPromise();
+    if (result?.account) {
+      msal.setActiveAccount(result.account);
+      return;
+    }
+
+    // Restaura conta se já existir no cache
+    const accounts = msal.getAllAccounts();
+    msal.setActiveAccount(accounts[0] ?? null);
+  } catch (err) {
+    await hardResetAuthState();
+    throw err;
   }
-
-  // Restaura conta se já existir no cache
-  const accounts = msal.getAllAccounts();
-  msal.setActiveAccount(accounts[0] ?? null);
 }
 
 export function getActiveAccount(): AccountInfo | null {
@@ -121,6 +139,8 @@ async function clearIndexedDbSafely(): Promise<void> {
 }
 
 export async function hardResetAuthState(): Promise<void> {
+  if (resetInProgress) return;
+  resetInProgress = true;
   try {
     const cache = msal.getTokenCache() as unknown as {
       removeAccount?: (account: AccountInfo) => Promise<void> | void;
@@ -151,6 +171,17 @@ export async function hardResetAuthState(): Promise<void> {
     // best effort only
   }
   await clearIndexedDbSafely();
+  initPromise = null;
+  resetInProgress = false;
+}
+
+export async function initAuthSafe(timeoutMs = 10_000): Promise<void> {
+  if (typeof window === "undefined") return;
+  try {
+    await withTimeout(initAuthOnce(), timeoutMs, "MSAL init");
+  } catch {
+    await hardResetAuthState();
+  }
 }
 
 export async function acquireApiToken(): Promise<string> {

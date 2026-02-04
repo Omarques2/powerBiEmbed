@@ -25,12 +25,16 @@
 <script setup lang="ts">
 import { onMounted } from "vue";
 import { useRouter } from "vue-router";
-import { getActiveAccount, initAuthOnce } from "../auth/auth";
+import { getActiveAccount, hardResetAuthState, initAuthSafe } from "../auth/auth";
 
 const router = useRouter();
 
 onMounted(async () => {
-  await initAuthOnce();
+  try {
+    await initAuthSafe();
+  } catch {
+    await hardResetAuthState();
+  }
   const acc = getActiveAccount();
   router.replace(acc ? "/app" : "/login");
 });

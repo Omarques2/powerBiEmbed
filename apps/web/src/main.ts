@@ -2,10 +2,14 @@ import { createApp } from "vue";
 import App from "./App.vue";
 import router from "./router";
 import "./assets/main.css";
-import { initAuthOnce } from "./auth/auth";
+import { hardResetAuthState, initAuthSafe } from "./auth/auth";
 
 async function bootstrap() {
-  await initAuthOnce();
+  try {
+    await initAuthSafe();
+  } catch {
+    await hardResetAuthState();
+  }
 
   const app = createApp(App);
   app.use(router);
