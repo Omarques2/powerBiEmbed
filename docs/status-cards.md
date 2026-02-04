@@ -76,6 +76,7 @@ Legenda:
 - [x] P1 Grupos de permissoes por report (UI + API)
 - [x] P1 Vincular grupos/paginas a customers e usuarios
 - [x] P1 Embed com navegacao controlada pelo app
+- [x] P1 Fix: navegacao nao trava ao clicar em paginas antes do report carregar
 - [x] P1 Acesso efetivo por interseccao (customer x usuario) + ordenacao por pageOrder
 - [x] P1 Exportacao PDF com whitelist no backend
 - [x] P1 Sync automatico de paginas (cron GH Actions + endpoint interno)

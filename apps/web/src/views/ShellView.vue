@@ -234,7 +234,11 @@
                 <div class="mx-1 h-6 w-px shrink-0 bg-border/70" aria-hidden="true" />
 
                 <div class="flex-1 overflow-hidden">
-                  <div class="no-scrollbar flex items-center gap-1 overflow-x-auto">
+                  <div
+                    ref="pagesScrollEl"
+                    class="no-scrollbar flex items-center gap-1 overflow-x-auto"
+                    @wheel="onPagesWheel"
+                  >
                     <button
                       v-for="p in allowedPages"
                       :key="p.pageName"
@@ -497,6 +501,7 @@ const noPagesAvailable = ref(false);
 const activePageName = ref<string | null>(null);
 const printBlocked = ref(false);
 const hostEl = ref<HTMLDivElement | null>(null);
+const pagesScrollEl = ref<HTMLDivElement | null>(null);
 const frameEl = ref<HTMLDivElement | null>(null);
 const containerEl = ref<HTMLDivElement | null>(null);
 const topChromeEl = ref<HTMLDivElement | null>(null);
@@ -593,6 +598,7 @@ let powerbiService: pbi.service.Service | null = null;
 let resizeObs: ResizeObserver | null = null;
 let embeddedReport: pbi.Report | null = null;
 let guardRedirecting = false;
+const pendingPageName = ref<string | null>(null);
 let refreshPollTimer: number | null = null;
 let tokenRefreshTimer: number | null = null;
 const tokenRefreshInFlight = ref(false);
@@ -621,6 +627,8 @@ function resetEmbed() {
   allowedPages.value = [];
   allowedPagesError.value = "";
   activePageName.value = null;
+  pendingPageName.value = null;
+  guardRedirecting = false;
   stopTokenRefreshTimer();
 }
 
@@ -731,6 +739,29 @@ function removeResizeHandlers() {
   onBeforePrint = null;
   onAfterPrint = null;
 
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  let timer: number | null = null;
+  const timeout = new Promise<T>((_, reject) => {
+    timer = window.setTimeout(() => reject(new Error("timeout")), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => {
+    if (timer) window.clearTimeout(timer);
+  });
+}
+
+async function setReportPage(pageName: string) {
+  if (!embeddedReport || !pageName) return;
+  guardRedirecting = true;
+  try {
+    await withTimeout(embeddedReport.setPage(pageName), 5000);
+    activePageName.value = pageName;
+  } catch {
+    // ignore setPage failures
+  } finally {
+    guardRedirecting = false;
+  }
 }
 
 function waitForReportRender(timeoutMs = 8000): Promise<boolean> {
@@ -1304,6 +1335,10 @@ async function openReport(r: Report) {
     report.on("loaded", async () => {
       loadingEmbed.value = false;
       await applyReportLayout();
+      if (pendingPageName.value && allowedPages.value.some((p) => p.pageName === pendingPageName.value)) {
+        await setReportPage(pendingPageName.value);
+        pendingPageName.value = null;
+      }
       window.setTimeout(() => {
         fitFrame();
         resizeEmbedded();
@@ -1314,6 +1349,10 @@ async function openReport(r: Report) {
       loadingEmbed.value = false;
       reportReady.value = true;
       lastRenderAt.value = Date.now();
+      if (pendingPageName.value && allowedPages.value.some((p) => p.pageName === pendingPageName.value)) {
+        void setReportPage(pendingPageName.value);
+        pendingPageName.value = null;
+      }
       window.setTimeout(() => {
         fitFrame();
         resizeEmbedded();
@@ -1331,13 +1370,7 @@ async function openReport(r: Report) {
       if (guardRedirecting) return;
       const fallback = allowedPages.value[0]?.pageName;
       if (!fallback || !embeddedReport) return;
-      guardRedirecting = true;
-      try {
-        await embeddedReport.setPage(fallback);
-        activePageName.value = fallback;
-      } finally {
-        guardRedirecting = false;
-      }
+      await setReportPage(fallback);
     });
 
     report.on("error", (event: any) => {
@@ -1374,19 +1407,25 @@ async function setActivePage(pageName: string) {
   if (!embeddedReport || !pageName) return;
   if (!allowedPages.value.some((p) => p.pageName === pageName)) return;
   if (guardRedirecting) return;
-  guardRedirecting = true;
-  try {
-    await embeddedReport.setPage(pageName);
+  if (!reportReady.value) {
+    pendingPageName.value = pageName;
     activePageName.value = pageName;
-  } catch {
-    // ignore set page failures
-  } finally {
-    guardRedirecting = false;
+    return;
   }
+  await setReportPage(pageName);
 }
 
 function toggleFullscreen() {
   isFullscreen.value = !isFullscreen.value;
+}
+
+function onPagesWheel(e: WheelEvent) {
+  const el = pagesScrollEl.value;
+  if (!el) return;
+  if (el.scrollWidth <= el.clientWidth) return;
+  if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
+  e.preventDefault();
+  el.scrollLeft += e.deltaY;
 }
 
 async function refreshModel() {
