@@ -1545,16 +1545,6 @@ async function loadMe() {
   }
 }
 
-async function checkAdmin() {
-  // compat: mantido caso alguém chame explicitamente
-  try {
-    await http.get("/admin/me");
-    isAdmin.value = true;
-  } catch {
-    isAdmin.value = false;
-  }
-}
-
 async function goAdmin() {
   await router.push("/admin");
 }

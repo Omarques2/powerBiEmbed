@@ -57,7 +57,7 @@ router.beforeEach(async (to, from) => {
   // Se já estiver logado e tentar ir pra /login, redireciona
   if (to.path === "/login" && acc) {
     const me = await getMeCached(false);
-    if (!me) return "/app"; // fallback
+    if (!me) return "/pending"; // garante criação via /users/me
     return me.status === "active" ? "/app" : "/pending";
   }
 
@@ -70,7 +70,7 @@ router.beforeEach(async (to, from) => {
   // Se rota exige active, valida /users/me
   if (to.meta.requiresActive) {
     const me = await getMeCached(false);
-    if (!me) return "/login";
+    if (!me) return "/pending";
     if (me.status !== "active") return "/pending";
   }
 
