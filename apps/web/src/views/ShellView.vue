@@ -466,6 +466,7 @@ type MeResponse = {
   status: "pending" | "active" | "disabled";
   rawStatus?: string;
   memberships?: any[];
+  isPlatformAdmin?: boolean;
 };
 
 const router = useRouter();
@@ -1538,12 +1539,14 @@ async function loadMe() {
   try {
     const res = await http.get("/users/me");
     me.value = unwrapData(res.data as ApiEnvelope<MeResponse>);
+    isAdmin.value = !!me.value?.isPlatformAdmin;
   } catch {
     me.value = null;
   }
 }
 
 async function checkAdmin() {
+  // compat: mantido caso alguém chame explicitamente
   try {
     await http.get("/admin/me");
     isAdmin.value = true;
@@ -1573,7 +1576,6 @@ onMounted(async () => {
     return;
   }
 
-  await checkAdmin();
   await loadWorkspaces();
 });
 

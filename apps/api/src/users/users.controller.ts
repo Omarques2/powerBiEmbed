@@ -34,6 +34,7 @@ export class UsersController {
       displayName: user.displayName ?? null,
       status: effectiveStatus,
       rawStatus: user.status, // útil para debug
+      isPlatformAdmin,
       memberships: memberships.map((m) => ({
         customerId: m.customerId,
         role: m.role,

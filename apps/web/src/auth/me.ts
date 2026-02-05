@@ -8,6 +8,7 @@ export type MeResponse = {
   status: "pending" | "active" | "disabled";
   rawStatus?: string;
   memberships?: any[];
+  isPlatformAdmin?: boolean;
 };
 
 type CacheState = {
