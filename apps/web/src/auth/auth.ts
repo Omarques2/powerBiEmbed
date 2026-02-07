@@ -184,6 +184,17 @@ export async function initAuthSafe(timeoutMs = 10_000): Promise<void> {
   }
 }
 
+export function getAdminConsentUrl(tenantHint?: string): string {
+  const tenant = tenantHint?.trim() || "common";
+  const apiClientId =
+    apiScope.startsWith("api://") ? apiScope.split("/")[2] : undefined;
+  const params = new URLSearchParams({
+    client_id: apiClientId || clientId,
+    redirect_uri: redirectUri,
+  });
+  return `https://login.microsoftonline.com/${tenant}/adminconsent?${params.toString()}`;
+}
+
 export async function acquireApiToken(): Promise<string> {
   await initAuthOnce();
 
