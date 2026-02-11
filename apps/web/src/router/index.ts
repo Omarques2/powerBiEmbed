@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory } from "vue-router";
-import { getActiveAccount, hardResetAuthState, initAuthSafe } from "../auth/auth";
+import { getActiveAccount, initAuthSafe } from "../auth/auth";
 import { getMeCached } from "../auth/me";
 import { resetRouteLoading, startRouteLoading, stopRouteLoading } from "../ui/loading/routeLoading";
 
@@ -45,17 +45,12 @@ router.beforeEach(async (to, from) => {
     resetRouteLoading();
   }
 
-  // Sempre garanta MSAL inicializado antes de qualquer decisão
-  try {
-    await initAuthSafe();
-  } catch {
-    await hardResetAuthState();
-    return "/login";
-  }
-  const acc = getActiveAccount();
-
   // Se já estiver logado e tentar ir pra /login, redireciona
-  if (to.path === "/login" && acc) {
+  if (to.path === "/login") {
+    await initAuthSafe(2_500);
+    const acc = getActiveAccount();
+    if (!acc) return true;
+
     const me = await getMeCached(false);
     if (!me) return "/pending"; // garante criação via /users/me
     return me.status === "active" ? "/app" : "/pending";
@@ -63,6 +58,10 @@ router.beforeEach(async (to, from) => {
 
   // Rotas públicas seguem normalmente
   if (!to.meta.requiresAuth) return true;
+
+  const initialized = await initAuthSafe(4_000);
+  if (!initialized) return "/login";
+  const acc = getActiveAccount();
 
   // Precisa estar logado no MSAL
   if (!acc) return "/login";

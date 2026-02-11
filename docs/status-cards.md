@@ -87,3 +87,74 @@ Legenda:
 - [x] P1 Permissoes de paginas no modal (grupos + preview multi-pagina)
 - [x] P1 Reestrutura da aba Users (Pendentes/Usuarios/Admins unificados)
 - [x] P1 Pre-cadastro de usuarios (email + membership + auto-link no 1º login)
+
+## EPIC-15 - Hardening de Auth UX + resiliencia de sessao (WEB/API)
+- [x] P0 Card 01 - Evitar logout agressivo em erro transitório de token
+  Problema: a sessão pode cair por erro transitório (rede, timeout, corrida de requests), mesmo sem expiração real do login.
+  Critérios de aceite:
+  - Falhas transitórias de `acquireTokenSilent` usam retry/backoff e nao limpam sessão imediatamente.
+  - Apenas `InteractionRequiredAuthError` dispara fluxo interativo.
+  - Usuario nao é redirecionado para `/login` em falha transitória recuperável.
+
+- [x] P0 Card 02 - Reset de auth não-destrutivo
+  Problema: reset amplo de storage pode apagar dados de UX e causar sensação de travamento/reload total.
+  Critérios de aceite:
+  - Reset remove apenas estado de autenticação (MSAL e chaves correlatas), sem `localStorage.clear()` global.
+  - IndexedDB é limpo somente para namespaces de auth.
+  - Tema/preferencias/outros estados do app permanecem intactos após reset de auth.
+
+- [x] P0 Card 03 - Boot não-bloqueante no startup
+  Problema: inicialização síncrona de auth pode congelar a entrada da aplicação e piorar tempo de primeira tela.
+  Critérios de aceite:
+  - App monta sem aguardar init completa de auth.
+  - Warm-up de auth roda em background com timeout controlado.
+  - Em lentidão de IdP/rede, a UI segue responsiva.
+
+- [x] P0 Card 04 - Mutex/serialização de aquisição de token
+  Problema: requests concorrentes de token geram corrida, erros de interação e comportamentos inconsistentes.
+  Critérios de aceite:
+  - Aquisição de token é serializada por mutex/single-flight.
+  - Requests paralelos reutilizam resultado em voo quando aplicável.
+  - Nao ocorre explosão de chamadas simultâneas ao MSAL em navegação com múltiplos requests.
+
+- [x] P1 Card 05 - Retry/backoff para `/users/me` e chamadas sensíveis
+  Problema: falhas momentâneas de rede geram estado falso de pending/sessão expirada.
+  Critérios de aceite:
+  - `/users/me` usa retry com backoff e jitter para erros retryable.
+  - Falha temporária preserva ultimo estado conhecido quando possível.
+  - Apenas 401/403 invalidam identidade de forma imediata.
+
+- [x] P1 Card 06 - Recuperação após background/suspensão de aba
+  Problema: após longo tempo em segundo plano, browsers podem descartar contexto e quebrar chamadas de auth.
+  Critérios de aceite:
+  - Eventos `visibilitychange`, `focus`, `pageshow` e `online` disparam recuperação silenciosa.
+  - Recuperação tem throttle para evitar tempestade de chamadas.
+  - Usuario volta para aba com sessão funcional sem precisar refresh manual.
+
+- [x] P1 Card 07 - Retry inteligente após 401 no HTTP client
+  Problema: 401 transitório no backend força logout direto sem tentativa de refresh token.
+  Critérios de aceite:
+  - Interceptor tenta 1 retry com `forceRefresh` antes de resetar auth.
+  - Requisição original é repetida uma vez com novo token.
+  - Se retry falhar, fallback para reset + navegação para login permanece funcionando.
+
+- [x] P1 Card 08 - Mensagens UX corretas em Pending/Callback
+  Problema: erro transitório pode ser exibido como “sessão expirada”, confundindo usuário e suporte.
+  Critérios de aceite:
+  - Pending diferencia “sem autorização” de “instabilidade temporária”.
+  - Callback trata falha de init sem loop de erro.
+  - Mensagens orientam usuário sem instruir limpeza manual de cache.
+
+- [x] P1 Card 09 - Compatibilidade de issuer no backend conforme host configurado
+  Problema: validação de issuer fixa em `login.microsoftonline.com` pode rejeitar tokens válidos em hosts autorizados.
+  Critérios de aceite:
+  - Validação de issuer usa `ENTRA_AUTHORITY_HOST` configurado.
+  - Tokens válidos no host configurado passam sem regressão de segurança.
+  - Tokens com issuer fora do host permitido continuam sendo rejeitados.
+
+- [x] P2 Card 10 - Política anti-stale para rotas de auth no Static Web App
+  Problema: HTML stale em borda/cache pode exigir refresh manual e quebrar callback/login.
+  Critérios de aceite:
+  - Rotas de entrada SPA (`/`, `/login`, `/auth/callback`, `/pending`, `/app`, `/admin`) retornam `Cache-Control: no-store`.
+  - Assets estáticos mantêm estratégia normal de cache via exclusões do fallback.
+  - Fluxo de login/callback funciona após deploy sem ação manual do usuário.

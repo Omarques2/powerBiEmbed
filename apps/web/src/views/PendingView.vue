@@ -59,6 +59,11 @@ type MeResponse = {
   memberships?: any[];
 };
 
+type FetchMeResult =
+  | { kind: "ok"; me: MeResponse | null }
+  | { kind: "unauthorized"; me: null }
+  | { kind: "transient"; me: null };
+
 const router = useRouter();
 
 const checking = ref(false);
@@ -67,10 +72,10 @@ const currentStatus = ref<MeResponse["status"] | null>(null);
 
 let timer: number | null = null;
 
-async function fetchMe(): Promise<MeResponse | null> {
+async function fetchMe(): Promise<FetchMeResult> {
   try {
     const res = await http.get("/users/me");
-    return unwrapData(res.data as ApiEnvelope<MeResponse>);
+    return { kind: "ok", me: unwrapData(res.data as ApiEnvelope<MeResponse>) };
   } catch (e: any) {
     const status = e?.response?.status;
 
@@ -82,19 +87,29 @@ async function fetchMe(): Promise<MeResponse | null> {
       } else {
         await logout();
       }
-      return null;
+      return { kind: "unauthorized", me: null };
     }
 
-    return null;
+    return { kind: "transient", me: null };
   }
 }
 
 async function checkNow() {
   checking.value = true;
   try {
-    const me = await fetchMe();
-    if (!me) {
+    const result = await fetchMe();
+    if (result.kind === "unauthorized") {
       statusMessage.value = "Sessão expirada. Redirecionando para login...";
+      return;
+    }
+    if (result.kind === "transient") {
+      statusMessage.value = "Instabilidade temporária de rede. Vamos tentar novamente automaticamente.";
+      return;
+    }
+
+    const me = result.me;
+    if (!me) {
+      statusMessage.value = "Aguardando confirmação de acesso.";
       return;
     }
     const st = me?.status;

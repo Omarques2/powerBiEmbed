@@ -170,9 +170,8 @@ onMounted(async () => {
     return;
   }
 
-  try {
-    await initAuthSafe();
-  } catch {
+  const initialized = await initAuthSafe();
+  if (!initialized) {
     await hardResetAuthState();
   }
   const acc = getActiveAccount();
