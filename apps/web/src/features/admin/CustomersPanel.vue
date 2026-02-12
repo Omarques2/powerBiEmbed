@@ -56,7 +56,11 @@
     />
 
     <!-- MODAL: customer hub -->
-    <div v-if="modalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
+    <div
+      v-if="modalOpen"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4"
+      @click.self="closeModal"
+    >
       <div
         class="max-h-[92vh] w-full max-w-6xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-900"
       >
@@ -706,7 +710,11 @@
     </div>
 
     <!-- MODAL: group editor -->
-    <div v-if="groupModalOpen" class="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 p-4">
+    <div
+      v-if="groupModalOpen"
+      class="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 p-4"
+      @click.self="closeGroupModal"
+    >
       <div class="w-full max-w-lg rounded-2xl border border-border bg-card p-4 shadow-xl">
         <div class="flex items-start justify-between gap-3">
           <div class="min-w-0">
@@ -780,7 +788,11 @@
     </div>
 
     <!-- MODAL: preview -->
-    <div v-if="previewOpen" class="fixed inset-0 z-[70] flex items-center justify-center bg-black/30 p-4">
+    <div
+      v-if="previewOpen"
+      class="fixed inset-0 z-[70] flex items-center justify-center bg-black/30 p-4"
+      @click.self="closePreview"
+    >
       <div class="w-full max-w-5xl rounded-2xl border border-border bg-card p-4 shadow-xl">
         <div class="flex items-start justify-between gap-3">
           <div class="min-w-0">

@@ -10,7 +10,11 @@
       @refresh="refresh"
     />
 
-    <div v-if="targetModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
+    <div
+      v-if="targetModalOpen"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4"
+      @click.self="closeTargetModal"
+    >
       <div
         class="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-4 shadow-xl
                dark:border-slate-800 dark:bg-slate-900"
@@ -145,7 +149,11 @@
       </div>
     </div>
 
-    <div v-if="ruleModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
+    <div
+      v-if="ruleModalOpen"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4"
+      @click.self="closeRuleModal"
+    >
       <div
         class="w-full max-w-3xl rounded-2xl border border-slate-200 bg-white p-4 shadow-xl
                dark:border-slate-800 dark:bg-slate-900"
@@ -718,7 +726,11 @@
     </PanelCard>
 
     <!-- MODAL guide -->
-    <div v-if="guideModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+    <div
+      v-if="guideModalOpen"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      @click.self="closeGuide"
+    >
       <div class="flex max-h-[92vh] w-full max-w-5xl flex-col rounded-2xl border border-slate-200 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-900">
         <div class="flex items-start justify-between gap-3 border-b border-slate-200 p-4 dark:border-slate-800">
           <div class="min-w-0">

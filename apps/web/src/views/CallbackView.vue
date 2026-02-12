@@ -3,6 +3,7 @@
     <div
       v-if="showNonAdminModal"
       class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-6"
+      @click.self="showNonAdminModal = false"
     >
       <div class="w-full max-w-md rounded-3xl border border-border/60 bg-card p-6 shadow-xl">
         <h2 class="text-lg font-semibold">Permissão de administrador necessária</h2>

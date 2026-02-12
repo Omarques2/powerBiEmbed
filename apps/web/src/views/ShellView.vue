@@ -440,10 +440,20 @@ import * as pbi from "powerbi-client";
 import ThemeToggle from "@/ui/theme/ThemeToggle.vue";
 import { Button as UiButton, Sheet as UiSheet } from "@/components/ui";
 import { useToast } from "@/ui/toast/useToast";
+import { useConfirm } from "@/ui/confirm/useConfirm";
 import PillToggle from "@/ui/toggles/PillToggle.vue";
 
 import { http } from "@/api/http";
 import { unwrapData, type ApiEnvelope } from "@/api/envelope";
+import {
+  MODEL_REFRESH_TIMEOUT_MS,
+  type ModelRefreshTracker,
+  isModelRefreshExpired,
+  isModelRefreshFailureStatus,
+  isModelRefreshSuccessStatus,
+  loadModelRefreshTracker,
+  saveModelRefreshTracker,
+} from "@/views/modelRefresh";
 import { logout } from "../auth/auth";
 import HamburgerIcon from "../components/icons/HamburgerIcon.vue";
 import SidebarContent from "../components/SidebarContent.vue";
@@ -471,6 +481,7 @@ type MeResponse = {
 
 const router = useRouter();
 const { push, remove } = useToast();
+const { confirm } = useConfirm();
 
 const me = ref<MeResponse | null>(null);
 const isAdmin = ref(false);
@@ -491,7 +502,6 @@ const selectedReport = ref<Report | null>(null);
 const loadingWorkspaces = ref(false);
 const loadingReports = ref(false);
 const loadingEmbed = ref(false);
-const refreshingModel = ref(false);
 const listError = ref("");
 const embedError = ref("");
 const embedErrorLocked = ref(false);
@@ -512,6 +522,15 @@ const reportReady = ref(false);
 const lastRenderAt = ref(0);
 
 const exportModalOpen = ref(false);
+const modelRefreshTracker = ref<ModelRefreshTracker | null>(null);
+const refreshingModel = computed(() => {
+  const tracker = modelRefreshTracker.value;
+  if (!tracker || !selectedReport.value || !selectedWorkspaceId.value) return false;
+  return (
+    tracker.workspaceId === selectedWorkspaceId.value &&
+    tracker.reportId === selectedReport.value.id
+  );
+});
 
 
 
@@ -601,12 +620,11 @@ let embeddedReport: pbi.Report | null = null;
 let guardRedirecting = false;
 const pendingPageName = ref<string | null>(null);
 let refreshPollTimer: number | null = null;
+const refreshPollInFlight = ref(false);
 let tokenRefreshTimer: number | null = null;
 const tokenRefreshInFlight = ref(false);
 const embedTokenExpiresAt = ref<number | null>(null);
-let refreshPollAttempts = 0;
-const REFRESH_POLL_INTERVAL = 6000;
-const REFRESH_POLL_MAX_ATTEMPTS = 30;
+const REFRESH_POLL_INTERVAL = 60_000;
 
 function createPowerBiService() {
   return new pbi.service.Service(
@@ -1153,7 +1171,190 @@ function stopRefreshPolling() {
     window.clearInterval(refreshPollTimer);
     refreshPollTimer = null;
   }
-  refreshPollAttempts = 0;
+  refreshPollInFlight.value = false;
+}
+
+function saveRefreshTrackerCache(): void {
+  if (typeof window === "undefined") return;
+  try {
+    saveModelRefreshTracker(window.localStorage, modelRefreshTracker.value);
+  } catch {
+    // best effort only
+  }
+}
+
+function setRefreshTracker(next: ModelRefreshTracker | null): void {
+  modelRefreshTracker.value = next;
+  saveRefreshTrackerCache();
+}
+
+function isCurrentReportTarget(target: ModelRefreshTracker): boolean {
+  return (
+    selectedReport.value?.id === target.reportId &&
+    selectedWorkspaceId.value === target.workspaceId
+  );
+}
+
+function startRefreshPolling(): void {
+  if (!modelRefreshTracker.value) return;
+  stopRefreshPolling();
+  refreshPollTimer = window.setInterval(() => {
+    void pollRefreshStatus();
+  }, REFRESH_POLL_INTERVAL);
+}
+
+async function reloadCurrentReportKeepingView(): Promise<void> {
+  const currentReport = selectedReport.value;
+  if (!currentReport) return;
+
+  if (!embeddedReport) {
+    await openReport(currentReport);
+    return;
+  }
+
+  const report = embeddedReport as any;
+  let bookmarkState: string | undefined;
+  let reportFilters: unknown[] | null = null;
+  let currentPageName = activePageName.value ?? null;
+
+  try {
+    if (report?.bookmarksManager?.capture) {
+      const bookmark = await report.bookmarksManager.capture();
+      bookmarkState = bookmark?.state;
+    }
+  } catch {
+    bookmarkState = undefined;
+  }
+
+  try {
+    if (!currentPageName && report?.getActivePage) {
+      const activePage = await report.getActivePage();
+      currentPageName = activePage?.name ?? null;
+    }
+  } catch {
+    currentPageName = activePageName.value ?? null;
+  }
+
+  try {
+    if (report?.getFilters) {
+      reportFilters = await report.getFilters();
+    }
+  } catch {
+    reportFilters = null;
+  }
+
+  const reloadFn = report?.reload;
+  if (typeof reloadFn === "function") {
+    try {
+      await withTimeout(reloadFn.call(report), 20_000);
+      await waitForReportRender(12_000);
+    } catch {
+      await openReport(currentReport);
+      return;
+    }
+
+    try {
+      if (bookmarkState && report?.bookmarksManager?.applyState) {
+        await withTimeout(report.bookmarksManager.applyState(bookmarkState), 5_000);
+      } else {
+        if (Array.isArray(reportFilters) && report?.setFilters) {
+          await withTimeout(report.setFilters(reportFilters), 5_000);
+        }
+        if (currentPageName) {
+          await setReportPage(currentPageName);
+        }
+      }
+    } catch {
+      // best effort only
+    }
+    return;
+  }
+
+  await openReport(currentReport);
+}
+
+async function pollRefreshStatus(): Promise<void> {
+  const tracker = modelRefreshTracker.value;
+  if (!tracker || refreshPollInFlight.value) return;
+
+  if (isModelRefreshExpired(tracker, Date.now(), MODEL_REFRESH_TIMEOUT_MS)) {
+    stopRefreshPolling();
+    setRefreshTracker(null);
+    push({
+      kind: "error",
+      title: "Falha na atualização",
+      message: "Não foi possível confirmar a atualização em até 15 minutos.",
+      timeoutMs: 8000,
+    });
+    return;
+  }
+
+  refreshPollInFlight.value = true;
+  try {
+    const statusRes = await http.get("/powerbi/refresh/status", {
+      params: {
+        workspaceId: tracker.workspaceId,
+        reportId: tracker.reportId,
+      },
+    });
+    const payload = unwrapData(
+      statusRes.data as ApiEnvelope<{ status?: string }>,
+    );
+    const statusText = (payload?.status ?? "unknown").toString().trim();
+    const normalized = statusText.toLowerCase();
+
+    if (isModelRefreshSuccessStatus(normalized)) {
+      stopRefreshPolling();
+      setRefreshTracker(null);
+      if (isCurrentReportTarget(tracker)) {
+        await reloadCurrentReportKeepingView();
+      }
+      push({
+        kind: "success",
+        title: "Modelo atualizado",
+        message: "A atualização do modelo semântico foi concluída.",
+        timeoutMs: 5000,
+      });
+      return;
+    }
+
+    if (isModelRefreshFailureStatus(normalized)) {
+      stopRefreshPolling();
+      setRefreshTracker(null);
+      push({
+        kind: "error",
+        title: "Falha na atualização",
+        message: "O Power BI informou falha ao atualizar o modelo.",
+        timeoutMs: 8000,
+      });
+      return;
+    }
+
+    setRefreshTracker({
+      ...tracker,
+      lastStatus: statusText,
+    });
+  } catch {
+    // mantém polling até timeout (15 min), sem interromper em falha transitória.
+  } finally {
+    refreshPollInFlight.value = false;
+  }
+}
+
+function restoreRefreshTrackerFromCache(): void {
+  if (typeof window === "undefined") return;
+  try {
+    const restored = loadModelRefreshTracker(window.localStorage, Date.now());
+    if (!restored) {
+      setRefreshTracker(null);
+      return;
+    }
+
+    setRefreshTracker(restored);
+    startRefreshPolling();
+  } catch {
+    setRefreshTracker(null);
+  }
 }
 
 function stopTokenRefreshTimer() {
@@ -1186,7 +1387,6 @@ async function refreshEmbedToken(reason = "manual") {
       params: { workspaceId: selectedWorkspaceId.value, reportId: selectedReport.value.id },
     });
     const cfg = unwrapData(cfgRes.data as ApiEnvelope<EmbedConfigResponse>);
-    scheduleTokenRefresh(cfg.expiresOn);
     scheduleTokenRefresh(cfg.expiresOn);
     if (embeddedReport?.setAccessToken) {
       await embeddedReport.setAccessToken(cfg.embedToken);
@@ -1431,88 +1631,44 @@ function onPagesWheel(e: WheelEvent) {
 
 async function refreshModel() {
   if (!selectedReport.value || !selectedWorkspaceId.value) return;
-  if (refreshingModel.value) return;
-  refreshingModel.value = true;
-  stopRefreshPolling();
+  if (refreshingModel.value || refreshPollInFlight.value) return;
+
+  const approved = await confirm({
+    title: "Atualizar modelo semântico?",
+    message:
+      "Essa ação dispara uma atualização completa do dataset do relatório atual. A conclusão pode levar vários minutos. Deseja continuar?",
+    confirmText: "Iniciar atualização",
+    cancelText: "Cancelar",
+    danger: true,
+  });
+  if (!approved) return;
+
+  const targetWorkspaceId = selectedWorkspaceId.value;
+  const targetReportId = selectedReport.value.id;
   try {
     const res = await http.post("/powerbi/refresh", {
-      workspaceId: selectedWorkspaceId.value,
-      reportId: selectedReport.value.id,
+      workspaceId: targetWorkspaceId,
+      reportId: targetReportId,
     });
     unwrapData(res.data as ApiEnvelope<{ ok: boolean }>);
+
+    setRefreshTracker({
+      workspaceId: targetWorkspaceId,
+      reportId: targetReportId,
+      startedAt: Date.now(),
+      lastStatus: "queued",
+    });
+    startRefreshPolling();
+
     push({
       kind: "info",
       title: "Atualização iniciada",
       message: "Vamos avisar quando o modelo terminar de atualizar.",
       timeoutMs: 4000,
     });
-
-    refreshPollTimer = window.setInterval(async () => {
-      if (!selectedReport.value || !selectedWorkspaceId.value) {
-        stopRefreshPolling();
-        refreshingModel.value = false;
-        return;
-      }
-
-      refreshPollAttempts += 1;
-      try {
-        const statusRes = await http.get("/powerbi/refresh/status", {
-          params: {
-            workspaceId: selectedWorkspaceId.value,
-            reportId: selectedReport.value.id,
-          },
-        });
-        const payload = unwrapData(
-          statusRes.data as ApiEnvelope<{ status?: string }>,
-        );
-        const statusText = (payload?.status ?? "unknown").toString().toLowerCase();
-
-        if (["completed", "succeeded"].some((s) => statusText.includes(s))) {
-          stopRefreshPolling();
-          refreshingModel.value = false;
-          push({
-            kind: "success",
-            title: "Modelo atualizado",
-            message: "A atualização do modelo semântico foi concluída.",
-            timeoutMs: 5000,
-          });
-          return;
-        }
-
-        if (["failed", "error", "cancelled"].some((s) => statusText.includes(s))) {
-          stopRefreshPolling();
-          refreshingModel.value = false;
-          push({
-            kind: "error",
-            title: "Falha na atualização",
-            message: "O Power BI informou falha ao atualizar o modelo.",
-            timeoutMs: 8000,
-          });
-          return;
-        }
-
-        if (refreshPollAttempts >= REFRESH_POLL_MAX_ATTEMPTS) {
-          stopRefreshPolling();
-          refreshingModel.value = false;
-          push({
-            kind: "info",
-            title: "Atualização em andamento",
-            message: "A atualização ainda está em progresso. Verifique novamente em instantes.",
-            timeoutMs: 6000,
-          });
-        }
-      } catch {
-        stopRefreshPolling();
-        refreshingModel.value = false;
-        push({
-          kind: "error",
-          title: "Falha ao verificar status",
-          message: "Não foi possível confirmar o status do refresh.",
-          timeoutMs: 6000,
-        });
-      }
-    }, REFRESH_POLL_INTERVAL);
   } catch (e: any) {
+    stopRefreshPolling();
+    setRefreshTracker(null);
     const message = await extractErrorMessage(e);
     push({
       kind: "error",
@@ -1520,9 +1676,6 @@ async function refreshModel() {
       message,
       timeoutMs: 8000,
     });
-    refreshingModel.value = false;
-  } finally {
-    // polling handles the final state
   }
 }
 
@@ -1566,6 +1719,7 @@ onMounted(async () => {
     return;
   }
 
+  restoreRefreshTrackerFromCache();
   await loadWorkspaces();
 });
 

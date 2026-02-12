@@ -42,7 +42,11 @@
   </PanelCard>
 
   <!-- Activate modal -->
-  <div v-if="activateModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+  <div
+    v-if="activateModalOpen"
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+    @click.self="closeActivateModal"
+  >
     <div class="w-full max-w-md rounded-2xl border border-border bg-card p-5 shadow-xl">
       <div class="flex items-start justify-between gap-3">
         <div>
@@ -116,7 +120,11 @@
   </div>
 
   <!-- Pre-register modal -->
-  <div v-if="preRegisterModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+  <div
+    v-if="preRegisterModalOpen"
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+    @click.self="closePreRegisterModal"
+  >
     <div class="w-full max-w-md rounded-2xl border border-border bg-card p-5 shadow-xl">
       <div class="flex items-start justify-between gap-3">
         <div>
@@ -200,7 +208,11 @@
   </div>
 
   <!-- User modal -->
-  <div v-if="userModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+  <div
+    v-if="userModalOpen"
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+    @click.self="closeUserModal"
+  >
     <div class="max-h-[92vh] w-full max-w-5xl overflow-hidden rounded-2xl border border-border bg-card shadow-xl">
       <div class="flex items-start justify-between gap-3 border-b border-border p-4">
         <div class="min-w-0">
@@ -521,7 +533,11 @@
   </div>
 
   <!-- User preview modal -->
-  <div v-if="userPreviewOpen" class="fixed inset-0 z-[55] flex items-center justify-center bg-black/40 p-4">
+  <div
+    v-if="userPreviewOpen"
+    class="fixed inset-0 z-[55] flex items-center justify-center bg-black/40 p-4"
+    @click.self="closeUserPreview"
+  >
     <div class="w-full max-w-5xl rounded-2xl border border-border bg-card p-4 shadow-xl">
       <div class="flex items-start justify-between gap-3">
         <div class="min-w-0">
@@ -628,7 +644,11 @@
   </div>
 
   <!-- Membership modal -->
-  <div v-if="membershipModalOpen" class="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4">
+  <div
+    v-if="membershipModalOpen"
+    class="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4"
+    @click.self="closeMembershipModal"
+  >
     <div class="max-h-[90vh] w-full max-w-4xl overflow-auto rounded-2xl border border-border bg-card p-4 shadow-xl">
       <div class="flex items-start justify-between gap-3">
         <div>
@@ -642,7 +662,7 @@
           variant="outline"
           size="sm"
           class="h-8 px-3 text-xs"
-          @click="membershipModalOpen = false"
+          @click="closeMembershipModal"
         >
           Fechar
         </UiButton>
@@ -1073,6 +1093,10 @@ function closeUserPreview() {
   userPreviewOpen.value = false;
   userPreviewReportRefId.value = "";
   resetUserPreview();
+}
+
+function closeMembershipModal() {
+  membershipModalOpen.value = false;
 }
 
 async function loadUserPreview() {

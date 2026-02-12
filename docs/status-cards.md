@@ -158,3 +158,20 @@ Legenda:
   - Rotas de entrada SPA (`/`, `/login`, `/auth/callback`, `/pending`, `/app`, `/admin`) retornam `Cache-Control: no-store`.
   - Assets estáticos mantêm estratégia normal de cache via exclusões do fallback.
   - Fluxo de login/callback funciona após deploy sem ação manual do usuário.
+
+- [x] P1 Card 11 - UX resiliente para "Atualizar modelo" com confirmação e recuperação
+  Problema: o usuário não tem clareza sobre impacto/tempo do refresh e o monitoramento pode se perder em reload/suspensão da aba.
+  Critérios de aceite:
+  - Ação "Atualizar modelo" exige confirmação modal com aviso de impacto e duração.
+  - Após confirmar, exibe apenas toast curto de início e monitora status por polling de 1 minuto.
+  - Monitoramento persiste em storage e é retomado automaticamente após recarregar a página.
+  - Status indefinido por até 15 minutos expira com erro controlado e limpeza de estado.
+  - No sucesso, o relatório é recarregado preservando contexto visual (página/filtros) quando possível.
+  - Ícone de atualização gira somente no relatório/workspace alvo do refresh.
+
+- [x] P2 Card 12 - Padrão global de fechamento de modal por clique fora
+  Problema: modais inconsistentes sem fechamento por backdrop causam sensação de travamento e pioram a UX.
+  Critérios de aceite:
+  - Todos os modais com overlay nas telas de administração e callback aceitam fechamento via clique fora (`@click.self`).
+  - Fechamento por backdrop reutiliza a mesma rotina de fechamento dos botões de "Fechar/Cancelar".
+  - Não há regressão em fluxos de confirmação/salvamento ao fechar modal pelo backdrop.
