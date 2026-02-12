@@ -7,6 +7,7 @@ import { AdminPlatformAdminsService } from './domains/admin-platform-admins.serv
 import { AdminUserLifecycleService } from './domains/admin-user-lifecycle.service';
 import { AdminOverviewService } from './domains/admin-overview.service';
 import { AdminSearchService } from './domains/admin-search.service';
+import { AdminMetricsService } from './domains/admin-metrics.service';
 import type { MembershipRole } from '@prisma/client';
 
 @Injectable()
@@ -20,6 +21,7 @@ export class AdminUsersService {
     private readonly platformAdmins: AdminPlatformAdminsService,
     private readonly overview: AdminOverviewService,
     private readonly search: AdminSearchService,
+    private readonly metrics: AdminMetricsService,
   ) {}
 
   listPending() {
@@ -296,5 +298,16 @@ export class AdminUsersService {
 
   globalSearch(input: { q: string; limit: number }) {
     return this.search.globalSearch(input);
+  }
+
+  getAccessMetrics(input: {
+    window?: '1h' | '6h' | '24h' | '7d' | '30d';
+    bucket?: 'hour' | 'day';
+    from?: string;
+    to?: string;
+    timezone?: string;
+    topLimit?: number;
+  }) {
+    return this.metrics.getAccessMetrics(input);
   }
 }

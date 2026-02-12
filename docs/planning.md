@@ -526,6 +526,69 @@ Aceite:
 - Reducao de tamanho/complexidade nas telas principais.
 Status: concluido.
 
+### EPIC-16: Métricas de acesso no Admin Panel (WEB/API)
+Card P1 - API | Instrumentar eventos de login para analytics
+Contexto: `lastLoginAt` é sobrescrito e não fornece histórico por horário.
+Objetivo: registrar `AUTH_LOGIN_SUCCEEDED` em `audit_log` com deduplicação temporal.
+Aceite:
+- Evento de login persistido com metadados mínimos.
+- Sem spam de eventos em chamadas repetidas.
+
+Card P1 - API | Endpoint agregado de métricas de acesso
+Contexto: falta endpoint único para alimentar dashboard operacional.
+Objetivo: expor `/admin/metrics/access` com KPIs, séries e ranking.
+Aceite:
+- Retorna KPIs, `loginsByBucket` e top usuários.
+- Suporta filtros de janela, bucket e timezone.
+- Guard de admin aplicado.
+
+Card P1 - WEB | Nova aba Metrics no Admin
+Contexto: overview atual não mostra evolução temporal de uso.
+Objetivo: adicionar aba com cards, gráfico de logins por horário e tabela de ranking.
+Aceite:
+- Estados loading/empty/error.
+- Filtros de janela/timezone funcionais.
+- Sem regressão de navegação entre abas.
+
+Card P2 - API | Hardening/performance das consultas de métricas
+Objetivo: manter latência estável com crescimento de `audit_log`.
+Aceite:
+- Índice para `action + created_at`.
+- Limites de consulta e cache curto.
+
+Card P2 - QA | Cobertura E2E + web para métricas
+Objetivo: evitar regressão no backend e no painel.
+Aceite:
+- E2E de autorização/contrato/edge cases.
+- Testes web de renderização e filtros.
+
+Card P1 - API/WEB | Métricas de acesso por customer
+Contexto: sem visão por customer, operações não identificam rapidamente contas com maior/menor adoção.
+Objetivo: expor e renderizar ranking por customer com acessos, usuários únicos e último acesso.
+Aceite:
+- `breakdowns.byCustomer` disponível no endpoint de métricas.
+- Tabela no Admin com customer + volume + usuários + último acesso.
+- Respeita filtros de janela/bucket/timezone.
+
+Card P1 - API/WEB | Métricas de acesso por relatório
+Contexto: sem visão por relatório, produto não consegue priorizar evolução dos conteúdos mais usados.
+Objetivo: expor e renderizar ranking por relatório + série temporal de visualizações.
+Aceite:
+- `breakdowns.byReport` disponível no endpoint de métricas.
+- Série `reportViewsByBucket` disponível no endpoint e exibida na UI.
+- Tabela no Admin com relatório/workspace + acessos + usuários/customers únicos.
+
+Card P1 - API | Instrumentação robusta de embed para analytics de acesso
+Contexto: métricas por customer/relatório dependem de evento confiável no fluxo real de abertura do relatório.
+Objetivo: registrar `REPORT_EMBED_VIEWED` no `GET /powerbi/embed-config` com deduplicação temporal.
+Aceite:
+- Evento contém `user`, `customer`, `report`, `workspace`.
+- Reentradas imediatas não geram spam (dedupe curto).
+- Falha de auditoria não quebra o fluxo de embed.
+
+Referência:
+- Plano detalhado: `docs/plans/2026-02-12-admin-access-metrics.md`
+
 Card P2 — WEB | Extrair componentes de UI reutilizaveis  
 Contexto: padroes repetidos (cards/listas/toggles/modais).  
 Objetivo: criar componentes base reutilizaveis.  
@@ -560,6 +623,7 @@ Fase 3 (concluida): EPIC-03 P1 (casing/migracao/reset).
 Fase 4 (concluida): EPIC-04 P0 + EPIC-05 (Shadcn rebuild e ajustes UX).  
 Fase 5 (concluida): EPIC-06 P1 (CI PR -> CD main com gates).  
 Fase 6 (concluida): EPIC-07 P2 + EPIC-08 P2 (testes e modularizacao).  
+Fase 7 (concluida): EPIC-16 (métricas de acesso no Admin Panel).  
 Proximas fases: novos cards de UX/operacao conforme backlog atualizado.
 
 ## Checklist de readiness de producao

@@ -42,6 +42,13 @@
           </div>
 
           <!-- ========================= -->
+          <!-- TAB: METRICS -->
+          <!-- ========================= -->
+          <div v-else-if="tab === 'metrics'">
+            <AccessMetricsPanel ref="metricsPanelRef" />
+          </div>
+
+          <!-- ========================= -->
           <!-- TAB: CUSTOMERS -->
           <!-- ========================= -->
           <div v-else-if="tab === 'customers'">
@@ -99,6 +106,7 @@ import AdminTopBar from "@/features/admin/components/AdminTopBar.vue";
 import AuditTab from "@/features/admin/tabs/AuditTab.vue";
 import OverviewPanel from "@/features/admin/OverviewPanel.vue";
 import UsersPanel from "@/features/admin/UsersPanel.vue";
+import AccessMetricsPanel from "@/features/admin/AccessMetricsPanel.vue";
 
 import {
   type CustomerRow,
@@ -121,6 +129,7 @@ const { push } = useToast();
 // ------------------------------------
 const sidebarItems: Array<{ key: AdminTabKey; label: string }> = [
   { key: "overview", label: "Overview" },
+  { key: "metrics", label: "Metrics" },
   { key: "customers", label: "Customers" },
   { key: "users", label: "Users" },
   { key: "rls", label: "RLS" },
@@ -156,6 +165,7 @@ function upsertCustomerLocal(row: CustomerRow) {
 const title = computed(() => {
   switch (tab.value) {
     case "overview": return "Overview";
+    case "metrics": return "Metrics";
     case "customers": return "Customers";
     case "users": return "Usuários";
     case "rls": return "RLS";
@@ -176,6 +186,7 @@ function goBack() {
 const error = ref("");
 const rlsPanelRef = ref<{ refresh: () => Promise<void> | void } | null>(null);
 const usersPanelRef = ref<{ refresh: () => Promise<void> | void } | null>(null);
+const metricsPanelRef = ref<{ refresh: () => Promise<void> | void } | null>(null);
 
 // ---------- CUSTOMERS ----------
 const loadingCustomers = ref(false);
@@ -273,6 +284,7 @@ const loadingAny = computed(() =>
 async function reloadCurrentTab() {
   error.value = "";
   if (tab.value === "customers") return loadCustomers();
+  if (tab.value === "metrics") return metricsPanelRef.value?.refresh?.();
   if (tab.value === "rls") return rlsPanelRef.value?.refresh?.();
   if (tab.value === "users") return usersPanelRef.value?.refresh?.();
   if (tab.value === "audit") return loadAudit(auditPaged.value.page || 1);

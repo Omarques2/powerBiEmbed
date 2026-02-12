@@ -10,6 +10,7 @@ import { PowerBiCatalogSyncService } from './powerbi-catalog-sync.service';
 import { PowerBiBootstrapSyncService } from './powerbi-bootstrap-sync.service';
 import { PowerBiPagesService } from './powerbi-pages.service';
 import { PowerBiSyncJobController } from './powerbi-sync-job.controller';
+import { PowerBiAccessAuditService } from './powerbi-access-audit.service';
 
 @Module({
   imports: [AuthModule, UsersModule, BiAuthzModule],
@@ -24,6 +25,7 @@ import { PowerBiSyncJobController } from './powerbi-sync-job.controller';
     PowerBiCatalogSyncService,
     PowerBiPagesService,
     PowerBiBootstrapSyncService,
+    PowerBiAccessAuditService,
   ],
   exports: [PowerBiService],
 })

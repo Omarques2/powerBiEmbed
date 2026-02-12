@@ -73,6 +73,7 @@ import {
 
 export type AdminTabKey =
   | "overview"
+  | "metrics"
   | "customers"
   | "users"
   | "audit"

@@ -67,6 +67,11 @@ describe('Full API (e2e)', () => {
         email: seed.disableUser.email ?? undefined,
         name: 'Disable User',
       },
+      metrics: {
+        sub: `test-metrics-${seed.runId}`,
+        email: `metrics-${seed.runId}@example.com`,
+        name: 'Metrics User',
+      },
     });
   });
 
@@ -115,6 +120,76 @@ describe('Full API (e2e)', () => {
       .set('x-test-user', 'admin');
     expect(res.status).toBe(200);
     expect(res.body.data.status).toBe('active');
+  });
+
+  it('records login audit event with temporal dedupe', async () => {
+    const first = await request(app.getHttpServer())
+      .get('/users/me')
+      .set('x-test-user', 'metrics');
+    expect(first.status).toBe(200);
+
+    const user = await prisma.user.findUnique({
+      where: { entraSub: `test-metrics-${seed.runId}` },
+      select: { id: true },
+    });
+    expect(user?.id).toBeTruthy();
+
+    const beforeCount = await prisma.auditLog.count({
+      where: {
+        action: 'AUTH_LOGIN_SUCCEEDED',
+        actorUserId: user!.id,
+      },
+    });
+
+    const second = await request(app.getHttpServer())
+      .get('/users/me')
+      .set('x-test-user', 'metrics');
+    expect(second.status).toBe(200);
+
+    const afterCount = await prisma.auditLog.count({
+      where: {
+        action: 'AUTH_LOGIN_SUCCEEDED',
+        actorUserId: user!.id,
+      },
+    });
+
+    expect(beforeCount).toBeGreaterThan(0);
+    expect(afterCount).toBe(beforeCount);
+  });
+
+  it('records report embed viewed event with temporal dedupe', async () => {
+    const first = await request(app.getHttpServer())
+      .get('/powerbi/embed-config')
+      .set('x-test-user', 'active')
+      .query({ workspaceId: seed.workspaceId, reportId: seed.reportId });
+    expect(first.status).toBe(200);
+
+    const beforeCount = await prisma.auditLog.count({
+      where: {
+        action: 'REPORT_EMBED_VIEWED',
+        actorUserId: seed.activeUser.id,
+        entityType: 'BI_REPORT',
+        entityId: seed.report.id,
+      },
+    });
+
+    const second = await request(app.getHttpServer())
+      .get('/powerbi/embed-config')
+      .set('x-test-user', 'active')
+      .query({ workspaceId: seed.workspaceId, reportId: seed.reportId });
+    expect(second.status).toBe(200);
+
+    const afterCount = await prisma.auditLog.count({
+      where: {
+        action: 'REPORT_EMBED_VIEWED',
+        actorUserId: seed.activeUser.id,
+        entityType: 'BI_REPORT',
+        entityId: seed.report.id,
+      },
+    });
+
+    expect(beforeCount).toBeGreaterThan(0);
+    expect(afterCount).toBe(beforeCount);
   });
 
   it('serves admin basics (me, customers, pending)', async () => {
@@ -321,7 +396,7 @@ describe('Full API (e2e)', () => {
     expect(reportPerm.body.data.ok).toBe(true);
   });
 
-  it('serves overview, audit, and search', async () => {
+  it('serves overview, audit, metrics, and search', async () => {
     const overview = await request(app.getHttpServer())
       .get('/admin/overview')
       .set('x-test-user', 'admin');
@@ -335,12 +410,55 @@ describe('Full API (e2e)', () => {
     expect(audit.status).toBe(200);
     expect(audit.body.meta.page).toBe(1);
 
+    const metrics = await request(app.getHttpServer())
+      .get('/admin/metrics/access')
+      .set('x-test-user', 'admin')
+      .query({ window: '24h', bucket: 'hour', timezone: 'America/Sao_Paulo' });
+    expect(metrics.status).toBe(200);
+    expect(metrics.body.data.kpis).toBeTruthy();
+    expect(metrics.body.data.series?.loginsByBucket).toBeTruthy();
+    expect(metrics.body.data.series?.reportViewsByBucket).toBeTruthy();
+    expect(metrics.body.data.kpis?.reportViewsWindow).toBeGreaterThanOrEqual(0);
+    expect(metrics.body.data.kpis?.uniqueCustomersWindow).toBeGreaterThanOrEqual(
+      0,
+    );
+    expect(metrics.body.data.kpis?.uniqueReportsWindow).toBeGreaterThanOrEqual(
+      0,
+    );
+    expect(Array.isArray(metrics.body.data.topUsers)).toBe(true);
+    expect(Array.isArray(metrics.body.data.breakdowns?.byCustomer)).toBe(true);
+    expect(Array.isArray(metrics.body.data.breakdowns?.byReport)).toBe(true);
+    expect(
+      metrics.body.data.breakdowns.byReport.some(
+        (row: any) => row.reportRefId === seed.report.id,
+      ),
+    ).toBe(true);
+
     const search = await request(app.getHttpServer())
       .get('/admin/search')
       .set('x-test-user', 'admin')
       .query({ q: seed.activeUser.email, limit: 5 });
     expect(search.status).toBe(200);
     expect(search.body.data.users.length).toBeGreaterThan(0);
+  });
+
+  it('guards and validates metrics endpoint', async () => {
+    const forbidden = await request(app.getHttpServer())
+      .get('/admin/metrics/access')
+      .set('x-test-user', 'active');
+    expect(forbidden.status).toBe(403);
+
+    const invalidRange = await request(app.getHttpServer())
+      .get('/admin/metrics/access')
+      .set('x-test-user', 'admin')
+      .query({ from: new Date().toISOString() });
+    expect(invalidRange.status).toBe(400);
+
+    const invalidTimezone = await request(app.getHttpServer())
+      .get('/admin/metrics/access')
+      .set('x-test-user', 'admin')
+      .query({ timezone: 'America/Invalid' });
+    expect(invalidTimezone.status).toBe(400);
   });
 
   it('handles platform admin list/grant/revoke', async () => {

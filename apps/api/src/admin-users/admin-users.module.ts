@@ -13,6 +13,7 @@ import { UsersModule } from '../users/users.module';
 // NOVOS
 import { AdminOverviewController } from './admin-overview.controller';
 import { AdminSearchController } from './admin-search.controller';
+import { AdminMetricsController } from './admin-metrics.controller';
 import { AdminActorService } from './domains/admin-actor.service';
 import { AdminAuditService } from './domains/admin-audit.service';
 import { AdminCustomersService } from './domains/admin-customers.service';
@@ -22,6 +23,7 @@ import { AdminPlatformAdminsService } from './domains/admin-platform-admins.serv
 import { AdminUserLifecycleService } from './domains/admin-user-lifecycle.service';
 import { AdminOverviewService } from './domains/admin-overview.service';
 import { AdminSearchService } from './domains/admin-search.service';
+import { AdminMetricsService } from './domains/admin-metrics.service';
 import { AuditRepository } from './repositories/audit.repository';
 import { CustomerRepository } from './repositories/customer.repository';
 import { MembershipRepository } from './repositories/membership.repository';
@@ -43,6 +45,7 @@ import { UserRepository } from './repositories/user.repository';
     // NOVOS
     AdminOverviewController,
     AdminSearchController,
+    AdminMetricsController,
   ],
   providers: [
     AdminUsersService,
@@ -55,6 +58,7 @@ import { UserRepository } from './repositories/user.repository';
     AdminUserLifecycleService,
     AdminOverviewService,
     AdminSearchService,
+    AdminMetricsService,
     AuditRepository,
     CustomerRepository,
     MembershipRepository,

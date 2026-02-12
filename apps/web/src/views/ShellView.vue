@@ -454,6 +454,10 @@ import {
   loadModelRefreshTracker,
   saveModelRefreshTracker,
 } from "@/views/modelRefresh";
+import {
+  recoverVisualAfterTokenRefresh,
+  shouldRecoverVisualAfterTokenRefresh,
+} from "@/views/tokenRefreshRecovery";
 import { logout } from "../auth/auth";
 import HamburgerIcon from "../components/icons/HamburgerIcon.vue";
 import SidebarContent from "../components/SidebarContent.vue";
@@ -1392,12 +1396,16 @@ async function refreshEmbedToken(reason = "manual") {
       await embeddedReport.setAccessToken(cfg.embedToken);
       embedError.value = "";
       embedErrorLocked.value = false;
-      if (reason === "token-expired") {
+      await recoverVisualAfterTokenRefresh(reason, async () => {
+        if (!selectedReport.value || !selectedWorkspaceId.value) return;
+        await reloadCurrentReportKeepingView();
+      });
+      if (shouldRecoverVisualAfterTokenRefresh(reason)) {
         push({
           kind: "info",
           title: "Token renovado",
-          message: "Atualizamos o token do Power BI automaticamente.",
-          timeoutMs: 3000,
+          message: "Atualizamos o token e recuperamos o visual automaticamente.",
+          timeoutMs: 3500,
         });
       }
       return;

@@ -1,6 +1,16 @@
 import { Injectable } from '@nestjs/common';
+import type { User } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import type { Claims } from '../auth/claims.type';
+
+const LOGIN_AUDIT_ACTION = 'AUTH_LOGIN_SUCCEEDED';
+const LOGIN_AUDIT_DEDUPE_WINDOW_MS = 15 * 60 * 1000;
+
+type LoginAuditContext = {
+  ip?: string | null;
+  userAgent?: string | null;
+  source?: string | null;
+};
 
 @Injectable()
 export class UsersService {
@@ -18,12 +28,13 @@ export class UsersService {
     return typeof raw === 'string' && raw.trim().length > 0 ? raw : null;
   }
 
-  async upsertFromClaims(claims: Claims) {
+  async upsertFromClaims(claims: Claims, context?: LoginAuditContext) {
     const entraSub = claims.sub;
     const entraOid = claims.oid ?? null;
 
     const email = this.pickEmail(claims); // mantenha sua logica atual
     const displayName = claims.name ?? null;
+    let user: User | null = null;
 
     if (email) {
       const existingBySub = await this.prisma.user.findUnique({
@@ -38,7 +49,7 @@ export class UsersService {
         });
 
         if (existingByEmail?.entraSub?.startsWith('pre_')) {
-          return this.prisma.user.update({
+          user = await this.prisma.user.update({
             where: { id: existingByEmail.id },
             data: {
               entraSub: entraSub,
@@ -48,11 +59,13 @@ export class UsersService {
               lastLoginAt: new Date(),
             },
           });
+          await this.registerLoginAuditEventIfNeeded(user.id, claims, context);
+          return user;
         }
       }
     }
 
-    return this.prisma.user.upsert({
+    user = await this.prisma.user.upsert({
       where: { entraSub: entraSub },
       create: {
         entraSub: entraSub,
@@ -70,6 +83,51 @@ export class UsersService {
         // nao mexe em status aqui
       },
     });
+
+    await this.registerLoginAuditEventIfNeeded(user.id, claims, context);
+    return user;
+  }
+
+  private async registerLoginAuditEventIfNeeded(
+    userId: string,
+    claims: Claims,
+    context?: LoginAuditContext,
+  ): Promise<void> {
+    const dedupeSince = new Date(Date.now() - LOGIN_AUDIT_DEDUPE_WINDOW_MS);
+
+    try {
+      const recent = await this.prisma.auditLog.findFirst({
+        where: {
+          action: LOGIN_AUDIT_ACTION,
+          actorUserId: userId,
+          createdAt: { gte: dedupeSince },
+        },
+        select: { id: true },
+      });
+      if (recent) return;
+
+      await this.prisma.auditLog.create({
+        data: {
+          actorUserId: userId,
+          action: LOGIN_AUDIT_ACTION,
+          entityType: 'USER',
+          entityId: userId,
+          ip: context?.ip ?? undefined,
+          userAgent: context?.userAgent ?? undefined,
+          afterData: {
+            source: context?.source ?? 'users/me',
+            authProvider: 'entra',
+            claims: {
+              sub: claims.sub ?? null,
+              oid: claims.oid ?? null,
+              email: claims.email ?? claims.preferred_username ?? null,
+            },
+          },
+        },
+      });
+    } catch {
+      // best effort only: analytics event must not block auth flow.
+    }
   }
 
   async listActiveMemberships(userId: string) {

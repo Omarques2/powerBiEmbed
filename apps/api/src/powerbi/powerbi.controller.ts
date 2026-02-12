@@ -20,6 +20,7 @@ import { UsersService } from '../users/users.service';
 import { BiAuthzService } from '../bi-authz/bi-authz.service';
 import type { AuthedRequest } from '../auth/authed-request.type';
 import { ActiveUserGuard } from '../auth/active-user.guard';
+import { PowerBiAccessAuditService } from './powerbi-access-audit.service';
 import {
   EmbedConfigQueryDto,
   ExportReportDto,
@@ -34,7 +35,27 @@ export class PowerBiController {
     private readonly svc: PowerBiService,
     private readonly usersService: UsersService,
     private readonly biAuthz: BiAuthzService,
+    private readonly accessAudit: PowerBiAccessAuditService,
   ) {}
+
+  private pickIp(req: AuthedRequest): string | null {
+    const forwarded = req.headers?.['x-forwarded-for'];
+    if (Array.isArray(forwarded) && forwarded.length) {
+      return String(forwarded[0] ?? '').split(',')[0]?.trim() || null;
+    }
+    if (typeof forwarded === 'string' && forwarded.trim().length) {
+      return forwarded.split(',')[0]?.trim() || null;
+    }
+    return req.ip ? String(req.ip) : null;
+  }
+
+  private pickUserAgent(req: AuthedRequest): string | null {
+    const userAgent = req.headers?.['user-agent'];
+    if (Array.isArray(userAgent) && userAgent.length) {
+      return String(userAgent[0] ?? null);
+    }
+    return typeof userAgent === 'string' ? userAgent : null;
+  }
 
   @UseGuards(AuthGuard, ActiveUserGuard)
   @Get('workspaces')
@@ -84,6 +105,16 @@ export class PowerBiController {
       query.workspaceId,
       query.reportId,
     );
+    await this.accessAudit.registerReportEmbedViewed({
+      userId: user.id,
+      workspaceId: query.workspaceId,
+      reportId: query.reportId,
+      reportRefId: access.reportRefId,
+      customerId: access.customerId,
+      datasetId: access.datasetId,
+      ip: this.pickIp(req),
+      userAgent: this.pickUserAgent(req),
+    });
     const customerId = access.customerId;
     const username = user.id;
     return this.svc.getEmbedConfig(query.workspaceId, query.reportId, {

@@ -175,3 +175,78 @@ Legenda:
   - Todos os modais com overlay nas telas de administração e callback aceitam fechamento via clique fora (`@click.self`).
   - Fechamento por backdrop reutiliza a mesma rotina de fechamento dos botões de "Fechar/Cancelar".
   - Não há regressão em fluxos de confirmação/salvamento ao fechar modal pelo backdrop.
+
+- [x] P1 Card 13 - Recuperação visual após renovação de token expirado no embed
+  Problema: quando o token do embed expira durante uso prolongado, o token é renovado mas o visual pode permanecer em erro até interação manual do usuário.
+  Critérios de aceite:
+  - Em evento de token expirado, após `setAccessToken` o app executa recuperação automática do visual (reload/render best-effort).
+  - A recuperação não exige clique em filtro nem refresh manual da página.
+  - Falha na recuperação visual não derruba o fluxo de renovação de token.
+  - Mensagem de UX informa que token e visual foram recuperados automaticamente.
+
+## EPIC-16 - Métricas de acesso no Admin Panel (WEB/API)
+- [x] P1 Card 01 - Instrumentar eventos de login para analytics
+  Problema: hoje não existe histórico de logins por horário confiável para montar série temporal no Admin.
+  Critérios de aceite:
+  - Logins bem-sucedidos geram evento `AUTH_LOGIN_SUCCEEDED` em `audit_log`.
+  - Há deduplicação temporal por usuário para evitar spam de eventos.
+  - Evento inclui metadados mínimos úteis (usuário, horário, contexto).
+
+- [x] P1 Card 02 - Endpoint agregado de métricas de acesso (`/admin/metrics/access`)
+  Problema: o Admin não tem endpoint único para KPIs e séries de acesso.
+  Critérios de aceite:
+  - Endpoint retorna KPIs, série temporal por bucket e top usuários por acesso.
+  - Suporta filtros de janela/período e timezone.
+  - Bloqueado por `AuthGuard + PlatformAdminGuard`.
+
+- [x] P1 Card 03 - Aba "Metrics" no Admin com gráfico e ranking
+  Problema: faltam visualizações operacionais para acompanhar uso real da aplicação.
+  Critérios de aceite:
+  - Nova aba no Admin exibe cards de KPI, gráfico de logins por horário e tabela de top usuários.
+  - Estados `loading`, `empty` e `error` estão implementados.
+  - Atualização manual funciona sem quebrar navegação entre abas.
+
+- [x] P1 Card 04 - Filtros de análise (janela, bucket, timezone)
+  Problema: sem filtros, o painel perde utilidade para investigação operacional.
+  Critérios de aceite:
+  - Usuário pode alternar janela (`1h`, `6h`, `24h`, `7d`, `30d`) e bucket (`hour`/`day`).
+  - Timezone é aplicado no backend para agregação e rótulos do gráfico.
+  - Buckets sem evento retornam `0` (sem quebrar linha do gráfico).
+
+- [x] P2 Card 05 - Performance e hardening de consultas de métricas
+  Problema: consultas agregadas em `audit_log` podem ficar pesadas em produção.
+  Critérios de aceite:
+  - Índice apropriado em `audit_log` para `action + created_at`.
+  - Limites de período e paginação aplicados no endpoint.
+  - Cache curto de agregação (30-60s) para reduzir carga em refresh frequente.
+
+- [x] P2 Card 06 - Cobertura de testes e validação operacional
+  Problema: sem cobertura, há risco de regressão silenciosa no painel e no backend de métricas.
+  Critérios de aceite:
+  - E2E cobre autorização, payload, intervalos inválidos e buckets vazios.
+  - Testes web cobrem renderização e mudança de filtros.
+  - Build/test passam com checklist manual do fluxo de métricas.
+
+- [x] P1 Card 07 - Métricas de acesso por customer
+  Problema: sem visão por customer, fica difícil entender quais contas realmente estão usando a plataforma.
+  Critérios de aceite:
+  - Endpoint retorna ranking `breakdowns.byCustomer` com volume de acessos, usuários únicos e último acesso.
+  - Painel Admin exibe tabela de acesso por customer com estados `loading/empty/error`.
+  - Agregação respeita janela, bucket e timezone selecionados.
+
+- [x] P1 Card 08 - Métricas de acesso por relatório
+  Problema: sem visão por relatório, o time não identifica quais conteúdos geram mais valor ou têm baixa adoção.
+  Critérios de aceite:
+  - Endpoint retorna ranking `breakdowns.byReport` com acessos, usuários únicos e customers únicos.
+  - Painel Admin exibe tabela de acesso por relatório e série temporal de views por bucket.
+  - Dados incluem contexto do workspace para facilitar investigação operacional.
+
+- [x] P1 Card 09 - Instrumentação robusta de visualização de relatório (embed)
+  Problema: métricas por customer/relatório exigem evento confiável de visualização no fluxo real de uso.
+  Critérios de aceite:
+  - `GET /powerbi/embed-config` registra evento `REPORT_EMBED_VIEWED` com contexto mínimo (user, customer, report/workspace).
+  - Deduplicação temporal evita spam de eventos em reentradas imediatas do mesmo relatório.
+  - Falha de auditoria não interrompe o fluxo de embed (best effort).
+
+Referência de implementação:
+- `docs/plans/2026-02-12-admin-access-metrics.md`

@@ -9,6 +9,7 @@ import { UsersService } from '../users/users.service';
 import { BiAuthzService } from '../bi-authz/bi-authz.service';
 import { AuthGuard } from '../auth/auth.guard';
 import { ActiveUserGuard } from '../auth/active-user.guard';
+import { PowerBiAccessAuditService } from './powerbi-access-audit.service';
 
 describe('PowerBiController', () => {
   let controller: any;
@@ -39,6 +40,12 @@ describe('PowerBiController', () => {
             listAllowedPages: jest.fn(),
             resolveReportAccess: jest.fn(),
             resolveAllowedPagesForAccess: jest.fn(),
+          },
+        },
+        {
+          provide: PowerBiAccessAuditService,
+          useValue: {
+            registerReportEmbedViewed: jest.fn(),
           },
         },
       ],
