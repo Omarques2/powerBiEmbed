@@ -206,6 +206,7 @@
                   </UiButton>
 
                   <UiButton
+                    v-if="isAdmin"
                     variant="outline"
                     size="sm"
                     class="h-9 w-9"
