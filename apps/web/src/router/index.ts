@@ -1,7 +1,9 @@
 import { createRouter, createWebHistory } from "vue-router";
-import { getActiveAccount, initAuthSafe } from "../auth/auth";
+import { authClient } from "../auth/sigfarm-auth";
 import { getMeCached } from "../auth/me";
+import { createAuthNavigationGuard } from "./auth-guard";
 import { resetRouteLoading, startRouteLoading, stopRouteLoading } from "../ui/loading/routeLoading";
+import { http } from "../api/http";
 
 import LoginView from "../views/LoginView.vue";
 import CallbackView from "../views/CallbackView.vue";
@@ -19,15 +21,36 @@ const router = createRouter({
     { path: "/", redirect: "/app" },
 
     { path: "/app", component: ShellView, meta: { requiresAuth: true, requiresActive: true } },
-    { path: "/admin", component: AdminView, meta: { requiresAuth: true, requiresActive: true, requiresAdmin: true } },
+    {
+      path: "/admin",
+      component: AdminView,
+      meta: { requiresAuth: true, requiresActive: true, requiresAdmin: true },
+    },
   ],
 });
 
 const AUTH_ROUTES = new Set(["/login", "/auth/callback", "/pending"]);
 
-function isAuthRoute(path: string) {
+function isAuthRoute(path: string): boolean {
   return AUTH_ROUTES.has(path);
 }
+
+const authNavigationGuard = createAuthNavigationGuard({
+  ensureSession: () => authClient.ensureSession(),
+  exchangeSession: () => authClient.exchangeSession(),
+  getMeCached,
+  checkAdminAccess: async () => {
+    try {
+      await http.get("/admin/me");
+      return "allowed" as const;
+    } catch (error: any) {
+      const status = error?.response?.status;
+      if (status === 401) return "unauthorized" as const;
+      if (status === 403) return "forbidden" as const;
+      return "error" as const;
+    }
+  },
+});
 
 router.beforeEach(async (to, from) => {
   const isAuthTarget = isAuthRoute(to.path);
@@ -45,47 +68,7 @@ router.beforeEach(async (to, from) => {
     resetRouteLoading();
   }
 
-  // Se já estiver logado e tentar ir pra /login, redireciona
-  if (to.path === "/login") {
-    await initAuthSafe(2_500);
-    const acc = getActiveAccount();
-    if (!acc) return true;
-
-    const me = await getMeCached(false);
-    if (!me) return "/pending"; // garante criação via /users/me
-    return me.status === "active" ? "/app" : "/pending";
-  }
-
-  // Rotas públicas seguem normalmente
-  if (!to.meta.requiresAuth) return true;
-
-  const initialized = await initAuthSafe(4_000);
-  if (!initialized) return "/login";
-  const acc = getActiveAccount();
-
-  // Precisa estar logado no MSAL
-  if (!acc) return "/login";
-
-  // Se rota exige active, valida /users/me
-  if (to.meta.requiresActive) {
-    const me = await getMeCached(false);
-    if (!me) return "/pending";
-    if (me.status !== "active") return "/pending";
-  }
-
-  // Admin check
-  if (to.meta.requiresAdmin) {
-    try {
-      await (await import("../api/http")).http.get("/admin/me");
-    } catch (e: any) {
-      const code = e?.response?.status;
-      if (code === 401) return "/login";
-      if (code === 403) return "/app";
-      return "/app";
-    }
-  }
-
-  return true;
+  return authNavigationGuard(to);
 });
 
 router.afterEach(() => {
@@ -95,6 +78,5 @@ router.afterEach(() => {
 router.onError(() => {
   resetRouteLoading();
 });
-
 
 export default router;

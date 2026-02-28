@@ -2,7 +2,7 @@ import { createApp } from "vue";
 import App from "./App.vue";
 import router from "./router";
 import "./assets/main.css";
-import { initAuthSafe, startAuthLifecycleRecovery } from "./auth/auth";
+import { initAuthSafe } from "./auth/auth";
 
 function bootstrap() {
   const isCallbackRoute =
@@ -11,8 +11,6 @@ function bootstrap() {
   const app = createApp(App);
   app.use(router);
   app.mount("#app");
-
-  startAuthLifecycleRecovery();
 
   // Warm-up assíncrono: não bloqueia primeiro paint.
   if (!isCallbackRoute) {

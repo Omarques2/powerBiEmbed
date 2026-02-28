@@ -1,72 +1,12 @@
+import { AuthApiError } from "@sigfarm/auth-client-vue";
 import {
-  PublicClientApplication,
-  type AccountInfo,
-  type AuthenticationResult,
-  InteractionRequiredAuthError,
-} from "@azure/msal-browser";
-import { isTransientMsalError, runWithRetryBackoff } from "./resilience";
-
-const clientId = import.meta.env.VITE_ENTRA_SPA_CLIENT_ID as string;
-const authority = import.meta.env.VITE_ENTRA_AUTHORITY as string;
-
-const envRedirectUri = import.meta.env.VITE_ENTRA_REDIRECT_URI as string | undefined;
-const envPostLogoutRedirectUri = import.meta.env.VITE_ENTRA_POST_LOGOUT_REDIRECT_URI as string | undefined;
-
-const apiScope = import.meta.env.VITE_ENTRA_API_SCOPE as string;
-
-// Opcional (somente CIAM/B2C/custom domains)
-const knownAuthority = (import.meta.env.VITE_ENTRA_KNOWN_AUTHORITY as string | undefined) ?? undefined;
-
-if (!clientId) throw new Error("Missing VITE_ENTRA_SPA_CLIENT_ID");
-if (!authority) throw new Error("Missing VITE_ENTRA_AUTHORITY");
-const redirectUri = resolveRedirectUri();
-const postLogoutRedirectUri = resolvePostLogoutRedirectUri();
-
-function resolveRedirectUri(): string {
-  if (typeof window !== "undefined" && window.location?.origin) {
-    return `${window.location.origin}/auth/callback`;
-  }
-  if (envRedirectUri) return envRedirectUri;
-  throw new Error("Missing redirectUri (window origin unavailable)");
-}
-
-function resolvePostLogoutRedirectUri(): string {
-  if (typeof window !== "undefined" && window.location?.origin) {
-    return `${window.location.origin}/`;
-  }
-  if (envPostLogoutRedirectUri) return envPostLogoutRedirectUri;
-  throw new Error("Missing postLogoutRedirectUri (window origin unavailable)");
-}
-if (!apiScope) throw new Error("Missing VITE_ENTRA_API_SCOPE");
-
-const isCiamLike =
-  authority.includes(".ciamlogin.com/") ||
-  authority.includes(".b2clogin.com/");
-
-export const msal = new PublicClientApplication({
-  auth: {
-    clientId,
-    authority,
-    redirectUri,
-    postLogoutRedirectUri,
-    navigateToLoginRequestUrl: false,
-    ...(isCiamLike && knownAuthority ? { knownAuthorities: [knownAuthority] } : {}),
-  },
-  cache: {
-    cacheLocation: "localStorage",
-    // Safari/Edge costumam perder estado sem cookie fallback.
-    storeAuthStateInCookie: true,
-  },
-});
-
-let initPromise: Promise<void> | null = null;
-let resetInProgress = false;
-let tokenGate: Promise<void> = Promise.resolve();
-let tokenInFlight: Promise<string> | null = null;
-let lifecycleStarted = false;
-let lifecycleTimer: number | null = null;
-let recoveryInFlight: Promise<void> | null = null;
-let lastRecoveryAt = 0;
+  authClient,
+  buildAuthCallbackReturnTo,
+  buildAuthPortalLoginUrl,
+  resolveReturnTo,
+  sigfarmAuthApiBaseUrl,
+} from "./sigfarm-auth";
+import { clearMeCache } from "./me";
 
 type AcquireApiTokenOptions = {
   forceRefresh?: boolean;
@@ -74,325 +14,191 @@ type AcquireApiTokenOptions = {
   reason?: string;
 };
 
-function isInteractiveAllowed(options?: AcquireApiTokenOptions): boolean {
-  return options?.interactive !== false;
-}
+const TOKEN_BOOTSTRAP_ATTEMPTS = 3;
+const TOKEN_BOOTSTRAP_DELAY_MS = 350;
 
-function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
-  let timer: number | null = null;
-  const timeout = new Promise<T>((_, reject) => {
-    timer = window.setTimeout(() => {
-      reject(new Error(`${label} timed out after ${ms}ms`));
-    }, ms);
-  });
-  return Promise.race([promise, timeout]).finally(() => {
-    if (timer) window.clearTimeout(timer);
-  });
-}
-
-/**
- * Inicializa MSAL + processa redirect exatamente 1x (robusto para produção).
- */
-export function initAuthOnce(): Promise<void> {
-  if (!initPromise) initPromise = initAuth();
-  return initPromise;
-}
-
-export async function initAuth(): Promise<void> {
+export async function initAuthSafe(_timeoutMs = 4_000): Promise<boolean> {
   try {
-    await msal.initialize();
-
-    const result = await msal.handleRedirectPromise();
-    if (result?.account) {
-      msal.setActiveAccount(result.account);
-      return;
-    }
-
-    // Restaura conta se já existir no cache
-    const accounts = msal.getAllAccounts();
-    msal.setActiveAccount(accounts[0] ?? null);
-  } catch (err) {
-    await hardResetAuthState();
-    throw err;
-  }
-}
-
-export function getActiveAccount(): AccountInfo | null {
-  return msal.getActiveAccount() ?? null;
-}
-
-export async function login(): Promise<void> {
-  await msal.loginRedirect({
-    scopes: ["openid", "profile", "email", apiScope],
-    prompt: "select_account",
-  });
-}
-
-export async function logout(): Promise<void> {
-  await msal.logoutRedirect();
-}
-
-function shouldClearAuthStorageKey(key: string): boolean {
-  const normalized = key.trim().toLowerCase();
-  if (!normalized) return false;
-  if (normalized.includes("msal")) return true;
-  if (normalized.includes(clientId.toLowerCase())) return true;
-  return false;
-}
-
-function clearStorageScope(storage: Storage): void {
-  const keys: string[] = [];
-  for (let i = 0; i < storage.length; i += 1) {
-    const key = storage.key(i);
-    if (key) keys.push(key);
-  }
-  for (const key of keys) {
-    if (shouldClearAuthStorageKey(key)) {
-      storage.removeItem(key);
-    }
-  }
-}
-
-async function clearIndexedDbSafely(): Promise<void> {
-  if (typeof window === "undefined" || !("indexedDB" in window)) return;
-  try {
-    const dbs = await (indexedDB as any).databases?.();
-    if (!Array.isArray(dbs)) return;
-    await Promise.all(
-      dbs
-        .map((db: any) => db?.name)
-        .filter((name: string | undefined) =>
-          Boolean(name && name.toLowerCase().includes("msal")),
-        )
-        .map(
-          (name: string) =>
-            new Promise<void>((resolve) => {
-              const req = indexedDB.deleteDatabase(name);
-              req.onsuccess = () => resolve();
-              req.onerror = () => resolve();
-              req.onblocked = () => resolve();
-            }),
-        ),
-    );
+    const session = await authClient.ensureSession();
+    return Boolean(session);
   } catch {
-    // best effort only
-  }
-}
-
-export async function hardResetAuthState(): Promise<void> {
-  if (resetInProgress) return;
-  resetInProgress = true;
-  try {
-    msal.setActiveAccount(null);
-    const cache = msal.getTokenCache() as unknown as {
-      removeAccount?: (account: AccountInfo) => Promise<void> | void;
-    };
-    const accounts = msal.getAllAccounts();
-    await Promise.all(
-      accounts.map(async (account) => {
-        try {
-          await cache.removeAccount?.(account);
-        } catch {
-          // best effort only
-        }
-      }),
-    );
-  } catch {
-    // best effort only
-  }
-  try {
-    const anyMsal = msal as unknown as { clearCache?: () => Promise<void> | void };
-    await anyMsal.clearCache?.();
-  } catch {
-    // best effort only
-  }
-  try {
-    clearStorageScope(localStorage);
-    clearStorageScope(sessionStorage);
-  } catch {
-    // best effort only
-  }
-  await clearIndexedDbSafely();
-  initPromise = null;
-  tokenInFlight = null;
-  resetInProgress = false;
-}
-
-export async function initAuthSafe(timeoutMs = 4_000): Promise<boolean> {
-  if (typeof window === "undefined") return true;
-  try {
-    await withTimeout(initAuthOnce(), timeoutMs, "MSAL init");
-    return true;
-  } catch {
-    initPromise = null;
-    await hardResetAuthState();
+    authClient.clearSession();
+    clearMeCache();
     return false;
   }
 }
 
-export function getAdminConsentUrl(tenantHint?: string): string {
-  const tenant = tenantHint?.trim() || "common";
-  const apiClientId =
-    apiScope.startsWith("api://") ? apiScope.split("/")[2] : undefined;
-  const params = new URLSearchParams({
-    client_id: apiClientId || clientId,
-    redirect_uri: redirectUri,
-  });
-  return `https://login.microsoftonline.com/${tenant}/adminconsent?${params.toString()}`;
-}
+export async function login(returnTo?: string): Promise<void> {
+  const safeReturnTo = resolveReturnTo(returnTo);
+  const callbackReturnTo = buildAuthCallbackReturnTo(safeReturnTo);
+  const loginUrl = buildAuthPortalLoginUrl(callbackReturnTo);
 
-async function withTokenGate<T>(operation: () => Promise<T>): Promise<T> {
-  const previous = tokenGate;
-  let releaseGate!: () => void;
-  tokenGate = new Promise<void>((resolve) => {
-    releaseGate = resolve;
-  });
-
-  await previous;
-  try {
-    return await operation();
-  } finally {
-    releaseGate();
+  if (typeof window !== "undefined") {
+    window.location.assign(loginUrl);
   }
 }
 
-async function acquireApiTokenInternal(
-  options: AcquireApiTokenOptions = {},
-): Promise<string> {
-  await initAuthOnce();
+export async function logout(): Promise<void> {
+  await Promise.allSettled([
+    revokeSigfarmSessionBestEffort(),
+    signOutBetterAuthSessionBestEffort(),
+  ]);
 
-  let account = getActiveAccount();
-  if (!account) {
-    const accounts = msal.getAllAccounts();
-    if (accounts.length) {
-      msal.setActiveAccount(accounts[0] ?? null);
-      account = msal.getActiveAccount() ?? null;
-    }
-  }
+  authClient.clearSession();
+  clearMeCache();
 
-  if (!account) {
-    if (!isInteractiveAllowed(options)) {
-      throw new Error("No active account available.");
-    }
-    await login();
-    throw new Error("No active account (redirecting to login).");
+  if (typeof window !== "undefined") {
+    window.location.assign("/login");
   }
+}
 
-  try {
-    const res: AuthenticationResult = await runWithRetryBackoff(
-      async () =>
-        msal.acquireTokenSilent({
-          account,
-          scopes: [apiScope],
-          forceRefresh: options.forceRefresh === true,
-        }),
-      {
-        attempts: 3,
-        baseDelayMs: 200,
-        maxDelayMs: 1_500,
-        jitterMs: 100,
-        shouldRetry: (error) =>
-          !(error instanceof InteractionRequiredAuthError) &&
-          isTransientMsalError(error),
-      },
-    );
-    return res.accessToken;
-  } catch (err) {
-    if (err instanceof InteractionRequiredAuthError) {
-      if (!isInteractiveAllowed(options)) throw err;
-      await msal.acquireTokenRedirect({
-        scopes: [apiScope],
-        prompt: "select_account",
-      });
-      throw new Error("Interaction required (redirecting).");
-    }
-    throw err;
-  }
+export async function hardResetAuthState(): Promise<void> {
+  authClient.clearSession();
+  clearMeCache();
 }
 
 export async function acquireApiToken(
   options: AcquireApiTokenOptions = {},
 ): Promise<string> {
-  if (!options.forceRefresh && tokenInFlight) {
-    return tokenInFlight;
-  }
-
-  const run = async () => withTokenGate(() => acquireApiTokenInternal(options));
-
   if (options.forceRefresh) {
-    return run();
-  }
-
-  tokenInFlight = run().finally(() => {
-    tokenInFlight = null;
-  });
-  return tokenInFlight;
-}
-
-async function recoverFromBackground(reason: string): Promise<void> {
-  const now = Date.now();
-  if (now - lastRecoveryAt < 15_000) return;
-  lastRecoveryAt = now;
-
-  if (recoveryInFlight) {
-    return recoveryInFlight;
-  }
-
-  recoveryInFlight = (async () => {
-    const initialized = await initAuthSafe(3_500);
-    if (!initialized) return;
-
-    if (!getActiveAccount()) return;
-
     try {
-      await acquireApiToken({
-        interactive: false,
-        reason,
-      });
-    } catch {
-      // best effort only: evita logout agressivo em retomada.
-    }
-  })().finally(() => {
-    recoveryInFlight = null;
-  });
+      await authClient.refreshSession();
+    } catch (error) {
+      if (isUnauthorizedAuthError(error)) {
+        throw buildNoActiveSessionError(options.reason);
+      }
 
-  return recoveryInFlight;
+      try {
+        await authClient.exchangeSession();
+      } catch (exchangeError) {
+        if (isUnauthorizedAuthError(exchangeError)) {
+          throw buildNoActiveSessionError(options.reason);
+        }
+        throw exchangeError;
+      }
+    }
+  }
+
+  let token = await authClient.getAccessToken();
+  if (token) return token;
+
+  for (let attempt = 1; attempt <= TOKEN_BOOTSTRAP_ATTEMPTS; attempt += 1) {
+    try {
+      await authClient.exchangeSession();
+    } catch (error) {
+      if (isUnauthorizedAuthError(error)) {
+        throw buildNoActiveSessionError(options.reason);
+      }
+      // Keep trying: cookie refresh fallback below can still recover the session.
+    }
+
+    token = await authClient.getAccessToken();
+    if (token) return token;
+
+    const refreshResult = await refreshAccessTokenFromCookieSession();
+    if (refreshResult.kind === "ok") return refreshResult.token;
+    if (refreshResult.kind === "unauthorized") {
+      throw buildNoActiveSessionError(options.reason);
+    }
+
+    if (attempt < TOKEN_BOOTSTRAP_ATTEMPTS) {
+      await delay(TOKEN_BOOTSTRAP_DELAY_MS);
+    }
+  }
+
+  throw buildNoActiveSessionError(options.reason);
 }
 
 export function startAuthLifecycleRecovery(): void {
-  if (lifecycleStarted || typeof window === "undefined") return;
-  lifecycleStarted = true;
-
-  const onFocusLikeEvent = () => {
-    if (document.visibilityState !== "visible") return;
-    void recoverFromBackground("focus-like");
-  };
-
-  const onVisibilityChange = () => {
-    if (document.visibilityState === "visible") {
-      void recoverFromBackground("visibilitychange");
-    }
-  };
-
-  window.addEventListener("focus", onFocusLikeEvent);
-  window.addEventListener("pageshow", onFocusLikeEvent);
-  window.addEventListener("online", () => {
-    void recoverFromBackground("online");
-  });
-  document.addEventListener("visibilitychange", onVisibilityChange);
-
-  lifecycleTimer = window.setInterval(() => {
-    if (document.visibilityState === "visible") {
-      void recoverFromBackground("heartbeat");
-    }
-  }, 5 * 60 * 1000);
+  // No-op: refresh lifecycle is handled by authClient.
 }
 
 export function stopAuthLifecycleRecoveryForTests(): void {
-  if (typeof window === "undefined") return;
-  if (lifecycleTimer) {
-    window.clearInterval(lifecycleTimer);
-    lifecycleTimer = null;
+  // No-op kept for compatibility with existing tests.
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    globalThis.setTimeout(resolve, ms);
+  });
+}
+
+type CookieRefreshResult =
+  | { kind: "ok"; token: string }
+  | { kind: "unauthorized" }
+  | { kind: "failed" };
+
+async function refreshAccessTokenFromCookieSession(): Promise<CookieRefreshResult> {
+  try {
+    const endpoint = new URL("/v1/auth/refresh", sigfarmAuthApiBaseUrl).toString();
+    const response = await fetch(endpoint, {
+      method: "POST",
+      credentials: "include",
+      headers: { "content-type": "application/json" },
+      body: "{}",
+    });
+
+    if (response.status === 401) return { kind: "unauthorized" };
+    if (!response.ok) return { kind: "failed" };
+
+    const payload = await response.json().catch(() => null);
+    const accessToken = payload?.data?.accessToken;
+
+    if (typeof accessToken === "string" && accessToken.length > 0) {
+      return { kind: "ok", token: accessToken };
+    }
+
+    return { kind: "failed" };
+  } catch {
+    return { kind: "failed" };
   }
-  lifecycleStarted = false;
+}
+
+function isUnauthorizedAuthError(error: unknown): boolean {
+  if (error instanceof AuthApiError) {
+    return error.status === 401;
+  }
+
+  if (!error || typeof error !== "object") return false;
+  const maybeStatus =
+    (error as { status?: unknown }).status ??
+    (error as { response?: { status?: unknown } }).response?.status;
+  return maybeStatus === 401;
+}
+
+function buildNoActiveSessionError(reason?: string): Error {
+  return new Error(`No active authentication session${reason ? ` (${reason})` : ""}`);
+}
+
+async function revokeSigfarmSessionBestEffort(): Promise<void> {
+  const endpoint = new URL("/v1/auth/logout", sigfarmAuthApiBaseUrl).toString();
+  const token = await authClient.getAccessToken().catch(() => null);
+
+  const headers: Record<string, string> = {
+    "content-type": "application/json",
+  };
+
+  if (token) {
+    headers.authorization = `Bearer ${token}`;
+  }
+
+  await fetch(endpoint, {
+    method: "POST",
+    credentials: "include",
+    headers,
+    body: "{}",
+  }).catch(() => undefined);
+}
+
+async function signOutBetterAuthSessionBestEffort(): Promise<void> {
+  const endpoint = new URL("/api/auth/sign-out", sigfarmAuthApiBaseUrl).toString();
+
+  await fetch(endpoint, {
+    method: "POST",
+    credentials: "include",
+    headers: {
+      "content-type": "application/json",
+    },
+    body: "{}",
+  }).catch(() => undefined);
 }

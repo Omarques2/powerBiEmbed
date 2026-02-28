@@ -13,8 +13,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@azure/msal-browser": "^4.27.0",
-    "axios": "^1.13.2",
+    "@sigfarm/auth-client-vue": "file:../../vendor/sigfarm-auth-platform/dist-packages/sigfarm-auth-client-vue-0.1.0.tgz",
+    "@sigfarm/auth-contracts": "file:../../vendor/sigfarm-auth-platform/dist-packages/sigfarm-auth-contracts-0.1.0.tgz",
+    "axios": "^1.13.6",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-vue-next": "^0.476.0",
@@ -27,12 +28,12 @@
     "vue-router": "^4.6.4"
   },
   "devDependencies": {
-    "@typescript-eslint/eslint-plugin": "^8.34.0",
-    "@typescript-eslint/parser": "^8.34.0",
     "@tailwindcss/vite": "^4.1.18",
     "@types/node": "^24.10.1",
-    "@vue/test-utils": "^2.4.6",
+    "@typescript-eslint/eslint-plugin": "^8.34.0",
+    "@typescript-eslint/parser": "^8.34.0",
     "@vitejs/plugin-vue": "^6.0.1",
+    "@vue/test-utils": "^2.4.6",
     "@vue/tsconfig": "^0.8.1",
     "autoprefixer": "^10.4.23",
     "eslint": "^9.20.1",
@@ -48,8 +49,8 @@
     "tw-animate-css": "^1.2.2",
     "typescript": "~5.9.3",
     "vite": "^7.2.4",
-    "vue-eslint-parser": "^10.2.0",
     "vitest": "^3.2.0",
+    "vue-eslint-parser": "^10.2.0",
     "vue-tsc": "^3.1.4"
   }
 }

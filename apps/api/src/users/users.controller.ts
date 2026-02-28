@@ -10,7 +10,11 @@ export class UsersController {
   private pickIp(req: AuthedRequest): string | null {
     const forwarded = req.headers?.['x-forwarded-for'];
     if (Array.isArray(forwarded) && forwarded.length) {
-      return String(forwarded[0] ?? '').split(',')[0]?.trim() || null;
+      return (
+        String(forwarded[0] ?? '')
+          .split(',')[0]
+          ?.trim() || null
+      );
     }
     if (typeof forwarded === 'string' && forwarded.trim().length) {
       return forwarded.split(',')[0]?.trim() || null;
@@ -43,16 +47,18 @@ export class UsersController {
     const isPlatformAdmin = await this.usersService.isPlatformAdmin(user.id);
 
     const hasCustomer = memberships.length > 0;
+    const globallyDisabled = claims.globalStatus === 'disabled';
 
     // Status efetivo (se disabled, bloqueia sempre)
     const effectiveStatus =
-      user.status === 'disabled'
+      globallyDisabled || user.status === 'disabled'
         ? 'disabled'
         : user.status === 'active' && (hasCustomer || isPlatformAdmin)
           ? 'active'
           : 'pending';
 
     return {
+      identityUserId: user.identityUserId ?? null,
       email: user.email ?? null,
       displayName: user.displayName ?? null,
       status: effectiveStatus,

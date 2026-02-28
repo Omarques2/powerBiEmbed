@@ -795,11 +795,18 @@ export class AdminRlsService {
     actorSub: string | null,
   ): Promise<string | null> {
     if (!actorSub) return null;
-    const actor = await this.prisma.user.findUnique({
+    if (isUuid(actorSub)) {
+      const actorByIdentity = await this.prisma.user.findUnique({
+        where: { identityUserId: actorSub },
+        select: { id: true },
+      });
+      if (actorByIdentity?.id) return actorByIdentity.id;
+    }
+    const actorByLegacySub = await this.prisma.user.findUnique({
       where: { entraSub: actorSub },
       select: { id: true },
     });
-    return actor?.id ?? null;
+    return actorByLegacySub?.id ?? null;
   }
 
   private toTargetDto(row: RlsTarget) {

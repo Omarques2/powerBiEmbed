@@ -1,5 +1,4 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
 import type {
   AdminMetricBucket,
   AdminMetricWindow,
@@ -103,13 +102,13 @@ export class AdminMetricsService {
       reportRows,
       recentRows,
     ] = await Promise.all([
-        prisma.user.count({
-          where: {
-            status: 'active',
-            lastLoginAt: { gte: activeSince },
-          },
-        }),
-        prisma.$queryRaw<CountRow[]>`
+      prisma.user.count({
+        where: {
+          status: 'active',
+          lastLoginAt: { gte: activeSince },
+        },
+      }),
+      prisma.$queryRaw<CountRow[]>`
           SELECT COUNT(DISTINCT a.actor_user_id)::int AS value
           FROM "audit_log" a
           WHERE a.action = ${LOGIN_SUCCESS_ACTION}
@@ -117,21 +116,21 @@ export class AdminMetricsService {
             AND a.created_at < ${resolved.to}
             AND a.actor_user_id IS NOT NULL
         `,
-        prisma.$queryRaw<CountRow[]>`
+      prisma.$queryRaw<CountRow[]>`
           SELECT COUNT(*)::int AS value
           FROM "audit_log" a
           WHERE a.action = ${LOGIN_FAILED_ACTION}
             AND a.created_at >= ${resolved.from}
             AND a.created_at < ${resolved.to}
         `,
-        prisma.$queryRaw<CountRow[]>`
+      prisma.$queryRaw<CountRow[]>`
           SELECT COUNT(DISTINCT NULLIF(a.after_data->>'customerId', ''))::int AS value
           FROM "audit_log" a
           WHERE a.action = ${REPORT_VIEW_ACTION}
             AND a.created_at >= ${resolved.from}
             AND a.created_at < ${resolved.to}
         `,
-        prisma.$queryRaw<CountRow[]>`
+      prisma.$queryRaw<CountRow[]>`
           SELECT COUNT(DISTINCT a.entity_id)::int AS value
           FROM "audit_log" a
           WHERE a.action = ${REPORT_VIEW_ACTION}
@@ -139,9 +138,9 @@ export class AdminMetricsService {
             AND a.created_at < ${resolved.to}
             AND a.entity_id IS NOT NULL
         `,
-        this.querySeriesByAction(prisma, resolved, LOGIN_SUCCESS_ACTION),
-        this.querySeriesByAction(prisma, resolved, REPORT_VIEW_ACTION),
-        prisma.$queryRaw<TopUserRow[]>`
+      this.querySeriesByAction(prisma, resolved, LOGIN_SUCCESS_ACTION),
+      this.querySeriesByAction(prisma, resolved, REPORT_VIEW_ACTION),
+      prisma.$queryRaw<TopUserRow[]>`
           SELECT
             a.actor_user_id AS user_id,
             u.email AS email,
@@ -158,7 +157,7 @@ export class AdminMetricsService {
           ORDER BY login_count DESC, last_login_at DESC
           LIMIT ${resolved.topLimit}
         `,
-        prisma.$queryRaw<TopCustomerRow[]>`
+      prisma.$queryRaw<TopCustomerRow[]>`
           SELECT
             NULLIF(a.after_data->>'customerId', '') AS customer_id,
             c.code AS customer_code,
@@ -184,7 +183,7 @@ export class AdminMetricsService {
           ORDER BY access_count DESC, last_access_at DESC
           LIMIT ${resolved.topLimit}
         `,
-        prisma.$queryRaw<TopReportRow[]>`
+      prisma.$queryRaw<TopReportRow[]>`
           SELECT
             a.entity_id AS report_ref_id,
             r.report_id AS report_id,
@@ -211,38 +210,38 @@ export class AdminMetricsService {
           ORDER BY access_count DESC, last_access_at DESC
           LIMIT ${resolved.topLimit}
         `,
-        prisma.auditLog.findMany({
-          where: {
-            action: {
-              in: [LOGIN_SUCCESS_ACTION, LOGIN_FAILED_ACTION, REPORT_VIEW_ACTION],
-            },
-            createdAt: {
-              gte: resolved.from,
-              lt: resolved.to,
+      prisma.auditLog.findMany({
+        where: {
+          action: {
+            in: [LOGIN_SUCCESS_ACTION, LOGIN_FAILED_ACTION, REPORT_VIEW_ACTION],
+          },
+          createdAt: {
+            gte: resolved.from,
+            lt: resolved.to,
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 20,
+        select: {
+          id: true,
+          action: true,
+          createdAt: true,
+          actorUserId: true,
+          entityType: true,
+          entityId: true,
+          ip: true,
+          userAgent: true,
+          afterData: true,
+          actor: {
+            select: {
+              id: true,
+              email: true,
+              displayName: true,
             },
           },
-          orderBy: { createdAt: 'desc' },
-          take: 20,
-          select: {
-            id: true,
-            action: true,
-            createdAt: true,
-            actorUserId: true,
-            entityType: true,
-            entityId: true,
-            ip: true,
-            userAgent: true,
-            afterData: true,
-            actor: {
-              select: {
-                id: true,
-                email: true,
-                displayName: true,
-              },
-            },
-          },
-        }),
-      ]);
+        },
+      }),
+    ]);
 
     const loginSeries = seriesRows.map((row) => ({
       bucketStart:
@@ -322,7 +321,9 @@ export class AdminMetricsService {
           accessCount: Number(row.access_count ?? 0),
           uniqueUsers: Number(row.unique_users ?? 0),
           uniqueCustomers: Number(row.unique_customers ?? 0),
-          lastAccessAt: row.last_access_at ? row.last_access_at.toISOString() : null,
+          lastAccessAt: row.last_access_at
+            ? row.last_access_at.toISOString()
+            : null,
         })),
       },
       recentAuthEvents: recentRows.map((row) => ({
@@ -399,8 +400,7 @@ export class AdminMetricsService {
     }
 
     const bucket =
-      input.bucket ??
-      (rangeMs <= 7 * 24 * 60 * 60 * 1000 ? 'hour' : 'day');
+      input.bucket ?? (rangeMs <= 7 * 24 * 60 * 60 * 1000 ? 'hour' : 'day');
 
     if (bucket === 'hour' && rangeMs > 31 * 24 * 60 * 60 * 1000) {
       throw new BadRequestException(

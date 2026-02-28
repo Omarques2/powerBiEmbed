@@ -10,6 +10,12 @@ export class UserRepository {
     return tx ?? this.prisma;
   }
 
+  private isUuid(value: string): boolean {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      value,
+    );
+  }
+
   listPending() {
     return this.client().user.findMany({
       where: { status: 'pending' },
@@ -46,11 +52,23 @@ export class UserRepository {
     });
   }
 
-  findBySub(entraSub: string) {
+  async findByIdentitySubject(subject: string) {
+    if (this.isUuid(subject)) {
+      const byIdentity = await this.client().user.findUnique({
+        where: { identityUserId: subject },
+        select: { id: true },
+      });
+      if (byIdentity) return byIdentity;
+    }
+
     return this.client().user.findUnique({
-      where: { entraSub },
+      where: { entraSub: subject },
       select: { id: true },
     });
+  }
+
+  findBySub(entraSub: string) {
+    return this.findByIdentitySubject(entraSub);
   }
 
   findByEmail(email: string) {
@@ -67,6 +85,7 @@ export class UserRepository {
         id: true,
         email: true,
         status: true,
+        identityUserId: true,
         entraSub: true,
         displayName: true,
       },
@@ -94,6 +113,7 @@ export class UserRepository {
         email: true,
         displayName: true,
         status: true,
+        identityUserId: true,
         entraSub: true,
       },
     });
@@ -103,6 +123,7 @@ export class UserRepository {
     tx: Prisma.TransactionClient,
     userId: string,
     input: {
+      identityUserId?: string;
       entraSub?: string;
       entraOid?: string | null;
       email?: string | null;
@@ -113,6 +134,7 @@ export class UserRepository {
     return this.client(tx).user.update({
       where: { id: userId },
       data: {
+        identityUserId: input.identityUserId ?? undefined,
         entraSub: input.entraSub ?? undefined,
         entraOid: input.entraOid ?? undefined,
         email: input.email ?? undefined,
@@ -124,6 +146,7 @@ export class UserRepository {
         email: true,
         displayName: true,
         status: true,
+        identityUserId: true,
         entraSub: true,
       },
     });

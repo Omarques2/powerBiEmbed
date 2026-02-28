@@ -41,7 +41,7 @@ describe('Negative API (e2e)', () => {
 
     setTestUsers({
       admin: {
-        sub: seed.admin.entraSub,
+        sub: seed.admin.identityUserId ?? seed.admin.entraSub,
         email: seed.admin.email ?? undefined,
         name: 'Admin User',
       },

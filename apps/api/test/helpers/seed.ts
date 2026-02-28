@@ -1,6 +1,11 @@
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../../src/prisma/prisma.service';
-import { buildCustomerCode, buildSeedIds, makeRunId } from './factories';
+import {
+  buildCustomerCode,
+  buildSeedIds,
+  makeRunId,
+  stableUuid,
+} from './factories';
 
 export type SeedData = {
   runId: string;
@@ -9,10 +14,30 @@ export type SeedData = {
   reportId: string;
   app: { id: string; appKey: string };
   role: { id: string; roleKey: string };
-  admin: { id: string; entraSub: string; email: string | null };
-  activeUser: { id: string; entraSub: string; email: string | null };
-  pendingUser: { id: string; entraSub: string; email: string | null };
-  disableUser: { id: string; entraSub: string; email: string | null };
+  admin: {
+    id: string;
+    identityUserId: string | null;
+    entraSub: string;
+    email: string | null;
+  };
+  activeUser: {
+    id: string;
+    identityUserId: string | null;
+    entraSub: string;
+    email: string | null;
+  };
+  pendingUser: {
+    id: string;
+    identityUserId: string | null;
+    entraSub: string;
+    email: string | null;
+  };
+  disableUser: {
+    id: string;
+    identityUserId: string | null;
+    entraSub: string;
+    email: string | null;
+  };
   customerA: { id: string; code: string };
   customerB: { id: string; code: string };
   workspace: { id: string; workspaceId: string };
@@ -61,6 +86,10 @@ export async function truncateAll(prisma: PrismaService) {
 export async function seedTestData(prisma: PrismaService): Promise<SeedData> {
   const runId = makeRunId();
   const { datasetId, workspaceId, reportId, entraOid } = buildSeedIds(runId);
+  const adminIdentityUserId = stableUuid(`${runId}:admin-sub`);
+  const activeIdentityUserId = stableUuid(`${runId}:active-sub`);
+  const pendingIdentityUserId = stableUuid(`${runId}:pending-sub`);
+  const disabledIdentityUserId = stableUuid(`${runId}:disabled-sub`);
 
   const app = await prisma.application.create({
     data: { appKey: 'PBI_EMBED', name: 'Power BI Embed' },
@@ -78,14 +107,15 @@ export async function seedTestData(prisma: PrismaService): Promise<SeedData> {
 
   const admin = await prisma.user.create({
     data: {
-      entraSub: `test-admin-${runId}`,
+      identityUserId: adminIdentityUserId,
+      entraSub: `legacy-admin-${runId}`,
       entraOid,
       email: `admin-${runId}@example.com`,
       displayName: `Admin ${runId}`,
       status: 'active',
       lastLoginAt: new Date(),
     },
-    select: { id: true, entraSub: true, email: true },
+    select: { id: true, identityUserId: true, entraSub: true, email: true },
   });
 
   await prisma.userAppRole.create({
@@ -99,36 +129,39 @@ export async function seedTestData(prisma: PrismaService): Promise<SeedData> {
 
   const activeUser = await prisma.user.create({
     data: {
-      entraSub: `test-user-${runId}`,
+      identityUserId: activeIdentityUserId,
+      entraSub: `legacy-user-${runId}`,
       entraOid: randomUUID(),
       email: `user-${runId}@example.com`,
       displayName: `User ${runId}`,
       status: 'active',
       lastLoginAt: new Date(),
     },
-    select: { id: true, entraSub: true, email: true },
+    select: { id: true, identityUserId: true, entraSub: true, email: true },
   });
 
   const pendingUser = await prisma.user.create({
     data: {
-      entraSub: `test-pending-${runId}`,
+      identityUserId: pendingIdentityUserId,
+      entraSub: `legacy-pending-${runId}`,
       entraOid: randomUUID(),
       email: `pending-${runId}@example.com`,
       displayName: `Pending ${runId}`,
       status: 'pending',
     },
-    select: { id: true, entraSub: true, email: true },
+    select: { id: true, identityUserId: true, entraSub: true, email: true },
   });
 
   const disableUser = await prisma.user.create({
     data: {
-      entraSub: `test-disable-${runId}`,
+      identityUserId: disabledIdentityUserId,
+      entraSub: `legacy-disable-${runId}`,
       entraOid: randomUUID(),
       email: `disable-${runId}@example.com`,
       displayName: `Disable ${runId}`,
       status: 'active',
     },
-    select: { id: true, entraSub: true, email: true },
+    select: { id: true, identityUserId: true, entraSub: true, email: true },
   });
 
   const customerA = await prisma.customer.create({

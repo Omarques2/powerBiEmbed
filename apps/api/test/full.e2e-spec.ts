@@ -3,6 +3,7 @@ import request from 'supertest';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { createE2eApp, setTestUsers } from './helpers/e2e-utils';
 import { seedTestData, truncateAll } from './helpers/seed';
+import { stableUuid } from './helpers/factories';
 import { createPowerBiStub, createRlsRefreshStub } from './helpers/stubs';
 
 describe('Full API (e2e)', () => {
@@ -15,6 +16,7 @@ describe('Full API (e2e)', () => {
   let newRuleId: string | null = null;
   let newUserRuleId: string | null = null;
   let createdCustomerId: string | null = null;
+  let noMembershipIdentityUserId = '';
 
   const powerBiStub = createPowerBiStub(() =>
     seed
@@ -40,37 +42,54 @@ describe('Full API (e2e)', () => {
 
     await truncateAll(prisma);
     seed = await seedTestData(prisma);
+    const preIdentityUserId = stableUuid(`${seed.runId}:pre-sub`);
+    const metricsIdentityUserId = stableUuid(`${seed.runId}:metrics-sub`);
+    noMembershipIdentityUserId = stableUuid(`${seed.runId}:no-membership-sub`);
+    const globalDisabledIdentityUserId = stableUuid(
+      `${seed.runId}:global-disabled-sub`,
+    );
 
     setTestUsers({
       admin: {
-        sub: seed.admin.entraSub,
+        sub: seed.admin.identityUserId ?? seed.admin.entraSub,
         email: seed.admin.email ?? undefined,
         name: 'Admin User',
       },
       active: {
-        sub: seed.activeUser.entraSub,
+        sub: seed.activeUser.identityUserId ?? seed.activeUser.entraSub,
         email: seed.activeUser.email ?? undefined,
         name: 'Active User',
       },
       pre: {
-        sub: `test-pre-${seed.runId}`,
+        sub: preIdentityUserId,
         email: `pre-${seed.runId}@example.com`,
         name: 'Pre User',
       },
       pending: {
-        sub: seed.pendingUser.entraSub,
+        sub: seed.pendingUser.identityUserId ?? seed.pendingUser.entraSub,
         email: seed.pendingUser.email ?? undefined,
         name: 'Pending User',
       },
       disable: {
-        sub: seed.disableUser.entraSub,
+        sub: seed.disableUser.identityUserId ?? seed.disableUser.entraSub,
         email: seed.disableUser.email ?? undefined,
         name: 'Disable User',
       },
       metrics: {
-        sub: `test-metrics-${seed.runId}`,
+        sub: metricsIdentityUserId,
         email: `metrics-${seed.runId}@example.com`,
         name: 'Metrics User',
+      },
+      nomembership: {
+        sub: noMembershipIdentityUserId,
+        email: `no-membership-${seed.runId}@example.com`,
+        name: 'No Membership User',
+      },
+      globalDisabled: {
+        sub: globalDisabledIdentityUserId,
+        email: `global-disabled-${seed.runId}@example.com`,
+        name: 'Global Disabled User',
+        globalStatus: 'disabled',
       },
     });
   });
@@ -122,6 +141,43 @@ describe('Full API (e2e)', () => {
     expect(res.body.data.status).toBe('active');
   });
 
+  it('keeps active users without membership as pending', async () => {
+    const bootstrap = await request(app.getHttpServer())
+      .get('/users/me')
+      .set('x-test-user', 'nomembership');
+    expect(bootstrap.status).toBe(200);
+    expect(bootstrap.body.data.status).toBe('pending');
+
+    await prisma.user.update({
+      where: { identityUserId: noMembershipIdentityUserId },
+      data: { status: 'active' },
+    });
+
+    const res = await request(app.getHttpServer())
+      .get('/users/me')
+      .set('x-test-user', 'nomembership');
+    expect(res.status).toBe(200);
+    expect(res.body.data.rawStatus).toBe('active');
+    expect(res.body.data.status).toBe('pending');
+    expect(res.body.data.memberships).toHaveLength(0);
+  });
+
+  it('blocks pending users on protected powerbi endpoints', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/powerbi/workspaces')
+      .set('x-test-user', 'pending');
+    expect(res.status).toBe(403);
+    expect(res.body.error.code).toBe('PENDING_APPROVAL');
+  });
+
+  it('blocks users disabled in central auth on protected powerbi endpoints', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/powerbi/workspaces')
+      .set('x-test-user', 'globalDisabled');
+    expect(res.status).toBe(403);
+    expect(res.body.error.code).toBe('GLOBAL_USER_DISABLED');
+  });
+
   it('records login audit event with temporal dedupe', async () => {
     const first = await request(app.getHttpServer())
       .get('/users/me')
@@ -129,7 +185,7 @@ describe('Full API (e2e)', () => {
     expect(first.status).toBe(200);
 
     const user = await prisma.user.findUnique({
-      where: { entraSub: `test-metrics-${seed.runId}` },
+      where: { identityUserId: stableUuid(`${seed.runId}:metrics-sub`) },
       select: { id: true },
     });
     expect(user?.id).toBeTruthy();
@@ -419,9 +475,9 @@ describe('Full API (e2e)', () => {
     expect(metrics.body.data.series?.loginsByBucket).toBeTruthy();
     expect(metrics.body.data.series?.reportViewsByBucket).toBeTruthy();
     expect(metrics.body.data.kpis?.reportViewsWindow).toBeGreaterThanOrEqual(0);
-    expect(metrics.body.data.kpis?.uniqueCustomersWindow).toBeGreaterThanOrEqual(
-      0,
-    );
+    expect(
+      metrics.body.data.kpis?.uniqueCustomersWindow,
+    ).toBeGreaterThanOrEqual(0);
     expect(metrics.body.data.kpis?.uniqueReportsWindow).toBeGreaterThanOrEqual(
       0,
     );

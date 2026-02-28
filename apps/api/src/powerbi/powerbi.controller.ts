@@ -41,7 +41,11 @@ export class PowerBiController {
   private pickIp(req: AuthedRequest): string | null {
     const forwarded = req.headers?.['x-forwarded-for'];
     if (Array.isArray(forwarded) && forwarded.length) {
-      return String(forwarded[0] ?? '').split(',')[0]?.trim() || null;
+      return (
+        String(forwarded[0] ?? '')
+          .split(',')[0]
+          ?.trim() || null
+      );
     }
     if (typeof forwarded === 'string' && forwarded.trim().length) {
       return forwarded.split(',')[0]?.trim() || null;

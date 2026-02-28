@@ -1,14 +1,15 @@
-import { randomUUID } from "crypto";
-import { PrismaClient } from "@prisma/client";
+import { randomUUID } from 'crypto';
+import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
 async function main() {
-  if (process.env.SEED_CONFIRM !== "test") {
-    throw new Error("Refusing to seed. Set SEED_CONFIRM=test to continue.");
+  if (process.env.SEED_CONFIRM !== 'test') {
+    throw new Error('Refusing to seed. Set SEED_CONFIRM=test to continue.');
   }
 
   const runId = randomUUID().slice(0, 8);
+  const identityUserId = randomUUID();
   const datasetId = randomUUID();
   const workspaceId = randomUUID();
   const reportId = randomUUID();
@@ -17,18 +18,19 @@ async function main() {
     data: {
       code: `SEED_${runId}`,
       name: `Seed Customer ${runId}`,
-      status: "active",
+      status: 'active',
     },
     select: { id: true, code: true },
   });
 
   const user = await prisma.user.create({
     data: {
-      entraSub: `seed-user-${runId}`,
+      identityUserId,
+      entraSub: identityUserId,
       entraOid: randomUUID(),
       email: `seed-${runId}@example.com`,
       displayName: `Seed User ${runId}`,
-      status: "active",
+      status: 'active',
       lastLoginAt: new Date(),
     },
     select: { id: true, email: true },
@@ -38,7 +40,7 @@ async function main() {
     data: {
       userId: user.id,
       customerId: customer.id,
-      role: "admin",
+      role: 'admin',
       isActive: true,
     },
   });
@@ -79,7 +81,7 @@ async function main() {
     },
   });
 
-  console.log("Seed complete", {
+  console.log('Seed complete', {
     customerId: customer.id,
     customerCode: customer.code,
     userId: user.id,

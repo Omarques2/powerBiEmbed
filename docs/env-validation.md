@@ -1,61 +1,64 @@
 # Fluxo de ambientes (Local -> Staging -> Prod)
 
-Este guia documenta o fluxo de validacao dos ambientes e os cuidados com banco de dados.
+Este guia define a validacao operacional apos o cutover para `sigfarm-auth-platform`.
 
-## Objetivo
-- Garantir que o desenvolvimento e os testes usem **DB test** (nunca prod).
-- Garantir que o deploy em **staging** seja automatico via CI/CD.
-- Garantir que o deploy em **prod** seja somente apos validacao manual em staging.
-- Preservar **integridade total** do DB prod (sem reset).
+## 1) Objetivo
+- Garantir deploy previsivel de auth central em `staging` e `prod`.
+- Evitar regressao no comportamento de acesso local (`pending`, `disabled`, `active`).
+- Preservar integridade de banco com migracao additive e rollback seguro.
 
-## Ambientes e responsabilidades
+## 2) Gates por ambiente
 
-### Local (dev)
-- **API**: roda local apontando para `TEST_DATABASE_URL`.
-- **WEB**: roda local apontando para API local.
-- **Banco**: usar apenas `pbi_embed_test` (resetavel).
+Local:
+- lint, typecheck e testes verdes.
+- smoke de login/callback sem loop.
 
-Checklist local:
-- `npm run lint` (api/web)
-- `npm run test` (api/web)
-- `npm run test:e2e` (api com TEST_DATABASE_URL)
-- Smoke manual rapido (login + /health + fluxo basico).
+Staging:
+- API `/health` e `/ready` com `200`.
+- fluxo completo de auth central validado.
+- regra de `pending` validada com usuario nao ativo.
 
-### Staging
-- **API**: container apps staging (deploy automatico pelo Actions).
-- **WEB**: SWA **staging** separado.
-- **Banco**: DB staging (clone via PITR ou dump/restore), **nunca** prod.
+Prod:
+- deploy somente apos aprovacao manual em environment `production`.
+- smoke de auth e rota protegida finalizados antes de encerrar release.
 
-Checklist staging (minimo):
-- `GET /health` e `GET /ready` 200
-- Login + navegação principal
-- Fluxo admin basico (customers, users, perms)
-- Embed/preview principais (com permissao)
+## 3) Checklist de rede (obrigatorio em staging)
+Executar nesta ordem:
+1. Abrir app e confirmar redirecionamento: `app-web -> auth-web/login`.
+2. Concluir login e confirmar retorno para: `app-web/auth/callback`.
+3. Confirmar no navegador que houve chamada `POST /v1/auth/refresh` no `auth-api` com sucesso.
+4. Confirmar chamadas privadas do app com header `Authorization: Bearer <token>`.
+5. Confirmar `GET /users/me` (ou `/v1/users/me`) com `200` para sessao valida.
+6. Validar politicas locais:
+   - `pending` -> pagina `/pending`
+   - `disabled` -> bloqueio `403`
+   - `platform_admin` sem membership -> acesso ativo
 
-### Prod
-- **API**: container apps prod (deploy manual/approve).
-- **WEB**: SWA **prod** separado.
-- **Banco**: `pbi_embed` (prod). **Nao resetar.**
+## 4) Checklist de promocao para prod
+1. Verificacoes do item 3 aprovadas em staging.
+2. Sem aumento anormal de `401/403` em staging.
+3. Sem loop de callback/login.
+4. Aprovar environment `production` no GitHub.
+5. Repetir smoke basico em prod.
 
-Checklist prod (minimo):
-- `GET /health` e `GET /ready` 200
-- Login + home
-- Admin (somente leitura, sem operacoes destrutivas no primeiro deploy)
+## 5) Rollback por app/ambiente
 
-## Fluxo recomendado de deploy
-1. **Local**: testes e lint ok.
-2. **Push main**: CI roda. CD publica **staging**.
-3. **Validar staging**: smoke test e checagem de features criticas.
-4. **Promover prod**: liberar deploy para prod (manual/approve + imagem por digest).
+API rollback:
+1. Reverter para revisao anterior no Azure Container Apps.
+2. Validar `/health` e `/ready`.
+3. Validar endpoint protegido com token valido.
 
-## Protecoes essenciais
-- `TEST_DATABASE_URL` obrigatorio em `test:e2e`.
-- Actions nunca roda `migrate dev` em prod.
- - Variaveis separadas por ambiente (staging/prod) para API e URL do Web.
-- DB prod nunca resetado.
- - Staging usa snapshot/clone do prod (PITR) quando for necessario validar migrations.
+WEB rollback:
+1. Reexecutar CD com commit anterior estavel.
+2. Validar login, callback e `/pending`.
 
-## Notas
-- Caso exista necessidade de validar feature de DB, sempre use DB test.
-- Se for necessario seed de prod, realizar manualmente e com revisao.
- - Para clonar prod -> staging, consulte `docs/db-clone-pitr.md`.
+Banco rollback:
+1. Tratar migracoes como additive no primeiro deploy.
+2. Nao remover `entra_sub` no primeiro ciclo de cutover/rollback.
+3. Restaurar snapshot apenas no ambiente impactado, com janela e responsavel definidos.
+
+## 6) Evidencias minimas para encerramento
+- link da pipeline `cd-main` em staging e prod.
+- capturas/logs do fluxo login -> callback -> `/users/me`.
+- registro de validacao de `pending` em staging.
+- registro de observabilidade da primeira hora (401/403/pending/loop).

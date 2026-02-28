@@ -1,8 +1,3 @@
-jest.mock('jose', () => ({
-  createRemoteJWKSet: jest.fn(),
-  jwtVerify: jest.fn(),
-}));
-
 import { Test, TestingModule } from '@nestjs/testing';
 import { PowerBiService } from './powerbi.service';
 import { UsersService } from '../users/users.service';

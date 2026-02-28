@@ -3,7 +3,10 @@ import { validateEnv } from './config.schema';
 
 const baseEnv = {
   DATABASE_URL: 'postgresql://user:pass@host:5432/db?sslmode=require',
-  ENTRA_API_AUDIENCE: 'api://test',
+  SIGFARM_AUTH_ISSUER: 'https://auth.sigfarmintelligence.com',
+  SIGFARM_AUTH_AUDIENCE: 'sigfarm-apps',
+  SIGFARM_AUTH_JWKS_URL:
+    'https://api-auth.sigfarmintelligence.com/.well-known/jwks.json',
   PBI_TENANT_ID: 'tenant-id',
   PBI_CLIENT_ID: 'client-id',
   PBI_CLIENT_SECRET: 'client-secret',
@@ -20,7 +23,7 @@ describe('validateEnv', () => {
   it('rejects when required variables are missing', () => {
     expect(() => validateEnv({})).toThrow('DATABASE_URL');
     expect(() => validateEnv({ DATABASE_URL: 'postgresql://x' })).toThrow(
-      'ENTRA_API_AUDIENCE',
+      'SIGFARM_AUTH_ISSUER',
     );
   });
 

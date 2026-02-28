@@ -6,20 +6,14 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import type { AuthedRequest } from './authed-request.type';
+import { UsersService } from '../users/users.service';
 
 @Injectable()
 export class ActiveUserGuard implements CanActivate {
-  constructor(private readonly prisma: PrismaService) {}
-
-  private pickEmail(claims: AuthedRequest['user']): string | null {
-    const emails = claims?.emails;
-    if (Array.isArray(emails) && emails.length) return String(emails[0]);
-
-    const raw =
-      claims?.email ?? claims?.preferred_username ?? claims?.upn ?? undefined;
-    if (!raw) return null;
-    return typeof raw === 'string' && raw.trim().length > 0 ? raw : null;
-  }
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly usersService: UsersService,
+  ) {}
 
   async canActivate(ctx: ExecutionContext): Promise<boolean> {
     const req = ctx.switchToHttp().getRequest<AuthedRequest>();
@@ -31,50 +25,14 @@ export class ActiveUserGuard implements CanActivate {
       });
     }
 
-    const entraSub = String(claims.sub);
-
-    let user = await this.prisma.user.findUnique({
-      where: { entraSub: entraSub },
-      select: { id: true, status: true, entraSub: true },
-    });
-
-    if (!user) {
-      const email = this.pickEmail(claims);
-      if (email) {
-        const existingByEmail = await this.prisma.user.findFirst({
-          where: { email: { equals: email, mode: 'insensitive' } },
-          select: { id: true, status: true, entraSub: true },
-        });
-
-        if (existingByEmail?.entraSub?.startsWith('pre_')) {
-          user = await this.prisma.user.update({
-            where: { id: existingByEmail.id },
-            data: {
-              entraSub: entraSub,
-              entraOid: claims.oid ? String(claims.oid) : undefined,
-              lastLoginAt: new Date(),
-            },
-            select: { id: true, status: true, entraSub: true },
-          });
-        }
-      }
-    }
-
-    // Se por algum motivo ainda não existe no DB, trate como pending
-    if (!user) {
-      await this.prisma.user.create({
-        data: {
-          entraSub: entraSub,
-          status: 'pending',
-          lastLoginAt: new Date(),
-        },
-      });
-
+    if (claims.globalStatus === 'disabled') {
       throw new ForbiddenException({
-        code: 'PENDING_APPROVAL',
-        message: 'User created as pending; waiting approval',
+        code: 'GLOBAL_USER_DISABLED',
+        message: 'User disabled in central auth',
       });
     }
+
+    const user = await this.usersService.upsertFromClaims(claims);
 
     if (user.status === 'disabled') {
       throw new ForbiddenException({

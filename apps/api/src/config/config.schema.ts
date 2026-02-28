@@ -28,12 +28,15 @@ const envSchema = z
     DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
     SHADOW_DATABASE_URL: z.string().optional(),
 
-    ENTRA_API_AUDIENCE: z.string().min(1, 'ENTRA_API_AUDIENCE is required'),
-    ENTRA_AUTHORITY_HOST: z
+    SIGFARM_AUTH_ISSUER: z
       .string()
-      .min(1)
-      .default('login.microsoftonline.com'),
-    ENTRA_JWKS_TENANT: z.string().min(1).default('common'),
+      .url('SIGFARM_AUTH_ISSUER must be a valid URL'),
+    SIGFARM_AUTH_AUDIENCE: z
+      .string()
+      .min(1, 'SIGFARM_AUTH_AUDIENCE is required'),
+    SIGFARM_AUTH_JWKS_URL: z
+      .string()
+      .url('SIGFARM_AUTH_JWKS_URL must be a valid URL'),
 
     PBI_TENANT_ID: z.string().min(1, 'PBI_TENANT_ID is required'),
     PBI_CLIENT_ID: z.string().min(1, 'PBI_CLIENT_ID is required'),

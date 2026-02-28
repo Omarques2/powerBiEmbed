@@ -1,2 +1,15 @@
-skills/nestjs-best-practices
-skills/nestjs-best-practices
+node_modules/
+dist/
+coverage/
+
+# Local environment files
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

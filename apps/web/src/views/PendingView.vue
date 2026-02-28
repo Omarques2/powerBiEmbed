@@ -50,7 +50,9 @@ import { onBeforeUnmount, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { http } from "@/api/http";
 import { unwrapData, type ApiEnvelope } from "@/api/envelope";
-import { hardResetAuthState, logout } from "../auth/auth";
+import { acquireApiToken, logout } from "../auth/auth";
+import { authClient, buildProductLoginRoute, resolveReturnTo } from "../auth/sigfarm-auth";
+import { isRetryableHttpError, runWithRetryBackoff } from "../auth/resilience";
 import { Button as UiButton } from "@/components/ui";
 
 type MeResponse = {
@@ -74,18 +76,35 @@ let timer: number | null = null;
 
 async function fetchMe(): Promise<FetchMeResult> {
   try {
-    const res = await http.get("/users/me");
+    const res = await runWithRetryBackoff(
+      async () => {
+        const token = await acquireApiToken({ reason: "pending:/users/me" });
+        return http.get("/users/me", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+      },
+      {
+        attempts: 3,
+        baseDelayMs: 150,
+        maxDelayMs: 1_000,
+        jitterMs: 80,
+        shouldRetry: (error) => isRetryableHttpError(error),
+      },
+    );
+
     return { kind: "ok", me: unwrapData(res.data as ApiEnvelope<MeResponse>) };
   } catch (e: any) {
     const status = e?.response?.status;
 
     // Se perdeu sessão / token inválido, volta para login
-    if (status === 401) {
-      await hardResetAuthState();
+    if (status === 401 || status === 403) {
+      authClient.clearSession();
       if (typeof window !== "undefined") {
-        window.location.assign("/login");
-      } else {
-        await logout();
+        const current = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+        const safeReturnTo = resolveReturnTo(current);
+        window.location.assign(buildProductLoginRoute(safeReturnTo));
       }
       return { kind: "unauthorized", me: null };
     }

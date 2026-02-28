@@ -10,14 +10,13 @@ import { EnvelopeInterceptor } from '../../src/common/http/envelope.interceptor'
 import { HttpExceptionFilter } from '../../src/common/http/http-exception.filter';
 import { PowerBiService } from '../../src/powerbi/powerbi.service';
 import { RlsRefreshService } from '../../src/admin-rls/rls-refresh.service';
+import type { Claims } from '../../src/auth/claims.type';
 
 export type TestUserClaims = {
   sub: string;
-  oid?: string;
-  name?: string;
   email?: string;
-  emails?: string[];
-  preferred_username?: string;
+  globalStatus?: 'pending' | 'active' | 'disabled';
+  [key: string]: unknown;
 };
 
 const testUsers: Record<string, TestUserClaims> = {};
@@ -30,10 +29,92 @@ export class HeaderAuthGuard implements CanActivate {
   canActivate(ctx: ExecutionContext): boolean {
     const req = ctx.switchToHttp().getRequest();
     const key = String(req.headers['x-test-user'] ?? 'admin');
-    const claims = testUsers[key];
+    const claims = normalizeTestClaims(testUsers[key]);
     if (claims) req.user = claims;
     return true;
   }
+}
+
+function normalizeTestClaims(claims?: TestUserClaims): Claims | null {
+  if (!claims?.sub) return null;
+  const email = normalizeEmail(claims.email, claims.sub);
+
+  return {
+    sub: claims.sub,
+    sid: toStringOr(`sid:${claims.sub}`, claims.sid),
+    amr: normalizeAmr(claims.amr),
+    email,
+    emailVerified: toBooleanOr(true, claims.emailVerified),
+    globalStatus: claims.globalStatus ?? 'active',
+    apps: Array.isArray(claims.apps) ? (claims.apps as Claims['apps']) : [],
+    ver: toNumberOr(1, claims.ver),
+    iat: toOptionalNumber(claims.iat),
+    exp: toOptionalNumber(claims.exp),
+    iss: toOptionalString(claims.iss),
+    aud: normalizeAudience(claims.aud),
+  };
+}
+
+function normalizeEmail(rawEmail: unknown, sub: string): string {
+  if (typeof rawEmail === 'string' && rawEmail.trim().length > 0) {
+    return rawEmail.trim();
+  }
+  return `${sub}@test.sigfarm.local`;
+}
+
+function normalizeAmr(rawAmr: unknown): Claims['amr'] {
+  return rawAmr === 'password' ? 'password' : 'entra';
+}
+
+function normalizeAudience(rawAud: unknown): Claims['aud'] | undefined {
+  if (typeof rawAud === 'string' && rawAud.trim().length > 0) return rawAud;
+  if (Array.isArray(rawAud)) {
+    const valid = rawAud
+      .map((item) => (typeof item === 'string' ? item.trim() : ''))
+      .filter((item) => item.length > 0);
+    return valid.length > 0 ? valid : undefined;
+  }
+  return undefined;
+}
+
+function toStringOr(fallback: string, value: unknown): string {
+  if (typeof value !== 'string') return fallback;
+  const normalized = value.trim();
+  return normalized.length > 0 ? normalized : fallback;
+}
+
+function toOptionalString(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const normalized = value.trim();
+  return normalized.length > 0 ? normalized : undefined;
+}
+
+function toNumberOr(fallback: number, value: unknown): number {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string') {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return fallback;
+}
+
+function toOptionalNumber(value: unknown): number | undefined {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string') {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return undefined;
+}
+
+function toBooleanOr(fallback: boolean, value: unknown): boolean {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === 'true') return true;
+    if (normalized === 'false') return false;
+  }
+  return fallback;
 }
 
 export function applyGlobals(app: INestApplication) {

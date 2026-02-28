@@ -27,6 +27,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Verify vendored Sigfarm auth SDK checksums
+        run: node vendor/sigfarm-auth-platform/verify-checksums.js
       - name: Normalize image name
         shell: bash
         run: |
@@ -37,6 +39,12 @@ jobs:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Prepare vendored SDKs for Docker context
+        shell: bash
+        run: |
+          mkdir -p apps/api/vendor
+          rm -rf apps/api/vendor/sigfarm-auth-platform
+          cp -R vendor/sigfarm-auth-platform apps/api/vendor/
       - name: Build and push
         id: build
         uses: docker/build-push-action@v6
@@ -81,6 +89,19 @@ jobs:
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
+      - name: Validate Sigfarm Auth env (staging)
+        shell: bash
+        run: |
+          set -euo pipefail
+          APP_NAME="${{ secrets.AZURE_CONTAINER_APP_NAME_STAGING }}"
+          RESOURCE_GROUP="${{ secrets.AZURE_RESOURCE_GROUP }}"
+          ENV_NAMES="$(az containerapp show --name "$APP_NAME" --resource-group "$RESOURCE_GROUP" --query "properties.template.containers[0].env[].name" -o tsv)"
+          for REQUIRED_ENV in SIGFARM_AUTH_ISSUER SIGFARM_AUTH_AUDIENCE SIGFARM_AUTH_JWKS_URL; do
+            if ! printf "%s\n" "$ENV_NAMES" | grep -Fxq "$REQUIRED_ENV"; then
+              echo "::error::Container App '$APP_NAME' is missing required env '$REQUIRED_ENV'."
+              exit 1
+            fi
+          done
       - name: Deploy to Azure Container Apps (staging)
         uses: azure/container-apps-deploy-action@v2
         with:
@@ -123,6 +144,19 @@ jobs:
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
+      - name: Validate Sigfarm Auth env (prod)
+        shell: bash
+        run: |
+          set -euo pipefail
+          APP_NAME="${{ secrets.AZURE_CONTAINER_APP_NAME_PROD }}"
+          RESOURCE_GROUP="${{ secrets.AZURE_RESOURCE_GROUP }}"
+          ENV_NAMES="$(az containerapp show --name "$APP_NAME" --resource-group "$RESOURCE_GROUP" --query "properties.template.containers[0].env[].name" -o tsv)"
+          for REQUIRED_ENV in SIGFARM_AUTH_ISSUER SIGFARM_AUTH_AUDIENCE SIGFARM_AUTH_JWKS_URL; do
+            if ! printf "%s\n" "$ENV_NAMES" | grep -Fxq "$REQUIRED_ENV"; then
+              echo "::error::Container App '$APP_NAME' is missing required env '$REQUIRED_ENV'."
+              exit 1
+            fi
+          done
       - name: Deploy to Azure Container Apps (prod)
         uses: azure/container-apps-deploy-action@v2
         with:
@@ -143,14 +177,30 @@ jobs:
     env:
       NODE_VERSION: "20.19.6"
       VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL_STAGING }}
-      VITE_ENTRA_SPA_CLIENT_ID: ${{ secrets.VITE_ENTRA_SPA_CLIENT_ID }}
-      VITE_ENTRA_AUTHORITY: ${{ secrets.VITE_ENTRA_AUTHORITY }}
-      VITE_ENTRA_REDIRECT_URI: ${{ secrets.VITE_ENTRA_REDIRECT_URI }}
-      VITE_ENTRA_POST_LOGOUT_REDIRECT_URI: ${{ secrets.VITE_ENTRA_POST_LOGOUT_REDIRECT_URI }}
-      VITE_ENTRA_API_SCOPE: ${{ secrets.VITE_ENTRA_API_SCOPE }}
+      VITE_SIGFARM_AUTH_API_BASE_URL: https://api-testauth.sigfarmintelligence.com
+      VITE_SIGFARM_AUTH_PORTAL_BASE_URL: https://testauth.sigfarmintelligence.com
+      VITE_SIGFARM_APP_BASE_URL: https://testbi.sigfarmintelligence.com
+      VITE_SIGFARM_AUTH_ALLOWED_RETURN_ORIGINS: https://testbi.sigfarmintelligence.com,https://testauth.sigfarmintelligence.com,https://testlandwatch.sigfarmintelligence.com
+      VITE_SIGFARM_AUTH_DEFAULT_RETURN_TO: https://testbi.sigfarmintelligence.com/
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Validate web env (staging)
+        shell: bash
+        run: |
+          set -euo pipefail
+          for REQUIRED_ENV in \
+            VITE_API_BASE_URL \
+            VITE_SIGFARM_AUTH_API_BASE_URL \
+            VITE_SIGFARM_AUTH_PORTAL_BASE_URL \
+            VITE_SIGFARM_APP_BASE_URL \
+            VITE_SIGFARM_AUTH_ALLOWED_RETURN_ORIGINS \
+            VITE_SIGFARM_AUTH_DEFAULT_RETURN_TO; do
+            if [ -z "${!REQUIRED_ENV:-}" ]; then
+              echo "::error::Missing required env '$REQUIRED_ENV' for web staging deploy."
+              exit 1
+            fi
+          done
       - name: Deploy to Azure Static Web Apps
         uses: Azure/static-web-apps-deploy@v1
         with:
@@ -167,14 +217,30 @@ jobs:
     env:
       NODE_VERSION: "20.19.6"
       VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL_PROD }}
-      VITE_ENTRA_SPA_CLIENT_ID: ${{ secrets.VITE_ENTRA_SPA_CLIENT_ID }}
-      VITE_ENTRA_AUTHORITY: ${{ secrets.VITE_ENTRA_AUTHORITY }}
-      VITE_ENTRA_REDIRECT_URI: ${{ secrets.VITE_ENTRA_REDIRECT_URI }}
-      VITE_ENTRA_POST_LOGOUT_REDIRECT_URI: ${{ secrets.VITE_ENTRA_POST_LOGOUT_REDIRECT_URI }}
-      VITE_ENTRA_API_SCOPE: ${{ secrets.VITE_ENTRA_API_SCOPE }}
+      VITE_SIGFARM_AUTH_API_BASE_URL: https://api-auth.sigfarmintelligence.com
+      VITE_SIGFARM_AUTH_PORTAL_BASE_URL: https://auth.sigfarmintelligence.com
+      VITE_SIGFARM_APP_BASE_URL: https://bi.sigfarmintelligence.com
+      VITE_SIGFARM_AUTH_ALLOWED_RETURN_ORIGINS: https://bi.sigfarmintelligence.com,https://auth.sigfarmintelligence.com,https://landwatch.sigfarmintelligence.com
+      VITE_SIGFARM_AUTH_DEFAULT_RETURN_TO: https://bi.sigfarmintelligence.com/
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Validate web env (prod)
+        shell: bash
+        run: |
+          set -euo pipefail
+          for REQUIRED_ENV in \
+            VITE_API_BASE_URL \
+            VITE_SIGFARM_AUTH_API_BASE_URL \
+            VITE_SIGFARM_AUTH_PORTAL_BASE_URL \
+            VITE_SIGFARM_APP_BASE_URL \
+            VITE_SIGFARM_AUTH_ALLOWED_RETURN_ORIGINS \
+            VITE_SIGFARM_AUTH_DEFAULT_RETURN_TO; do
+            if [ -z "${!REQUIRED_ENV:-}" ]; then
+              echo "::error::Missing required env '$REQUIRED_ENV' for web production deploy."
+              exit 1
+            fi
+          done
       - name: Deploy to Azure Static Web Apps (prod)
         uses: Azure/static-web-apps-deploy@v1
         with:

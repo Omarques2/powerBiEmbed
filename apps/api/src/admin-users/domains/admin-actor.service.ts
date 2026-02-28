@@ -7,7 +7,7 @@ export class AdminActorService {
 
   async resolveActorUserId(actorSub: string | null): Promise<string | null> {
     if (!actorSub) return null;
-    const actor = await this.users.findBySub(actorSub);
+    const actor = await this.users.findByIdentitySubject(actorSub);
     return actor?.id ?? null;
   }
 }

@@ -197,13 +197,118 @@
 </template>
 
 <script setup lang="ts">
-import { login } from "../auth/auth";
+import { AuthApiError } from "@sigfarm/auth-client-vue";
+import { onMounted } from "vue";
+import { useRoute, useRouter } from "vue-router";
+import {
+  authClient,
+  buildAuthCallbackReturnTo,
+  buildAuthPortalLoginUrl,
+  getRouteReturnTo,
+} from "../auth/sigfarm-auth";
+import { getMeCached } from "../auth/me";
 import { Button as UiButton } from "@/components/ui";
 import logoUrl from "../assets/logo.png";
 
-async function onLogin() {
-  await login();
+const route = useRoute();
+const router = useRouter();
+
+const RESUME_RETRY_ATTEMPTS = import.meta.env.MODE === "test" ? 3 : 12;
+const RESUME_RETRY_DELAY_MS = import.meta.env.MODE === "test" ? 300 : 500;
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  let timer: number | null = null;
+  const timeout = new Promise<T>((_, reject) => {
+    timer = window.setTimeout(() => {
+      reject(new Error(`${label} timed out after ${ms}ms`));
+    }, ms);
+  });
+
+  return Promise.race([promise, timeout]).finally(() => {
+    if (timer) window.clearTimeout(timer);
+  });
 }
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
+}
+
+async function exchangeSessionWithRetry(): Promise<boolean> {
+  for (let attempt = 1; attempt <= RESUME_RETRY_ATTEMPTS; attempt += 1) {
+    try {
+      await withTimeout(authClient.exchangeSession(), 6_000, "exchangeSession");
+      return true;
+    } catch (error) {
+      if (attempt < RESUME_RETRY_ATTEMPTS && shouldRetryExchangeError(error)) {
+        await delay(RESUME_RETRY_DELAY_MS);
+        continue;
+      }
+      break;
+    }
+  }
+
+  return false;
+}
+
+function shouldRetryExchangeError(error: unknown): boolean {
+  if (error instanceof AuthApiError) {
+    return error.status !== 401;
+  }
+
+  const maybeStatus =
+    (error as { status?: unknown })?.status ??
+    (error as { response?: { status?: unknown } })?.response?.status;
+  return maybeStatus !== 401;
+}
+
+function toAppPath(returnTo: string): string {
+  if (typeof window === "undefined") return "/app";
+  if (!returnTo.startsWith(window.location.origin)) return "/app";
+  const path = returnTo.slice(window.location.origin.length) || "/app";
+  return path === "/" ? "/app" : path;
+}
+
+async function tryResumeSessionFromLogin() {
+  if (typeof route.query.returnTo !== "string") return;
+
+  let returnTo =
+    typeof window !== "undefined" ? `${window.location.origin}/app` : "http://localhost:5173/app";
+  try {
+    returnTo = getRouteReturnTo(route.query.returnTo);
+  } catch {
+    // keep safe fallback
+  }
+
+  const exchanged = await exchangeSessionWithRetry();
+
+  try {
+    const me = await withTimeout(getMeCached(true), 8_000, "/users/me");
+    if (!me) return;
+
+    if (me.status === "active") {
+      await router.replace(toAppPath(returnTo));
+      return;
+    }
+
+    if (exchanged) {
+      await router.replace("/pending");
+    }
+  } catch {
+    // Keep user on login when auto-resume is not possible.
+  }
+}
+
+function onLogin(): void {
+  const returnTo = getRouteReturnTo(route.query.returnTo);
+  const callbackReturnTo = buildAuthCallbackReturnTo(returnTo);
+  window.location.assign(buildAuthPortalLoginUrl(callbackReturnTo));
+}
+
+onMounted(() => {
+  void tryResumeSessionFromLogin();
+});
 </script>
 
 <style scoped>
