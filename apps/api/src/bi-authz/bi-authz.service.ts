@@ -221,6 +221,47 @@ export class BiAuthzService {
     await this.resolveReportAccess(userId, workspaceId, reportId);
   }
 
+  async canRefreshModelForCustomer(
+    userId: string,
+    customerId: string,
+  ): Promise<boolean> {
+    const membership = await this.prisma.userCustomerMembership.findFirst({
+      where: {
+        userId: userId,
+        customerId: customerId,
+        isActive: true,
+        customer: { status: 'active' },
+      },
+      select: {
+        canRefreshModelOverride: true,
+        customer: { select: { canRefreshModel: true } },
+      },
+    });
+
+    if (!membership) return false;
+    if (typeof membership.canRefreshModelOverride === 'boolean') {
+      return membership.canRefreshModelOverride;
+    }
+    return membership.customer.canRefreshModel;
+  }
+
+  async canRefreshModelForReport(
+    userId: string,
+    workspaceId: string,
+    reportId: string,
+  ) {
+    const access = await this.resolveReportAccess(userId, workspaceId, reportId);
+    const canRefreshModel = await this.canRefreshModelForCustomer(
+      userId,
+      access.customerId,
+    );
+
+    return {
+      ...access,
+      canRefreshModel,
+    };
+  }
+
   async resolveAllowedPagesForAccess(input: {
     userId: string;
     customerId: string;

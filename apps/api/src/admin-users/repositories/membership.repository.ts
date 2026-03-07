@@ -17,14 +17,26 @@ export class MembershipRepository {
   ) {
     return this.client(tx).userCustomerMembership.findUnique({
       where: { userId_customerId: { userId, customerId } },
-      select: { id: true, role: true, isActive: true, createdAt: true },
+      select: {
+        id: true,
+        role: true,
+        isActive: true,
+        canRefreshModelOverride: true,
+        createdAt: true,
+      },
     });
   }
 
   findByUserCustomerDirect(userId: string, customerId: string) {
     return this.client().userCustomerMembership.findUnique({
       where: { userId_customerId: { userId, customerId } },
-      select: { id: true, role: true, isActive: true, createdAt: true },
+      select: {
+        id: true,
+        role: true,
+        isActive: true,
+        canRefreshModelOverride: true,
+        createdAt: true,
+      },
     });
   }
 
@@ -34,12 +46,32 @@ export class MembershipRepository {
     customerId: string,
     role: MembershipRole,
     isActive: boolean,
+    canRefreshModelOverride?: boolean | null,
   ) {
     return this.client(tx).userCustomerMembership.upsert({
       where: { userId_customerId: { userId, customerId } },
-      create: { userId, customerId, role, isActive },
-      update: { role, isActive },
-      select: { id: true, customerId: true, role: true, isActive: true },
+      create: {
+        userId,
+        customerId,
+        role,
+        isActive,
+        canRefreshModelOverride:
+          canRefreshModelOverride === undefined ? null : canRefreshModelOverride,
+      },
+      update: {
+        role,
+        isActive,
+        ...(canRefreshModelOverride === undefined
+          ? {}
+          : { canRefreshModelOverride }),
+      },
+      select: {
+        id: true,
+        customerId: true,
+        role: true,
+        isActive: true,
+        canRefreshModelOverride: true,
+      },
     });
   }
 
@@ -52,7 +84,13 @@ export class MembershipRepository {
     return this.client(tx).userCustomerMembership.update({
       where: { userId_customerId: { userId, customerId } },
       data,
-      select: { id: true, customerId: true, role: true, isActive: true },
+      select: {
+        id: true,
+        customerId: true,
+        role: true,
+        isActive: true,
+        canRefreshModelOverride: true,
+      },
     });
   }
 
@@ -67,7 +105,13 @@ export class MembershipRepository {
       where: { userId, customer: { status: 'active' } },
       include: {
         customer: {
-          select: { id: true, code: true, name: true, status: true },
+          select: {
+            id: true,
+            code: true,
+            name: true,
+            status: true,
+            canRefreshModel: true,
+          },
         },
       },
       orderBy: { createdAt: 'asc' },

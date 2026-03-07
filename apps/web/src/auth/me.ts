@@ -10,6 +10,7 @@ export type MeResponse = {
   rawStatus?: string;
   memberships?: any[];
   isPlatformAdmin?: boolean;
+  canRefreshModel?: boolean;
 };
 
 type CacheState = {

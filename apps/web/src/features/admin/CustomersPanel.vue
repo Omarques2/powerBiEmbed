@@ -115,6 +115,24 @@
               </div>
             </div>
 
+            <div class="mt-4 rounded-xl border border-border p-3">
+              <div class="flex items-center justify-between gap-3">
+                <div>
+                  <div class="text-xs font-semibold text-foreground">Atualizar Modelo (padrão)</div>
+                  <div class="mt-1 text-[11px] text-muted-foreground">
+                    Usuários deste customer herdam esta permissão, salvo override individual.
+                  </div>
+                </div>
+                <PermSwitch
+                  :model-value="form.canRefreshModel"
+                  :disabled="modalSaving"
+                  on-label="ON"
+                  off-label="OFF"
+                  @toggle="form.canRefreshModel = !form.canRefreshModel"
+                />
+              </div>
+            </div>
+
             <div class="mt-4 flex items-center justify-end gap-2">
               <UiButton
                 type="button"
@@ -167,6 +185,24 @@
                         v-model="form.name"
                         class="mt-1 w-full"
                         :disabled="modalSaving"
+                      />
+                    </div>
+                  </div>
+
+                  <div class="mt-4 rounded-xl border border-border p-3">
+                    <div class="flex items-center justify-between gap-3">
+                      <div>
+                        <div class="text-xs font-semibold text-foreground">Atualizar Modelo (padrão)</div>
+                        <div class="mt-1 text-[11px] text-muted-foreground">
+                          Usuários deste customer herdam esta permissão, salvo override individual.
+                        </div>
+                      </div>
+                      <PermSwitch
+                        :model-value="form.canRefreshModel"
+                        :disabled="modalSaving"
+                        on-label="ON"
+                        off-label="OFF"
+                        @toggle="form.canRefreshModel = !form.canRefreshModel"
                       />
                     </div>
                   </div>
@@ -944,6 +980,7 @@ const modalTabs = [
 const form = reactive({
   code: "",
   name: "",
+  canRefreshModel: false,
 });
 
 const canSubmit = computed(() => {
@@ -956,6 +993,7 @@ function openCreate() {
   modalCustomer.value = null;
   form.code = "";
   form.name = "";
+  form.canRefreshModel = false;
   modalTab.value = "summary";
   previewReportRefId.value = "";
   resetPreviewTab();
@@ -968,6 +1006,7 @@ function openEdit(c: CustomerRow) {
   modalCustomer.value = c;
   form.code = c.code ?? "";
   form.name = c.name ?? "";
+  form.canRefreshModel = !!c.canRefreshModel;
   modalTab.value = "summary";
   previewReportRefId.value = "";
   resetPreviewTab();
@@ -1062,13 +1101,19 @@ async function saveCustomer() {
   const payload = {
     code: form.code.trim(),
     name: form.name.trim(),
+    canRefreshModel: !!form.canRefreshModel,
   };
 
   modalSaving.value = true;
 
   try {
     if (!modalCustomer.value) {
-      const created = await createCustomer({ code: payload.code, name: payload.name, status: "active" });
+      const created = await createCustomer({
+        code: payload.code,
+        name: payload.name,
+        status: "active",
+        canRefreshModel: payload.canRefreshModel,
+      });
       props.upsertCustomerLocal(created);
       modalCustomer.value = created;
       push({ kind: "success", title: "Customer criado", message: `${created.code} — ${created.name}` });
@@ -1078,22 +1123,48 @@ async function saveCustomer() {
     }
 
     const target = modalCustomer.value;
-    const prev = { code: target.code, name: target.name };
+    const prev = {
+      code: target.code,
+      name: target.name,
+      canRefreshModel: target.canRefreshModel,
+    };
 
     await mutate<typeof prev, { ok: boolean; customer: CustomerRow }>({
       key: target.id,
       busy,
       optimistic: () => {
-        props.patchCustomerLocal(target.id, { code: payload.code, name: payload.name });
-        modalCustomer.value = { ...target, code: payload.code, name: payload.name };
+        props.patchCustomerLocal(target.id, {
+          code: payload.code,
+          name: payload.name,
+          canRefreshModel: payload.canRefreshModel,
+        });
+        modalCustomer.value = {
+          ...target,
+          code: payload.code,
+          name: payload.name,
+          canRefreshModel: payload.canRefreshModel,
+        };
         return prev;
       },
       request: async () => {
-        return await updateCustomer(target.id, { code: payload.code, name: payload.name });
+        return await updateCustomer(target.id, {
+          code: payload.code,
+          name: payload.name,
+          canRefreshModel: payload.canRefreshModel,
+        });
       },
       rollback: (snap) => {
-        props.patchCustomerLocal(target.id, { code: snap.code, name: snap.name });
-        modalCustomer.value = { ...target, code: snap.code, name: snap.name };
+        props.patchCustomerLocal(target.id, {
+          code: snap.code,
+          name: snap.name,
+          canRefreshModel: snap.canRefreshModel,
+        });
+        modalCustomer.value = {
+          ...target,
+          code: snap.code,
+          name: snap.name,
+          canRefreshModel: snap.canRefreshModel,
+        };
       },
       onSuccess: (res) => {
         if (res?.customer) {

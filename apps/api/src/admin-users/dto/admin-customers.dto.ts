@@ -22,6 +22,11 @@ export class CreateCustomerDto {
   @IsOptional()
   @IsIn(CUSTOMER_STATUSES)
   status?: (typeof CUSTOMER_STATUSES)[number];
+
+  @IsOptional()
+  @Transform(toBoolean)
+  @IsBoolean()
+  canRefreshModel?: boolean;
 }
 
 export class UpdateCustomerDto {
@@ -34,6 +39,11 @@ export class UpdateCustomerDto {
   @IsString()
   @IsNotEmpty()
   name?: string;
+
+  @IsOptional()
+  @Transform(toBoolean)
+  @IsBoolean()
+  canRefreshModel?: boolean;
 }
 
 export class UpdateCustomerStatusDto {

@@ -256,6 +256,7 @@ export class AdminMembershipsService {
       grantCustomerWorkspaces?: boolean;
       revokeCustomerPermissions?: boolean;
       ensureUserActive?: boolean;
+      canRefreshModelOverride?: boolean | null;
     },
     actorSub: string | null,
   ) {
@@ -273,6 +274,12 @@ export class AdminMembershipsService {
       false,
     );
     const ensureUserActive = asBool(input.ensureUserActive, false);
+    const canRefreshModelOverride =
+      input.canRefreshModelOverride === undefined
+        ? undefined
+        : input.canRefreshModelOverride === null
+          ? null
+          : asBool(input.canRefreshModelOverride);
 
     const { user, customer } = await this.assertUserAndCustomer(
       userId,
@@ -297,6 +304,7 @@ export class AdminMembershipsService {
         customerId,
         role,
         isActive,
+        canRefreshModelOverride,
       );
 
       const granted = { wsGranted: 0, rpGranted: 0 };
@@ -335,6 +343,7 @@ export class AdminMembershipsService {
             customerId,
             role: membership.role,
             isActive: membership.isActive,
+            canRefreshModelOverride: membership.canRefreshModelOverride,
           },
           key: { userId, customerId },
           granted,
@@ -349,6 +358,7 @@ export class AdminMembershipsService {
           customerId,
           role: membership.role,
           isActive: membership.isActive,
+          canRefreshModelOverride: membership.canRefreshModelOverride,
         },
         granted,
         revoked,
@@ -364,6 +374,7 @@ export class AdminMembershipsService {
       isActive?: boolean;
       grantCustomerWorkspaces?: boolean;
       revokeCustomerPermissions?: boolean;
+      canRefreshModelOverride?: boolean | null;
     },
     actorSub: string | null,
   ) {
@@ -378,6 +389,12 @@ export class AdminMembershipsService {
 
     const isActive =
       input.isActive === undefined ? undefined : asBool(input.isActive);
+    const canRefreshModelOverride =
+      input.canRefreshModelOverride === undefined
+        ? undefined
+        : input.canRefreshModelOverride === null
+          ? null
+          : asBool(input.canRefreshModelOverride);
     const revokeCustomerPermissions = asBool(
       input.revokeCustomerPermissions,
       false,
@@ -403,6 +420,9 @@ export class AdminMembershipsService {
       const updated = await this.memberships.update(tx, userId, customerId, {
         role: nextRole,
         isActive: nextIsActive,
+        ...(canRefreshModelOverride === undefined
+          ? {}
+          : { canRefreshModelOverride }),
       });
 
       const granted = { wsGranted: 0, rpGranted: 0 };
@@ -446,6 +466,7 @@ export class AdminMembershipsService {
             customerId,
             role: updated.role,
             isActive: updated.isActive,
+            canRefreshModelOverride: updated.canRefreshModelOverride,
           },
           key: { userId, customerId },
           granted,
@@ -460,6 +481,7 @@ export class AdminMembershipsService {
           customerId,
           role: updated.role,
           isActive: updated.isActive,
+          canRefreshModelOverride: updated.canRefreshModelOverride,
         },
         granted,
         revoked,

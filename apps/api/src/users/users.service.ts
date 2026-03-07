@@ -168,6 +168,27 @@ export class UsersService {
     return Boolean(row);
   }
 
+  async canRefreshModel(userId: string): Promise<boolean> {
+    const memberships = await this.prisma.userCustomerMembership.findMany({
+      where: {
+        userId: userId,
+        isActive: true,
+        customer: { status: 'active' },
+      },
+      select: {
+        canRefreshModelOverride: true,
+        customer: { select: { canRefreshModel: true } },
+      },
+    });
+
+    return memberships.some((membership) => {
+      if (typeof membership.canRefreshModelOverride === 'boolean') {
+        return membership.canRefreshModelOverride;
+      }
+      return membership.customer.canRefreshModel;
+    });
+  }
+
   private async registerLoginAuditEventIfNeeded(
     userId: string,
     claims: Claims,

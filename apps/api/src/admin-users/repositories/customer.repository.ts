@@ -13,14 +13,26 @@ export class CustomerRepository {
   list() {
     return this.client().customer.findMany({
       orderBy: { createdAt: 'desc' },
-      select: { id: true, code: true, name: true, status: true },
+      select: {
+        id: true,
+        code: true,
+        name: true,
+        status: true,
+        canRefreshModel: true,
+      },
     });
   }
 
   findById(customerId: string) {
     return this.client().customer.findUnique({
       where: { id: customerId },
-      select: { id: true, status: true, code: true, name: true },
+      select: {
+        id: true,
+        status: true,
+        code: true,
+        name: true,
+        canRefreshModel: true,
+      },
     });
   }
 

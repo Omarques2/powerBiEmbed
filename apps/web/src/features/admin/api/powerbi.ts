@@ -46,7 +46,13 @@ export async function syncPowerBiCatalog(payload: {
 }
 
 export type CustomerCatalog = {
-  customer: { id: string; code: string; name: string; status: string };
+  customer: {
+    id: string;
+    code: string;
+    name: string;
+    status: string;
+    canRefreshModel?: boolean;
+  };
   workspaces: Array<{
     workspaceRefId: string;
     workspaceId: string;

@@ -11,7 +11,14 @@ export type UserPermissionsResponse = {
     customerId: string;
     role: MembershipRole;
     isActive: boolean;
-    customer: { id: string; code: string; name: string; status: string };
+    canRefreshModelOverride?: boolean | null;
+    customer: {
+      id: string;
+      code: string;
+      name: string;
+      status: string;
+      canRefreshModel?: boolean;
+    };
   }>;
   workspaces: Array<{
     workspaceRefId: string;

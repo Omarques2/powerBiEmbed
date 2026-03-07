@@ -93,6 +93,33 @@
             @toggle="toggleActive(row.customerId, row.isActive)"
           />
         </div>
+
+        <div class="mt-3">
+          <label class="text-[11px] font-medium text-slate-600 dark:text-slate-300">
+            Atualizar modelo
+          </label>
+          <div class="mt-1 flex items-center gap-2">
+            <select
+              class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs
+                     disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900"
+              :disabled="!!busy.map[row.customerId]"
+              :value="row.refreshMode"
+              @change="onChangeRefreshOverride(row.customerId, ($event.target as HTMLSelectElement).value)"
+            >
+              <option value="inherit">herdar customer</option>
+              <option value="allow">permitir usuário</option>
+              <option value="deny">revogar usuário</option>
+            </select>
+            <span
+              class="shrink-0 rounded-full border px-2 py-1 text-[10px] font-semibold"
+              :class="row.refreshEffective
+                ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/40 dark:text-emerald-200'
+                : 'border-slate-200 bg-slate-50 text-slate-500 dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-300'"
+            >
+              {{ row.refreshEffective ? "ON" : "OFF" }}
+            </span>
+          </div>
+        </div>
       </div>
 
       <div v-if="!membershipRows.length" class="rounded-2xl border border-dashed border-slate-200 p-4 text-center text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400">
@@ -107,6 +134,7 @@
             <th class="px-4 py-3">Customer</th>
             <th class="w-44 px-4 py-3">Role</th>
             <th class="w-36 px-4 py-3">Ativo</th>
+            <th class="w-56 px-4 py-3">Atualizar Modelo</th>
           </tr>
         </thead>
 
@@ -152,10 +180,34 @@
                 />
               </div>
             </td>
+
+            <td class="px-4 py-3">
+              <div class="flex items-center gap-2">
+                <select
+                  class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs
+                         disabled:opacity-60 dark:border-slate-800 dark:bg-slate-900"
+                  :disabled="!!busy.map[row.customerId]"
+                  :value="row.refreshMode"
+                  @change="onChangeRefreshOverride(row.customerId, ($event.target as HTMLSelectElement).value)"
+                >
+                  <option value="inherit">herdar customer</option>
+                  <option value="allow">permitir usuário</option>
+                  <option value="deny">revogar usuário</option>
+                </select>
+                <span
+                  class="shrink-0 rounded-full border px-2 py-1 text-[10px] font-semibold"
+                  :class="row.refreshEffective
+                    ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/40 dark:bg-emerald-950/40 dark:text-emerald-200'
+                    : 'border-slate-200 bg-slate-50 text-slate-500 dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-300'"
+                >
+                  {{ row.refreshEffective ? "ON" : "OFF" }}
+                </span>
+              </div>
+            </td>
           </tr>
 
           <tr v-if="!membershipRows.length">
-            <td colspan="3" class="px-4 py-6 text-center text-xs text-slate-500 dark:text-slate-400">
+            <td colspan="4" class="px-4 py-6 text-center text-xs text-slate-500 dark:text-slate-400">
               Nenhum customer encontrado.
             </td>
           </tr>
@@ -185,7 +237,14 @@ const props = defineProps<{
     customerId: string;
     role: MembershipRole;
     isActive: boolean;
-    customer?: { id: string; code: string; name: string; status: string };
+    canRefreshModelOverride?: boolean | null;
+    customer?: {
+      id: string;
+      code: string;
+      name: string;
+      status: string;
+      canRefreshModel?: boolean;
+    };
   }>;
   embedded?: boolean;
 }>();
@@ -201,11 +260,20 @@ const busy = useBusyMap();
 const { mutate } = useOptimisticMutation();
 
 type PatchMembershipResult = Awaited<ReturnType<typeof patchUserMembership>>;
+type RefreshOverrideMode = "inherit" | "allow" | "deny";
 
 const error = ref<string>("");
 
 // customers
-const customers = ref<Array<{ id: string; code: string; name: string; status: string }>>([]);
+const customers = ref<
+  Array<{
+    id: string;
+    code: string;
+    name: string;
+    status: string;
+    canRefreshModel?: boolean;
+  }>
+>([]);
 const loadingCustomers = ref(false);
 async function refreshCustomers() {
   loadingCustomers.value = true;
@@ -225,22 +293,52 @@ onMounted(() => refreshCustomers());
 
 // helpers
 const roleOverrides = ref<Record<string, MembershipRole>>({});
+const refreshOverrideDrafts = ref<Record<string, RefreshOverrideMode>>({});
+
+function toRefreshOverrideMode(
+  value: boolean | null | undefined,
+): RefreshOverrideMode {
+  if (value === true) return "allow";
+  if (value === false) return "deny";
+  return "inherit";
+}
+
+function fromRefreshOverrideMode(mode: RefreshOverrideMode): boolean | null {
+  if (mode === "allow") return true;
+  if (mode === "deny") return false;
+  return null;
+}
 
 const membershipRows = computed(() =>
   customers.value.map((c) => {
     const m = props.memberships.find((x) => x.customerId === c.id);
     const role = m?.role ?? roleOverrides.value[c.id] ?? "viewer";
+    const refreshMode = m
+      ? toRefreshOverrideMode(m.canRefreshModelOverride ?? null)
+      : (refreshOverrideDrafts.value[c.id] ?? "inherit");
+    const refreshOverride = fromRefreshOverrideMode(refreshMode);
+    const refreshEffective =
+      refreshOverride === null ? !!c.canRefreshModel : refreshOverride;
     return {
       customerId: c.id,
       customer: c,
       membership: m ?? null,
       role,
       isActive: m?.isActive ?? false,
+      refreshMode,
+      refreshEffective,
     };
   }),
 );
 
-function updateMembership(customerId: string, patch: Partial<{ role: MembershipRole; isActive: boolean }>) {
+function updateMembership(
+  customerId: string,
+  patch: Partial<{
+    role: MembershipRole;
+    isActive: boolean;
+    canRefreshModelOverride: boolean | null;
+  }>,
+) {
   const next = props.memberships.map((m) => (m.customerId === customerId ? { ...m, ...patch } : m));
   emit("update:memberships", next);
   emit("changed");
@@ -248,9 +346,16 @@ function updateMembership(customerId: string, patch: Partial<{ role: MembershipR
 
 function addMembership(customerId: string, role: MembershipRole) {
   const c = customers.value.find((x) => x.id === customerId);
+  const overrideMode = refreshOverrideDrafts.value[customerId] ?? "inherit";
   const next = [
     ...props.memberships,
-    { customerId, role, isActive: true, customer: c },
+    {
+      customerId,
+      role,
+      isActive: true,
+      canRefreshModelOverride: fromRefreshOverrideMode(overrideMode),
+      customer: c,
+    },
   ];
   emit("update:memberships", next);
   emit("changed");
@@ -304,6 +409,9 @@ async function onToggleActive(customerId: string, isActive: boolean) {
           grantCustomerWorkspaces: true,
           revokeCustomerPermissions: false,
           ensureUserActive: true,
+          canRefreshModelOverride: fromRefreshOverrideMode(
+            refreshOverrideDrafts.value[customerId] ?? "inherit",
+          ),
         }),
       rollback: () => null,
       toast: {
@@ -355,6 +463,42 @@ async function toggleActive(customerId: string, current: boolean) {
     if (!ok) return;
   }
   onToggleActive(customerId, next);
+}
+
+async function onChangeRefreshOverride(customerId: string, mode: string) {
+  const nextMode = mode as RefreshOverrideMode;
+  const current = getMembership(customerId);
+  if (!current) {
+    refreshOverrideDrafts.value = {
+      ...refreshOverrideDrafts.value,
+      [customerId]: nextMode,
+    };
+    return;
+  }
+
+  const nextOverride = fromRefreshOverrideMode(nextMode);
+  await mutate<{ prev: boolean | null | undefined }, PatchMembershipResult>({
+    key: `${customerId}:refresh`,
+    busy,
+    optimistic: () => {
+      updateMembership(customerId, { canRefreshModelOverride: nextOverride });
+      return { prev: current.canRefreshModelOverride };
+    },
+    request: () =>
+      patchUserMembership(props.userId, customerId, {
+        canRefreshModelOverride: nextOverride,
+      }),
+    rollback: (snapshot) => {
+      updateMembership(customerId, {
+        canRefreshModelOverride:
+          snapshot.prev === undefined ? null : snapshot.prev,
+      });
+    },
+    toast: {
+      success: { title: "Permissão de atualização salva" },
+      error: { title: "Falha ao salvar permissão de atualização" },
+    },
+  });
 }
 
 function effectiveAccessRow(row: { isActive: boolean; customer: { status: string } }) {

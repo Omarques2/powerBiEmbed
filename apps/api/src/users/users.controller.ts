@@ -45,6 +45,7 @@ export class UsersController {
     // Opcional: carregar memberships (para informar o usuário)
     const memberships = await this.usersService.listActiveMemberships(user.id);
     const isPlatformAdmin = await this.usersService.isPlatformAdmin(user.id);
+    const canRefreshModel = await this.usersService.canRefreshModel(user.id);
 
     const hasCustomer = memberships.length > 0;
     const globallyDisabled = claims.globalStatus === 'disabled';
@@ -64,10 +65,13 @@ export class UsersController {
       status: effectiveStatus,
       rawStatus: user.status, // útil para debug
       isPlatformAdmin,
+      canRefreshModel,
       memberships: memberships.map((m) => ({
         customerId: m.customerId,
         role: m.role,
         isActive: m.isActive,
+        canRefreshModelOverride: m.canRefreshModelOverride ?? null,
+        customerCanRefreshModel: m.customer.canRefreshModel,
       })),
     };
   }

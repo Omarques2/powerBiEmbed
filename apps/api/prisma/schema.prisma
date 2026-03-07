@@ -51,6 +51,7 @@ model Customer {
   code         String                    @unique
   name         String
   status       String                    @default("active")
+  canRefreshModel Boolean                @default(false) @map("can_refresh_model")
   createdAt    DateTime                  @default(now()) @map("created_at") @db.Timestamptz(6)
   workspaceLinks BiCustomerWorkspace[]
   reportPermissions BiCustomerReportPermission[]
@@ -69,6 +70,7 @@ model UserCustomerMembership {
   customerId String         @map("customer_id") @db.Uuid
   role       MembershipRole @default(viewer)
   isActive   Boolean        @default(true) @map("is_active")
+  canRefreshModelOverride Boolean? @map("can_refresh_model_override")
   createdAt  DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
   customer   Customer       @relation(fields: [customerId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   user       User           @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)

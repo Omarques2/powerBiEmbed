@@ -206,7 +206,7 @@
                   </UiButton>
 
                   <UiButton
-                    v-if="isAdmin"
+                    v-if="canRefreshModelButton"
                     variant="outline"
                     size="sm"
                     class="h-9 w-9"
@@ -482,6 +482,7 @@ type MeResponse = {
   rawStatus?: string;
   memberships?: any[];
   isPlatformAdmin?: boolean;
+  canRefreshModel?: boolean;
 };
 
 const router = useRouter();
@@ -490,6 +491,8 @@ const { confirm } = useConfirm();
 
 const me = ref<MeResponse | null>(null);
 const isAdmin = ref(false);
+const canRefreshModelGlobal = ref(false);
+const canRefreshModelCurrent = ref<boolean | null>(null);
 
 const drawerOpen = ref(false);
 const sidebarOpen = ref(true);
@@ -535,6 +538,11 @@ const refreshingModel = computed(() => {
     tracker.workspaceId === selectedWorkspaceId.value &&
     tracker.reportId === selectedReport.value.id
   );
+});
+const canRefreshModelButton = computed(() => {
+  if (!selectedReport.value) return canRefreshModelGlobal.value;
+  if (canRefreshModelCurrent.value === null) return canRefreshModelGlobal.value;
+  return canRefreshModelCurrent.value;
 });
 
 
@@ -1449,6 +1457,7 @@ async function loadAllReports(workspaceList: Workspace[]) {
       );
       if (!keep) {
         selectedReport.value = null;
+        canRefreshModelCurrent.value = null;
         resetEmbed();
       }
     }
@@ -1475,6 +1484,7 @@ async function openReport(r: Report) {
   embedError.value = "";
   embedErrorLocked.value = false;
   selectedReport.value = r;
+  canRefreshModelCurrent.value = null;
   loadingEmbed.value = true;
   reportReady.value = false;
   noPagesAvailable.value = false;
@@ -1490,6 +1500,7 @@ async function openReport(r: Report) {
         workspaces.value.find((w) => (w.workspaceId ?? w.id) === workspaceId) ?? null;
     }
     expandedWorkspaceId.value = workspaceId;
+    const refreshPermissionPromise = loadRefreshPermission(workspaceId, r.id);
 
     loadingPages.value = true;
     allowedPagesError.value = "";
@@ -1513,6 +1524,8 @@ async function openReport(r: Report) {
     } finally {
       loadingPages.value = false;
     }
+
+    await refreshPermissionPromise;
 
     const cfgRes = await http.get("/powerbi/embed-config", {
       params: { workspaceId, reportId: r.id },
@@ -1610,6 +1623,24 @@ async function openReport(r: Report) {
     }
     loadingEmbed.value = false;
     reportReady.value = false;
+    canRefreshModelCurrent.value = false;
+  }
+}
+
+async function loadRefreshPermission(
+  workspaceId: string,
+  reportId: string,
+): Promise<void> {
+  try {
+    const res = await http.get("/powerbi/refresh/permission", {
+      params: { workspaceId, reportId },
+    });
+    const payload = unwrapData(
+      res.data as ApiEnvelope<{ canRefreshModel: boolean }>,
+    );
+    canRefreshModelCurrent.value = !!payload?.canRefreshModel;
+  } catch {
+    canRefreshModelCurrent.value = false;
   }
 }
 
@@ -1640,6 +1671,7 @@ function onPagesWheel(e: WheelEvent) {
 
 async function refreshModel() {
   if (!selectedReport.value || !selectedWorkspaceId.value) return;
+  if (!canRefreshModelButton.value) return;
   if (refreshingModel.value || refreshPollInFlight.value) return;
 
   const approved = await confirm({
@@ -1702,8 +1734,10 @@ async function loadMe() {
     const res = await http.get("/users/me");
     me.value = unwrapData(res.data as ApiEnvelope<MeResponse>);
     isAdmin.value = !!me.value?.isPlatformAdmin;
+    canRefreshModelGlobal.value = !!me.value?.canRefreshModel;
   } catch {
     me.value = null;
+    canRefreshModelGlobal.value = false;
   }
 }
 

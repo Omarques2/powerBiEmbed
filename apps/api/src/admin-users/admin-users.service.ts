@@ -90,6 +90,7 @@ export class AdminUsersService {
       grantCustomerWorkspaces?: boolean;
       revokeCustomerPermissions?: boolean;
       ensureUserActive?: boolean;
+      canRefreshModelOverride?: boolean | null;
     },
     actorSub: string | null,
   ) {
@@ -104,6 +105,7 @@ export class AdminUsersService {
       isActive?: boolean;
       grantCustomerWorkspaces?: boolean;
       revokeCustomerPermissions?: boolean;
+      canRefreshModelOverride?: boolean | null;
     },
     actorSub: string | null,
   ) {
@@ -150,7 +152,12 @@ export class AdminUsersService {
   }
 
   createCustomer(
-    input: { code: string; name: string; status?: string },
+    input: {
+      code: string;
+      name: string;
+      status?: string;
+      canRefreshModel?: boolean;
+    },
     actorSub: string | null,
   ) {
     return this.customers.createCustomer(input, actorSub);
@@ -158,7 +165,12 @@ export class AdminUsersService {
 
   updateCustomer(
     customerId: string,
-    input: { code?: string; name?: string; status?: string },
+    input: {
+      code?: string;
+      name?: string;
+      status?: string;
+      canRefreshModel?: boolean;
+    },
     actorSub: string | null,
   ) {
     return this.customers.updateCustomer(customerId, input, actorSub);

@@ -7,6 +7,7 @@ export type CustomerRow = {
   code: string;
   name: string;
   status: string;
+  canRefreshModel: boolean;
   createdAt: string;
 };
 
@@ -14,11 +15,13 @@ export type CreateCustomerPayload = {
   code: string;
   name: string;
   status?: "active" | "inactive";
+  canRefreshModel?: boolean;
 };
 
 export type UpdateCustomerPayload = {
   code?: string;
   name?: string;
+  canRefreshModel?: boolean;
 };
 
 export async function listCustomers() {

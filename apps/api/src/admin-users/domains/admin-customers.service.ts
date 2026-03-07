@@ -136,7 +136,12 @@ export class AdminCustomersService {
   }
 
   async createCustomer(
-    input: { code: string; name: string; status?: string },
+    input: {
+      code: string;
+      name: string;
+      status?: string;
+      canRefreshModel?: boolean;
+    },
     actorSub: string | null,
   ) {
     const code = normalizeCustomerCode(input.code ?? '');
@@ -157,6 +162,7 @@ export class AdminCustomersService {
           code,
           name,
           status,
+          canRefreshModel: input.canRefreshModel ?? false,
         });
 
         await this.audit.create(tx, {
@@ -169,6 +175,7 @@ export class AdminCustomersService {
             code: row.code,
             name: row.name,
             status: row.status,
+            canRefreshModel: row.canRefreshModel,
           },
         });
 
@@ -180,6 +187,7 @@ export class AdminCustomersService {
         code: created.code,
         name: created.name,
         status: created.status,
+        canRefreshModel: created.canRefreshModel,
       };
     } catch (err) {
       if (isUniqueConstraintError(err)) {
@@ -191,7 +199,12 @@ export class AdminCustomersService {
 
   async updateCustomer(
     customerId: string,
-    input: { code?: string; name?: string; status?: string },
+    input: {
+      code?: string;
+      name?: string;
+      status?: string;
+      canRefreshModel?: boolean;
+    },
     actorSub: string | null,
   ) {
     if (!isUuid(customerId))
@@ -200,7 +213,12 @@ export class AdminCustomersService {
     const current = await this.customers.findById(customerId);
     if (!current) throw new NotFoundException('Customer not found');
 
-    const patch: { code?: string; name?: string; status?: string } = {};
+    const patch: {
+      code?: string;
+      name?: string;
+      status?: string;
+      canRefreshModel?: boolean;
+    } = {};
     if (input.code !== undefined) {
       const code = normalizeCustomerCode(input.code);
       validateCustomerCode(code);
@@ -216,6 +234,9 @@ export class AdminCustomersService {
         throw new BadRequestException('Invalid status');
       }
       patch.status = input.status;
+    }
+    if (input.canRefreshModel !== undefined) {
+      patch.canRefreshModel = Boolean(input.canRefreshModel);
     }
 
     const actorUserId = await this.actors.resolveActorUserId(actorSub);
@@ -235,6 +256,7 @@ export class AdminCustomersService {
             code: row.code,
             name: row.name,
             status: row.status,
+            canRefreshModel: row.canRefreshModel,
           },
         });
 
@@ -248,6 +270,7 @@ export class AdminCustomersService {
           code: updated.code,
           name: updated.name,
           status: updated.status,
+          canRefreshModel: updated.canRefreshModel,
         },
       };
     } catch (err) {

@@ -31,7 +31,12 @@ export class AdminCustomersController {
   create(@Req() req: AuthedRequest, @Body() body: CreateCustomerDto) {
     const actorSub = req.user?.sub ? String(req.user.sub) : null;
     return this.svc.createCustomer(
-      { code: body.code, name: body.name, status: body.status },
+      {
+        code: body.code,
+        name: body.name,
+        status: body.status,
+        canRefreshModel: body.canRefreshModel,
+      },
       actorSub,
     );
   }
@@ -45,7 +50,11 @@ export class AdminCustomersController {
     const actorSub = req.user?.sub ? String(req.user.sub) : null;
     return this.svc.updateCustomer(
       customerId,
-      { code: body.code, name: body.name },
+      {
+        code: body.code,
+        name: body.name,
+        canRefreshModel: body.canRefreshModel,
+      },
       actorSub,
     );
   }

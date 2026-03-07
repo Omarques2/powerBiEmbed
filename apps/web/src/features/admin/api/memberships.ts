@@ -11,12 +11,18 @@ export async function upsertUserMembership(userId: string, payload: {
   grantCustomerWorkspaces?: boolean;
   revokeCustomerPermissions?: boolean;
   ensureUserActive?: boolean;
+  canRefreshModelOverride?: boolean | null;
 }) {
   const res = await http.post(`/admin/users/${userId}/memberships`, payload);
   return unwrapData(
     res.data as ApiEnvelope<{
       ok: boolean;
-      membership: { customerId: string; role: MembershipRole; isActive: boolean };
+      membership: {
+        customerId: string;
+        role: MembershipRole;
+        isActive: boolean;
+        canRefreshModelOverride?: boolean | null;
+      };
       granted?: { wsGranted: number; rpGranted: number };
       revoked?: { wsRevoked: number; rpRevoked: number };
     }>,
@@ -28,12 +34,18 @@ export async function patchUserMembership(userId: string, customerId: string, pa
   isActive?: boolean;
   grantCustomerWorkspaces?: boolean;
   revokeCustomerPermissions?: boolean;
+  canRefreshModelOverride?: boolean | null;
 }) {
   const res = await http.patch(`/admin/users/${userId}/memberships/${customerId}`, payload);
   return unwrapData(
     res.data as ApiEnvelope<{
       ok: boolean;
-      membership: { customerId: string; role: MembershipRole; isActive: boolean };
+      membership: {
+        customerId: string;
+        role: MembershipRole;
+        isActive: boolean;
+        canRefreshModelOverride?: boolean | null;
+      };
       granted?: { wsGranted: number; rpGranted: number };
       revoked?: { wsRevoked: number; rpRevoked: number };
     }>,

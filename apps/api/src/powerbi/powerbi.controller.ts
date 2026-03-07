@@ -199,6 +199,22 @@ export class PowerBiController {
   }
 
   @UseGuards(AuthGuard, ActiveUserGuard)
+  @Get('refresh/permission')
+  async refreshPermission(
+    @Req() req: AuthedRequest,
+    @Query() query: RefreshStatusQueryDto,
+  ) {
+    if (!req.user) throw new BadRequestException('Missing user claims');
+    const user = await this.usersService.upsertFromClaims(req.user);
+    const access = await this.biAuthz.canRefreshModelForReport(
+      user.id,
+      query.workspaceId,
+      query.reportId,
+    );
+    return { canRefreshModel: access.canRefreshModel };
+  }
+
+  @UseGuards(AuthGuard, ActiveUserGuard)
   @Post('refresh')
   @HttpCode(200)
   async refreshReport(
@@ -214,11 +230,15 @@ export class PowerBiController {
 
     if (!req.user) throw new BadRequestException('Missing user claims');
     const user = await this.usersService.upsertFromClaims(req.user);
-    const access = await this.biAuthz.resolveReportAccess(
+    const access = await this.biAuthz.canRefreshModelForReport(
       user.id,
       workspaceId,
       reportId,
     );
+
+    if (!access.canRefreshModel) {
+      throw new ForbiddenException('No permission to refresh model');
+    }
 
     if (!access.datasetId) {
       throw new BadRequestException('Report sem datasetId');
@@ -240,11 +260,15 @@ export class PowerBiController {
   ) {
     if (!req.user) throw new BadRequestException('Missing user claims');
     const user = await this.usersService.upsertFromClaims(req.user);
-    const access = await this.biAuthz.resolveReportAccess(
+    const access = await this.biAuthz.canRefreshModelForReport(
       user.id,
       query.workspaceId,
       query.reportId,
     );
+
+    if (!access.canRefreshModel) {
+      throw new ForbiddenException('No permission to refresh model');
+    }
 
     if (!access.datasetId) {
       throw new BadRequestException('Report sem datasetId');

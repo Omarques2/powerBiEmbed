@@ -6,6 +6,7 @@ type PrismaMock = {
   biPageGroup: { findMany: jest.Mock };
   biCustomerPageAllowlist: { findMany: jest.Mock };
   biUserPageAllowlist: { findMany: jest.Mock };
+  userCustomerMembership: { findFirst: jest.Mock };
 };
 
 const basePages = [
@@ -20,6 +21,7 @@ function createService() {
     biPageGroup: { findMany: jest.fn() },
     biCustomerPageAllowlist: { findMany: jest.fn() },
     biUserPageAllowlist: { findMany: jest.fn() },
+    userCustomerMembership: { findFirst: jest.fn() },
   };
   const service = new BiAuthzService(prisma as any);
   return { prisma, service };
@@ -185,5 +187,43 @@ describe('BiAuthzService.resolveAllowedPagesForAccess', () => {
         reportRefId: 'r1',
       }),
     ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+});
+
+describe('BiAuthzService.canRefreshModelForCustomer', () => {
+  it('inherits allow from customer when membership override is null', async () => {
+    const { prisma, service } = createService();
+    prisma.userCustomerMembership.findFirst.mockResolvedValue({
+      canRefreshModelOverride: null,
+      customer: { canRefreshModel: true },
+    });
+
+    await expect(
+      service.canRefreshModelForCustomer('u1', 'c1'),
+    ).resolves.toBe(true);
+  });
+
+  it('allows user override true when customer default is false', async () => {
+    const { prisma, service } = createService();
+    prisma.userCustomerMembership.findFirst.mockResolvedValue({
+      canRefreshModelOverride: true,
+      customer: { canRefreshModel: false },
+    });
+
+    await expect(
+      service.canRefreshModelForCustomer('u1', 'c1'),
+    ).resolves.toBe(true);
+  });
+
+  it('denies user override false when customer default is true', async () => {
+    const { prisma, service } = createService();
+    prisma.userCustomerMembership.findFirst.mockResolvedValue({
+      canRefreshModelOverride: false,
+      customer: { canRefreshModel: true },
+    });
+
+    await expect(
+      service.canRefreshModelForCustomer('u1', 'c1'),
+    ).resolves.toBe(false);
   });
 });

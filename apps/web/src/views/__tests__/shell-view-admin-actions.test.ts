@@ -67,9 +67,10 @@ vi.mock("@/auth/auth", () => ({
 
 type MountOptions = {
   isPlatformAdmin: boolean;
+  canRefreshModel: boolean;
 };
 
-async function mountShellView({ isPlatformAdmin }: MountOptions) {
+async function mountShellView({ isPlatformAdmin, canRefreshModel }: MountOptions) {
   httpGetMock.mockImplementation((url: string) => {
     if (url === "/users/me") {
       return Promise.resolve({
@@ -79,6 +80,7 @@ async function mountShellView({ isPlatformAdmin }: MountOptions) {
             displayName: "User",
             status: "active",
             isPlatformAdmin,
+            canRefreshModel,
           },
         },
       });
@@ -115,12 +117,18 @@ describe("ShellView admin actions", () => {
   });
 
   it("shows model refresh action for platform admin", async () => {
-    const wrapper = await mountShellView({ isPlatformAdmin: true });
+    const wrapper = await mountShellView({
+      isPlatformAdmin: false,
+      canRefreshModel: true,
+    });
     expect(wrapper.find('[aria-label="Atualizar modelo"]').exists()).toBe(true);
   });
 
   it("hides model refresh action for non-admin", async () => {
-    const wrapper = await mountShellView({ isPlatformAdmin: false });
+    const wrapper = await mountShellView({
+      isPlatformAdmin: true,
+      canRefreshModel: false,
+    });
     expect(wrapper.find('[aria-label="Atualizar modelo"]').exists()).toBe(false);
   });
 });

@@ -359,7 +359,13 @@ export class PowerBiCatalogSyncService {
 
     const customer = await this.prisma.customer.findUnique({
       where: { id: customerId },
-      select: { id: true, status: true, code: true, name: true },
+      select: {
+        id: true,
+        status: true,
+        code: true,
+        name: true,
+        canRefreshModel: true,
+      },
     });
     if (!customer) throw new NotFoundException('Customer not found');
 

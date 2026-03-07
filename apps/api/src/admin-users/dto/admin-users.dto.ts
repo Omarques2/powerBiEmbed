@@ -53,6 +53,10 @@ export class UpsertMembershipDto {
   @Transform(toBoolean)
   @IsBoolean()
   ensureUserActive?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  canRefreshModelOverride?: boolean | null;
 }
 
 export class PatchMembershipDto {
@@ -74,6 +78,10 @@ export class PatchMembershipDto {
   @Transform(toBoolean)
   @IsBoolean()
   revokeCustomerPermissions?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  canRefreshModelOverride?: boolean | null;
 }
 
 export class TransferMembershipDto {
